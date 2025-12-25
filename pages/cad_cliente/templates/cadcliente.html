@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Cadastro{% endblock %}
+
+{% block content %}
+
+<ul class="nav nav-tabs" id="cadastroTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active"
+                id="cadastro-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#cadastro"
+                type="button"
+                role="tab">
+            CADASTRO
+        </button>
+    </li>
+
+    <li class="nav-item" role="presentation">
+        <button class="nav-link"
+                id="observacao-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#observacao"
+                type="button"
+                role="tab">
+            OBSERVAÇÃO
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content border border-top-0 p-1" id="cadastroTabsContent">
+    <div class="tab-pane fade show active" id="cadastro" role="tabpanel">
+        <div class="container my-4">
+            <form id="cadForm" novalidate>
+
+                <div class="row g-3">
+
+                <!-- Grupo -->
+                <div class="col-md-4">
+                    <label for="grupo" class="form-label">Grupo *</label>
+                    <select
+                    id="grupo"
+                    name="grupo"
+                    class="form-select"
+                    required
+                    >
+                    <option value="">Selecione</option>
+                    <option value="A">Grupo A</option>
+                    <option value="B">Grupo B</option>
+                    <option value="C">Grupo C</option>
+                    </select>
+                </div>
+
+                <!-- Nome -->
+                <div class="col-md-8">
+                    <label for="nome" class="form-label">Nome *</label>
+                    <input
+                    type="text"
+                    id="nome"
+                    name="nome"
+                    class="form-control smart-input"
+                    data-textCase="upper"
+                    maxlength="100"
+                    required
+                    >
+                </div>
+
+                <!-- Logradouro -->
+                <div class="col-md-12">
+                    <label for="logradouro" class="form-label">Logradouro</label>
+                    <div class="input-group">
+                        <select
+                        id="logradouro"
+                        name="logradouro"
+                        class="form-select"
+                        style="max-width: 160px"
+                        >
+                        <option value="">Selecione</option>
+                        <option value="Rua">Rua</option>
+                        <option value="Avenida">Avenida</option>
+                        <option value="Travessa">Travessa</option>
+                        <option value="Alameda">Alameda</option>
+                        </select>
+
+                        <input
+                        type="text"
+                        id="endereco"
+                        name="endereco"
+                        class="form-control smart-input"
+                        maxlength="150"
+                        >
+                    </div>
+                </div>
+
+                <!-- Número -->
+                <div class="col-md-3">
+                    <label for="numero" class="form-label">Número</label>
+                    <input
+                    type="text"
+                    id="numero"
+                    name="numero"
+                    class="form-control smart-input"
+                    maxlength="10"
+                    >
+                </div>
+
+                <!-- Complemento -->
+                <div class="col-md-3">
+                    <label for="complemento" class="form-label">Complemento</label>
+                    <input
+                    type="text"
+                    id="complemento"
+                    name="complemento"
+                    class="form-control smart-input"
+                    maxlength="50"
+                    >
+                </div>
+
+                <!-- Bairro -->
+                <div class="col-md-6">
+                    <label for="bairro" class="form-label">Bairro</label>
+                    <input
+                    type="text"
+                    id="bairro"
+                    name="bairro"
+                    class="form-control smart-input"
+                    maxlength="60"
+                    >
+                </div>
+
+                <!-- País -->
+                <div class="col-md-4">
+                    <label for="pais" class="form-label">País *</label>
+                    <select
+                    id="pais"
+                    name="pais"
+                    class="form-select"
+                    data-hierarchy="Paises"
+                    data-hierarchy-root
+                    required
+                    >
+                     <option value="">Selecione</option>
+                    </select>
+                </div>
+
+                <!-- UF -->
+                <div class="col-md-3">
+                    <label for="uf" class="form-label">UF *</label>
+                    <select
+                    id="uf"
+                    name="uf"
+                    class="form-select"
+                    data-hierarchy="Paises"
+                    data-select-depends="pais"
+                    required
+                    disabled
+                    >
+                     <option value="">Selecione</option>
+                    </select>
+                </div>
+
+                <!-- Cidade -->
+                <div class="col-md-5">
+                    <label for="cidade" class="form-label">Cidade *</label>
+                    <select
+                    id="cidade"
+                    name="cidade"
+                    class="form-select"
+                    data-hierarchy="Paises"
+                    data-select-depends="pais,uf"
+                    required
+                    disabled
+                    >
+                     <option value="">Selecione</option>
+                    </select>
+                </div>
+
+                <!-- Código Postal -->
+                <div class="col-md-4">
+                    <label for="codpostal" class="form-label">Código Postal</label>
+                    <input
+                    type="text"
+                    id="codpostal"
+                    name="codpostal"
+                    class="form-control smart-input"
+                    data-mask="pt-postcode"
+                    data-allow="0-9"
+                    maxlength="8"
+                    >
+                </div>
+
+                <!-- Botão -->
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+
+                </div>
+            </form>
+            <button id="teste" class="btn btn-primary">TESTE</button>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="observacao" role="tabpanel">
+        <p>Conteúdo da observação.</p>
+    </div>
+</div>
+
+{% endblock %}
