@@ -12,10 +12,12 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import os
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+URL_BD = os.environ.get('BANCO_DE_DADOS')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -39,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'pages.cad_cliente',
+    'pages.cad_grupo_cli',
 ]
 
 MIDDLEWARE = [
@@ -73,12 +76,15 @@ WSGI_APPLICATION = 'sac_base.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+if not URL_BD:
+    raise RuntimeError('Variável de ambiente BANCO_DE_DADOS não definida')
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=URL_BD,
+        conn_max_age=60,
+        ssl_require=True
+    )
 }
 
 

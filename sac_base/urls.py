@@ -6,6 +6,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('painel_adm/', admin.site.urls),
     path('app/cad/', include('pages.cad_cliente.urls')),
+    path('app/cad/', include('pages.cad_grupo_cli.urls')),
 ]
 
 if settings.DEBUG:
