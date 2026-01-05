@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Cadastro de Grupo de Clientes{% endblock %}
+
+{% block estilo %}<link rel="stylesheet" href="{% static 'usuario/css/styles.css' %}">{% endblock %}
+
+{% block content %}
+
+<form id="loginForm">
+  {% csrf_token %}
+  <input
+    name="username"
+    class="smart-input"
+    placeholder="Usuário"
+    required
+  >
+
+  <input
+    type="password"
+    name="password"
+    placeholder="Senha"
+    required
+  >
+
+  <button type="submit">Entrar</button>
+</form>
+<button id="teste" type="button" class="btn btn-primary">TESTE</button>
+
+{% block scripts %}
+  {{ sisVar|json_script:"sisDados" }}
+  <script type="module" src="{% static 'usuario/js/scripts.js' %}"></script>
+{% endblock %}
+
+{% endblock %}

@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 from pathlib import Path
 import os
 import dj_database_url
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -40,8 +41,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework', # Necessário para o app de usuário/autenticação
+    'rest_framework_simplejwt', # Necessário para o app de usuário/autenticação
     'pages.cad_cliente',
     'pages.cad_grupo_cli',
+    'pages.usuario',
 ]
 
 MIDDLEWARE = [
@@ -50,9 +54,23 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'pages.usuario.middleware.JWTAuthMiddleware', # Necessário para o app de usuário/autenticação
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+REST_FRAMEWORK = {# Necessário para o app de usuário/autenticação
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
+
+SIMPLE_JWT = {# Necessário para o app de usuário/autenticação
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': False,
+}
 
 ROOT_URLCONF = 'sac_base.urls'
 
@@ -72,6 +90,8 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'sac_base.wsgi.application'
+
+AUTH_USER_MODEL = "usuario.Usuarios" # Necessário para o app de usuário/autenticação
 
 
 # Database

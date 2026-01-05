@@ -7,6 +7,7 @@ urlpatterns = [
     path('painel_adm/', admin.site.urls),
     path('app/cad/', include('pages.cad_cliente.urls')),
     path('app/cad/', include('pages.cad_grupo_cli.urls')),
+    path('app/', include('pages.usuario.urls')),
 ]
 
 if settings.DEBUG:

@@ -1,0 +1,111 @@
+### script.js
+
+import { updateFormField, getForm, getDataBackEnd } from "/static/js/sisVar.js";
+import { criarAtualizadorForm } from "/static/js/refresh_varSis.js";
+
+const form = document.getElementById("loginForm");
+getDataBackEnd();
+
+const updater = criarAtualizadorForm({
+  formId: "loginForm",
+  setter: updateFormField,
+  form
+});
+
+form.addEventListener("input", updater);
+
+form.addEventListener("submit", async e => {
+  e.preventDefault();
+
+  const sisVarPayload = {
+    form: {
+      loginForm: getForm('loginForm')
+    }
+  };
+
+  const res = await fetch("/app/usuario/login/", {
+    method: "POST",
+    body: JSON.stringify(sisVarPayload)
+  });
+
+});
+
+### views.py
+
+from django.contrib.auth import authenticate, get_user_model
+from django.shortcuts import render, redirect
+from .tokens import CustomRefreshToken
+
+User = get_user_model()
+
+def login_view(request):
+    schema = {
+        'username': {'type': 'string', 'maxlength': 50, 'required': True},
+        'password': {'type': 'password', 'required': True}
+    }
+        
+    if request.method == "GET":
+        return render(request, "login.html", {"sisVar": {'schema': schema}})
+
+    username = request.POST.get("username")
+    password = request.POST.get("password")
+
+    user = authenticate(username=username, password=password)
+    if not user:
+        return render(request, "login.html", {"erro": "Credenciais inválidas"})
+
+    refresh = CustomRefreshToken.for_user(user)
+
+    response = redirect("/home/")
+    response.set_cookie(
+        "access_token",
+        str(refresh.access_token),
+        httponly=True,
+        samesite="Lax"
+    )
+    response.set_cookie(
+        "refresh_token",
+        str(refresh),
+        httponly=True,
+        samesite="Lax",
+        max_age=60 * 60 * 24 * 7
+    )
+
+    return response
+  
+### login.html
+
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Cadastro de Grupo de Clientes{% endblock %}
+
+{% block estilo %}<link rel="stylesheet" href="{% static 'usuario/css/styles.css' %}">{% endblock %}
+
+{% block content %}
+
+<form id="loginForm">
+  {% csrf_token %}
+  <input
+    name="username"
+    class="smart-input"
+    placeholder="Usuário"
+    required
+  >
+
+  <input
+    type="password"
+    name="password"
+    placeholder="Senha"
+    required
+  >
+
+  <button type="submit">Entrar</button>
+</form>
+
+{% block scripts %}
+  {{ sisVar|json_script:"sisDados" }}
+  <script type="module" src="{% static 'usuario/js/scripts.js' %}"></script>
+{% endblock %}
+
+{% endblock %}

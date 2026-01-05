@@ -21,9 +21,14 @@ class GrupoCli(models.Model):
         super().save(*args, **kwargs)
 
     class Meta:
+        db_table = 'grupo_cli'
+
         constraints = [
             models.UniqueConstraint(
                 Upper('descricao'),
                 name='unique_descricao_upper'
             )
         ]
+
+    def __str__(self):
+        return self.descricao
