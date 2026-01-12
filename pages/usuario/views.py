@@ -2,7 +2,7 @@ import json
 from django.http import JsonResponse
 from django.contrib.auth import authenticate, get_user_model
 from django.shortcuts import render, redirect
-from .tokens import CustomRefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken
 
 User = get_user_model()
 
@@ -39,7 +39,7 @@ def login_view(request):
             status=401
         )
 
-    refresh = CustomRefreshToken.for_user(user)
+    refresh = RefreshToken.for_user(user)
 
     response = JsonResponse({
         "success": True,
@@ -73,7 +73,7 @@ def logout_view(request):
 
 def cadastro_view(request):
     if request.method == "GET":
-        return render(request, "usuario.html",{"sisVar": {"usuario": {"autenticado":request.user.is_authenticated, "id":request.user.id}}})
+        return render(request, "usuario.html",{"sisVar": {"usuario": {"autenticado":request.user.is_authenticated, "id":request.user.id, "nome":request.user.username, "permissoes":list(request.user.get_all_permissions())}}})
 
     username = request.POST.get("username")
     email = request.POST.get("email")

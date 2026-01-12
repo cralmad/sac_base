@@ -1,4 +1,5 @@
-﻿{% load static %}
+# base.html #
+{% load static %}
 
 <!DOCTYPE html>
 
@@ -20,7 +21,7 @@
     <body class="bg-light">
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
             <div class="container-fluid">
-                <a class="navbar-brand" href="/">SacBase</a>
+                <a class="navbar-brand" href="/">Meu Sistema</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                     <span class="navbar-toggler-icon"></span>
                 </button>
@@ -84,3 +85,40 @@
         </div>
     </div>
 </html>
+
+# login.html #
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Cadastro de Grupo de Clientes{% endblock %}
+
+{% block estilo %}<link rel="stylesheet" href="{% static 'usuario/css/styles.css' %}">{% endblock %}
+
+{% block content %}
+
+<form id="loginForm">
+  {% csrf_token %}
+  <input
+    name="username"
+    class="smart-input"
+    placeholder="Usuário"
+    required
+  >
+
+  <input
+    type="password"
+    name="password"
+    placeholder="Senha"
+    required
+  >
+
+  <button type="submit" class="btn btn-primary show-loader">Entrar</button>
+</form>
+<button id="teste" type="button" class="btn btn-primary">TESTE</button>
+
+{% block scripts %}
+  {{ sisVar|json_script:"sisDados" }}
+  <script type="module" src="{% static 'usuario/js/scripts.js' %}"></script>
+{% endblock %}
+
+{% endblock %}

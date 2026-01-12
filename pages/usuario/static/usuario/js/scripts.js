@@ -1,5 +1,6 @@
 import { updateFormField, getForm, getDataBackEnd } from "/static/js/sisVar.js";
 import { criarAtualizadorForm } from "/static/js/refresh_varSis.js";
+import { AppLoader } from '/static/js/loader.js';
 
 const form = document.getElementById("loginForm");
 getDataBackEnd();
@@ -15,27 +16,40 @@ form.addEventListener("input", updater);
 form.addEventListener("submit", async e => {
   e.preventDefault();
 
+  // O AppLoader.show() já foi disparado automaticamente pelo 'submit' 
+  // se o botão ou o form tiverem a classe "show-loader".
+
   const sisVarPayload = {
     form: {
       loginForm: getForm("loginForm")
     }
   };
 
-  const res = await fetch("/app/usuario/login/", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
-    },
-    body: JSON.stringify(sisVarPayload)
-  });
+  try {
+    const res = await fetch("/app/usuario/login/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+      },
+      body: JSON.stringify(sisVarPayload)
+    });
 
-  const data = await res.json();
+    const data = await res.json();
 
-  if (data.success) {
-    window.location.href = "/app/cad/cliente/";
-  } else {
-    console.log(data.error);
+    if (data.success) {
+      // O redirecionamento mata a página atual, então o loader some sozinho
+      window.location.href = "/app/cad/cliente/";
+    } else {
+      // Erro de credenciais ou validação
+      console.log(data.error);
+      alert("Erro: " + data.error);
+      AppLoader.hide(); // LIBERA A TELA para o usuário tentar novamente
+    }
+  } catch (err) {
+    // Erro de rede ou servidor fora do ar
+    console.error("Erro na requisição:", err);
+    AppLoader.hide(); // LIBERA A TELA em caso de falha técnica
   }
 });
 

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Cadastro de Grupo de Clientes{% endblock %}
+{% block title %}SacBase - login{% endblock %}
 
 {% block estilo %}<link rel="stylesheet" href="{% static 'usuario/css/styles.css' %}">{% endblock %}
 
@@ -23,7 +23,7 @@
     required
   >
 
-  <button type="submit">Entrar</button>
+  <button type="submit" class="btn btn-primary show-loader">Entrar</button>
 </form>
 <button id="teste" type="button" class="btn btn-primary">TESTE</button>
 
