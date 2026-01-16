@@ -3,8 +3,8 @@
 
 {% block title %}SacBase - login{% endblock %}
 
-{% block estilo %}<link rel="stylesheet" href="{% static 'usuario/css/styles.css' %}">{% endblock %}
-
+<link rel="stylesheet" href="{% static 'usuario/css/styles.css' %}">
+{% block page_title %}Login{% endblock %}
 {% block content %}
 
 <form id="loginForm">
@@ -27,9 +27,9 @@
 </form>
 <button id="teste" type="button" class="btn btn-primary">TESTE</button>
 
+{% endblock %}
+
 {% block scripts %}
   {{ sisVar|json_script:"sisDados" }}
   <script type="module" src="{% static 'usuario/js/scripts.js' %}"></script>
-{% endblock %}
-
 {% endblock %}

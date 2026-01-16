@@ -14,10 +14,16 @@ def login_view(request):
 
     # ---------- GET ----------
     if request.method == "GET":
+
+        usuario = {
+            "autenticado": getattr(request.user, "is_authenticated", False),
+            "id": getattr(request.user, "id", None)
+        }
+
         return render(
             request,
             "login.html",
-            {"sisVar": {"schema": schema, "usuario": {"autenticado":request.user.is_authenticated, "id":request.user.id}}}
+            {"sisVar": {"schema": schema, "usuario": usuario}}
         )
 
     # ---------- POST ----------
@@ -65,15 +71,29 @@ def login_view(request):
 
     return response
 
+
 def logout_view(request):
     response = redirect("/login/")
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
     return response
 
+
 def cadastro_view(request):
     if request.method == "GET":
-        return render(request, "usuario.html",{"sisVar": {"usuario": {"autenticado":request.user.is_authenticated, "id":request.user.id, "nome":request.user.username, "permissoes":list(request.user.get_all_permissions())}}})
+
+        usuario = {
+            "autenticado": getattr(request.user, "is_authenticated", False),
+            "id": getattr(request.user, "id", None),
+            "nome": getattr(request.user, "username", None),
+            "permissoes": list(getattr(request.user, "get_all_permissions", lambda: [])())
+        }
+
+        return render(
+            request,
+            "usuario.html",
+            {"sisVar": {"usuario": usuario}}
+        )
 
     username = request.POST.get("username")
     email = request.POST.get("email")

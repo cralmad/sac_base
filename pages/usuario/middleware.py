@@ -17,10 +17,19 @@ class JWTAuthMiddleware:
     def __call__(self, request):
         path = request.path
 
+        token = request.COOKIES.get("access_token")
+
+        if token:
+            try:
+                validated = self.jwt_auth.get_validated_token(token)
+                request.user = self.jwt_auth.get_user(validated)
+                request.user_data = validated.payload
+            except InvalidToken:
+                pass
+
         if any(path.startswith(r) for r in ROTAS_PUBLICAS):
             return self.get_response(request)
 
-        token = request.COOKIES.get("access_token")
         if not token:
             return redirect("/app/usuario/login/")
 
