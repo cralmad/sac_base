@@ -4,10 +4,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    path('painel_adm/', admin.site.urls),
+    path('app/painel_adm/', admin.site.urls),
     path('app/cad/', include('pages.cad_cliente.urls')),
     path('app/cad/', include('pages.cad_grupo_cli.urls')),
     path('app/', include('pages.usuario.urls')),
+    path('', include('pages.home.urls')),
 ]
 
 if settings.DEBUG:

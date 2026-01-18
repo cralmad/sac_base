@@ -11,6 +11,10 @@ export function getSchema(formId) {
   return _state.schema[formId];
 }
 
+export function getUsuario() {
+  return _state.usuario;
+}
+
 export function updateFormField(formId, name, value) {
   if (!_state.form[formId]) {
     _state.form[formId] = {};

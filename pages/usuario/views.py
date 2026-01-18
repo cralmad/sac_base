@@ -12,19 +12,12 @@ def login_view(request):
         'password': {'type': 'password', 'required': True}
     }
 
+    request.sisvar_extra = {"schema": schema}
+    
     # ---------- GET ----------
     if request.method == "GET":
 
-        usuario = {
-            "autenticado": getattr(request.user, "is_authenticated", False),
-            "id": getattr(request.user, "id", None)
-        }
-
-        return render(
-            request,
-            "login.html",
-            {"sisVar": {"schema": schema, "usuario": usuario}}
-        )
+        return render(request, "login.html")
 
     # ---------- POST ----------
     try:

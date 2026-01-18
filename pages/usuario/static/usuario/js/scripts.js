@@ -1,9 +1,8 @@
-import { updateFormField, getForm, getDataBackEnd } from "/static/js/sisVar.js";
+import { updateFormField, getForm } from "/static/js/sisVar.js";
 import { criarAtualizadorForm } from "/static/js/refresh_varSis.js";
-import { AppLoader } from '/static/js/loader.js';
+import { AppLoader } from "/static/js/loader.js";
 
 const form = document.getElementById("loginForm");
-getDataBackEnd();
 
 const updater = criarAtualizadorForm({
   formId: "loginForm",
@@ -39,7 +38,7 @@ form.addEventListener("submit", async e => {
 
     if (data.success) {
       // O redirecionamento mata a página atual, então o loader some sozinho
-      window.location.href = "/app/cad/cliente/";
+      window.location.href = "/app/home/";
     } else {
       // Erro de credenciais ou validação
       console.log(data.error);

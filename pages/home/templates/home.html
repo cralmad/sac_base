@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Home{% endblock %}
+
+<link rel="stylesheet" href="{% static 'home/css/styles.css' %}">
+{% block page_title %}Bem vindo!{% endblock %}
+
+{% block content %}
+
+<button id="teste" type="button" class="btn btn-primary">TESTE</button>
+
+{% endblock %}
+
+{% block scripts %}
+  {{ sisVar|json_script:"sisDados" }}
+  <script type="module" src="{% static 'home/js/scripts.js' %}"></script>
+{% endblock %}

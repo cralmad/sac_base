@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'pages.cad_cliente',
     'pages.cad_grupo_cli',
     'pages.usuario',
+    'pages.home',
 ]
 
 MIDDLEWARE = [
@@ -84,6 +85,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'sac_base.context_processors.sisvar_global', # Context processor customizado para variável global sisVar
             ],
         },
     },
