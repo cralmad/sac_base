@@ -14,7 +14,8 @@
 
         <!-- CSS global -->
         <link rel="stylesheet" href="{% static '/css/styles.css' %}">
-
+        
+        {{ sisVar|json_script:"sisDados" }}
     </head>
 
     <body class="bg-light">

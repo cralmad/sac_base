@@ -1,3 +1,218 @@
+### Projeto SacBase ###
+
+1 - Base de desenvolvimento
+  1.1 - Front End
+    - HTML
+    - CSS
+    - JavaScript Vanila
+    - Bootstrap 5
+
+  1.2 - Back End
+    - Python
+    - Django Framework
+
+  1.3 - Banco de Dados
+    - Postgresql
+
+2 - Estrutura das pastas e arquivos principais
+  - SAC_BASE (pasta raiz do projeto)
+    - sac_base (pasta do aplicativo principal)
+      - context_processors.py
+    - pages (pasta onde ficam os aplicativos)
+      - usuario (pasta do aplicativo para gestão de usuáios - login, logout, alterar senha, cadastro de usuário, permissões)
+        - middleware.py
+    - static (pasta estática global)
+      - css
+      - js
+        - base.js
+        - refresh_varSis.js
+        - sisVar.js
+    - base.html
+
+3 - Lógica do sistema
+  3.1 - sisVar: variável global. 
+    - Todos os formulários consomem e alimentam a variável;
+    - Só a variável é enviada para o servidor;
+    - O servidor sempre envia sisVar por meio do context_processors.py
+    - A variável é recebido do servidor pelo front end a partir da ilha de dados {{ sisVar|json_script:"sisDados" }}
+    - getDataBackEnd() trata os dados vindos do servidor e alimenta a sisVar inicialmente no front end
+
+# context_processors.py #
+
+def sisvar_global(request):
+    base = {
+        "usuario": {
+            "autenticado": request.user.is_authenticated,
+            "id": request.user.id if request.user.is_authenticated else None,
+            "nome": request.user.username if request.user.is_authenticated else None,
+        },
+        "schema": {},
+        "form": {},
+        "others": {},
+    }
+
+    # Se a view já tiver colocado algo em request.sisvar, mescla
+    if hasattr(request, "sisvar_extra"):
+        for key, value in request.sisvar_extra.items():
+            base[key] = value
+
+    return {"sisVar": base}
+
+# middleware.py #
+
+from django.shortcuts import redirect
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import InvalidToken
+
+ROTAS_PUBLICAS = [
+    "/app/usuario/login/",
+    "/app/usuario/logout/",
+    "/static/",
+]
+
+class JWTAuthMiddleware:
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.jwt_auth = JWTAuthentication()
+
+    def __call__(self, request):
+        path = request.path
+
+        token = request.COOKIES.get("access_token")
+
+        if token:
+            try:
+                validated = self.jwt_auth.get_validated_token(token)
+                request.user = self.jwt_auth.get_user(validated)
+                request.user_data = validated.payload
+            except InvalidToken:
+                pass
+
+        if any(path.startswith(r) for r in ROTAS_PUBLICAS):
+            return self.get_response(request)
+
+        if not token:
+            return redirect("/app/usuario/login/")
+
+        try:
+            validated = self.jwt_auth.get_validated_token(token)
+            request.user = self.jwt_auth.get_user(validated)
+            request.user_data = validated.payload
+        except InvalidToken:
+            return redirect("/app/usuario/login/")
+
+        return self.get_response(request)
+
+# usuario/models.py #
+
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+
+class Usuarios(AbstractUser):
+    nome = models.CharField(max_length=150)
+
+    class Meta:
+        db_table = 'usuarios'
+
+    def sisvar_payload(self):
+        return {
+            "id": self.id,
+            "nome": self.nome,
+            "permissoes": list(
+                self.get_all_permissions()
+            )
+        }
+
+# sisVar.js #
+
+const _state = {
+  usuario: {},
+  form: {},
+  schema: {},
+  others: {}
+};
+
+const _dadosBE = 'sisDados';// ID do elemento HTML que contem os dados do back-end
+
+export function getSchema(formId) {
+  return _state.schema[formId];
+}
+
+export function getUsuario() {
+  return _state.usuario;
+}
+
+export function updateFormField(formId, name, value) {
+  if (!_state.form[formId]) {
+    _state.form[formId] = {};
+  }
+
+  _state.form[formId][name] = value;
+}
+
+export function getForm(formId) {
+  return _state.form[formId] ?? {};
+}
+
+export function getDataBackEnd() {// Dados enviados pelo back-end
+  if(document.getElementById(_dadosBE)){
+    const dadosSis = JSON.parse(document.getElementById(_dadosBE).textContent)
+    _state.others = dadosSis.others || {}
+    _state.schema = dadosSis.schema || {}
+    _state.form = dadosSis.form || {}
+    _state.usuario = dadosSis.usuario || {}
+  }
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!! Apenas para debug !!!!!!!!!!!!!!!!!!!!!!!
+export function __debugState() {
+  return structuredClone(_state);
+}
+
+# refresh_varSis.js #
+
+export function criarAtualizadorForm({//Função que cria a função de atualização do form
+  formId,
+  setter,
+  form
+}) {
+  return function atualizarSisVarForm(event) {//Função que atualiza o valor do form após o evento
+    const el = event.target;
+    if (!el.name) return;
+
+    queueMicrotask(() => {
+      const value = getDataForm(el, form);
+      setter(formId, el.name, value);
+    });
+  };
+}
+
+//Captura os valores do form de acordo com o tipo do input
+export function getDataForm(el, form) {
+  switch (el.type) {
+
+    case 'checkbox':
+      return el.checked;
+
+    case 'radio': {
+      const checked = form.querySelector(
+        `input[type="radio"][name="${el.name}"]:checked`
+      );
+      return checked ? checked.value : null;
+    }
+
+    case 'select-multiple':
+      return Array.from(el.selectedOptions).map(opt => opt.value);
+
+    case 'number':
+      return el.value === '' ? null : Number(el.value);
+
+    default:
+      return el.value;
+  }
+}
+
 # base.html #
 
 {% load static %}
@@ -16,7 +231,8 @@
 
         <!-- CSS global -->
         <link rel="stylesheet" href="{% static '/css/styles.css' %}">
-
+        
+        {{ sisVar|json_script:"sisDados" }}
     </head>
 
     <body class="bg-light">
@@ -81,8 +297,7 @@
 
 # base.js #
 
-import { getDataBackEnd, getUsuario } from "/sisVar.js";
-import { AppLoader } from "/static/js/loader.js";
+import { getDataBackEnd, getUsuario } from "/static/js/sisVar.js";
 
 export async function inicializarNavbarUsuario() {
     try {
@@ -121,7 +336,7 @@ export async function inicializarNavbarUsuario() {
                         </a>
                     </li>
                     <li>
-                        <a class="dropdown-item" href="/logout">
+                        <a class="dropdown-item" href="/app/usuario/logout/">
                             Logout
                         </a>
                     </li>
@@ -141,157 +356,3 @@ export async function inicializarNavbarUsuario() {
 document.addEventListener("DOMContentLoaded", () => {
     inicializarNavbarUsuario();
 });
-
-# sisvar.js #
-
-const _state = {
-  usuario: {},
-  form: {},
-  schema: {},
-  others: {}
-};
-
-const _dadosBE = 'sisDados';// ID do elemento HTML que contem os dados do back-end
-
-export function getSchema(formId) {
-  return _state.schema[formId];
-}
-
-export function getUsuario() {
-  return _state.usuario;
-}
-
-export function updateFormField(formId, name, value) {
-  if (!_state.form[formId]) {
-    _state.form[formId] = {};
-  }
-
-  _state.form[formId][name] = value;
-}
-
-export function getForm(formId) {
-  return _state.form[formId] ?? {};
-}
-
-export function getDataBackEnd() {// Dados enviados pelo back-end
-  if(document.getElementById(_dadosBE)){
-    const dadosSis = JSON.parse(document.getElementById(_dadosBE).textContent)
-    _state.others = dadosSis.others || {}
-    _state.schema = dadosSis.schema || {}
-    _state.form = dadosSis.form || {}
-    _state.usuario = dadosSis.usuario || {}
-  }
-}
-
-// !!!!!!!!!!!!!!!!!!!!!!! Apenas para debug !!!!!!!!!!!!!!!!!!!!!!!
-export function __debugState() {
-  return structuredClone(_state);
-}
-
-# login.html #
-
-{% extends "base.html" %}
-{% load static %}
-
-{% block title %}SacBase - login{% endblock %}
-
-<link rel="stylesheet" href="{% static 'usuario/css/styles.css' %}">
-{% block page_title %}Login{% endblock %}
-{% block content %}
-
-<form id="loginForm">
-  {% csrf_token %}
-  <input
-    name="username"
-    class="smart-input"
-    placeholder="Usuário"
-    required
-  >
-
-  <input
-    type="password"
-    name="password"
-    placeholder="Senha"
-    required
-  >
-
-  <button type="submit" class="btn btn-primary show-loader">Entrar</button>
-</form>
-<button id="teste" type="button" class="btn btn-primary">TESTE</button>
-
-{% endblock %}
-
-{% block scripts %}
-  {{ sisVar|json_script:"sisDados" }}
-  <script type="module" src="{% static 'usuario/js/scripts.js' %}"></script>
-{% endblock %}
-
-# login.js #
-
-import { updateFormField, getForm } from "/static/js/sisVar.js";
-import { criarAtualizadorForm } from "/static/js/refresh_varSis.js";
-
-const form = document.getElementById("loginForm");
-
-const updater = criarAtualizadorForm({
-  formId: "loginForm",
-  setter: updateFormField,
-  form
-});
-
-form.addEventListener("input", updater);
-
-form.addEventListener("submit", async e => {
-  e.preventDefault();
-
-  // O AppLoader.show() já foi disparado automaticamente pelo 'submit' 
-  // se o botão ou o form tiverem a classe "show-loader".
-
-  const sisVarPayload = {
-    form: {
-      loginForm: getForm("loginForm")
-    }
-  };
-
-  try {
-    const res = await fetch("/app/usuario/login/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
-      },
-      body: JSON.stringify(sisVarPayload)
-    });
-
-    const data = await res.json();
-
-    if (data.success) {
-      // O redirecionamento mata a página atual, então o loader some sozinho
-      window.location.href = "/app/home/";
-    } else {
-      // Erro de credenciais ou validação
-      console.log(data.error);
-      alert("Erro: " + data.error);
-      AppLoader.hide(); // LIBERA A TELA para o usuário tentar novamente
-    }
-  } catch (err) {
-    // Erro de rede ou servidor fora do ar
-    console.error("Erro na requisição:", err);
-    AppLoader.hide(); // LIBERA A TELA em caso de falha técnica
-  }
-});
-
-/*****************DEBUG**********************/
-import { __debugState } from '../../js/sisVar.js';
-
-window.__DEBUG__ = {
-  get state() {
-    return __debugState();
-  }
-};
-
-function exibir() {
-  console.log(window.__DEBUG__.state);
-}
-
-document.getElementById('teste').addEventListener('click', exibir);

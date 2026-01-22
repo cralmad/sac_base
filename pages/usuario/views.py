@@ -21,7 +21,7 @@ def login_view(request):
 
     # ---------- POST ----------
     try:
-        payload = json.loads(request.body)
+        payload = request.sisvar_front
         form = payload["form"]["loginForm"]
         username = form.get("username")
         password = form.get("password")

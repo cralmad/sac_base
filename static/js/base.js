@@ -37,7 +37,7 @@ export async function inicializarNavbarUsuario() {
                         </a>
                     </li>
                     <li>
-                        <a class="dropdown-item" href="/logout">
+                        <a class="dropdown-item" href="/app/usuario/logout/">
                             Logout
                         </a>
                     </li>
