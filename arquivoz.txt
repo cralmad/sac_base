@@ -1,358 +1,181 @@
-### Projeto SacBase ###
+// sisVar.js
 
-1 - Base de desenvolvimento
-  1.1 - Front End
-    - HTML
-    - CSS
-    - JavaScript Vanila
-    - Bootstrap 5
-
-  1.2 - Back End
-    - Python
-    - Django Framework
-
-  1.3 - Banco de Dados
-    - Postgresql
-
-2 - Estrutura das pastas e arquivos principais
-  - SAC_BASE (pasta raiz do projeto)
-    - sac_base (pasta do aplicativo principal)
-      - context_processors.py
-    - pages (pasta onde ficam os aplicativos)
-      - usuario (pasta do aplicativo para gestão de usuáios - login, logout, alterar senha, cadastro de usuário, permissões)
-        - middleware.py
-    - static (pasta estática global)
-      - css
-      - js
-        - base.js
-        - refresh_varSis.js
-        - sisVar.js
-    - base.html
-
-3 - Lógica do sistema
-  3.1 - sisVar: variável global. 
-    - Todos os formulários consomem e alimentam a variável;
-    - Só a variável é enviada para o servidor;
-    - O servidor sempre envia sisVar por meio do context_processors.py
-    - A variável é recebido do servidor pelo front end a partir da ilha de dados {{ sisVar|json_script:"sisDados" }}
-    - getDataBackEnd() trata os dados vindos do servidor e alimenta a sisVar inicialmente no front end
-
-# context_processors.py #
-
-def sisvar_global(request):
-    base = {
-        "usuario": {
-            "autenticado": request.user.is_authenticated,
-            "id": request.user.id if request.user.is_authenticated else None,
-            "nome": request.user.username if request.user.is_authenticated else None,
-        },
-        "schema": {},
-        "form": {},
-        "others": {},
-    }
-
-    # Se a view já tiver colocado algo em request.sisvar, mescla
-    if hasattr(request, "sisvar_extra"):
-        for key, value in request.sisvar_extra.items():
-            base[key] = value
-
-    return {"sisVar": base}
-
-# middleware.py #
-
-from django.shortcuts import redirect
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework_simplejwt.exceptions import InvalidToken
-
-ROTAS_PUBLICAS = [
-    "/app/usuario/login/",
-    "/app/usuario/logout/",
-    "/static/",
-]
-
-class JWTAuthMiddleware:
-
-    def __init__(self, get_response):
-        self.get_response = get_response
-        self.jwt_auth = JWTAuthentication()
-
-    def __call__(self, request):
-        path = request.path
-
-        token = request.COOKIES.get("access_token")
-
-        if token:
-            try:
-                validated = self.jwt_auth.get_validated_token(token)
-                request.user = self.jwt_auth.get_user(validated)
-                request.user_data = validated.payload
-            except InvalidToken:
-                pass
-
-        if any(path.startswith(r) for r in ROTAS_PUBLICAS):
-            return self.get_response(request)
-
-        if not token:
-            return redirect("/app/usuario/login/")
-
-        try:
-            validated = self.jwt_auth.get_validated_token(token)
-            request.user = self.jwt_auth.get_user(validated)
-            request.user_data = validated.payload
-        except InvalidToken:
-            return redirect("/app/usuario/login/")
-
-        return self.get_response(request)
-
-# usuario/models.py #
-
-from django.contrib.auth.models import AbstractUser
-from django.db import models
-
-class Usuarios(AbstractUser):
-    nome = models.CharField(max_length=150)
-
-    class Meta:
-        db_table = 'usuarios'
-
-    def sisvar_payload(self):
-        return {
-            "id": self.id,
-            "nome": self.nome,
-            "permissoes": list(
-                self.get_all_permissions()
-            )
-        }
-
-# sisVar.js #
-
+// 1. Contrato padronizado para o _state [cite: 1]
 const _state = {
   usuario: {},
-  form: {},
-  schema: {},
-  others: {}
+  form: {},    // Dados dos campos (ex: { formId: { nome: 'João' } }) [cite: 3, 4]
+  schema: {},  // Definições de validação/campos [cite: 6]
+  others: {},  // Dados genéricos do backend [cite: 5, 6]
+  
+  // 3. Contrato para estados do formulário (Mode)
+  // Armazena se o form está em: 'novo', 'visualizar', 'editar', 'deletar'
+  status: {}, 
+  
+  // 1. Padronização de mensagens/notificações do backend
+  mensagens: {
+    sucesso: null,
+    erro: null,
+    avisos: []
+  }
 };
 
-const _dadosBE = 'sisDados';// ID do elemento HTML que contem os dados do back-end
+const _dadosBE = 'sisDados'; // ID do elemento HTML [cite: 2]
 
-export function getSchema(formId) {
-  return _state.schema[formId];
+// --- Getters e Setters ---
+
+export function getFormStatus(formId) {
+  return _state.status[formId] || 'visualizar'; // 'visualizar' como padrão seguro
 }
 
-export function getUsuario() {
-  return _state.usuario;
+export function setFormStatus(formId, status) {
+  const modosValidos = ['novo', 'visualizar', 'editar', 'deletar'];
+  if (modosValidos.includes(status)) {
+    _state.status[formId] = status;
+  }
+}
+
+export function getForm(formId) {
+  return _state.form[formId] ?? {}; [cite: 4, 5]
 }
 
 export function updateFormField(formId, name, value) {
   if (!_state.form[formId]) {
-    _state.form[formId] = {};
+    _state.form[formId] = {}; [cite: 3]
   }
+  _state.form[formId][name] = value; [cite: 4]
+}
 
-  _state.form[formId][name] = value;
+// 2. Melhoria no getDataBackEnd com limpeza de HTML e Segurança
+export function getDataBackEnd() {
+  const elemento = document.getElementById(_dadosBE); [cite: 5]
+  
+  if (elemento) {
+    try {
+      const dadosSis = JSON.parse(elemento.textContent); [cite: 5]
+      
+      // Mapeamento seguro para o estado [cite: 5, 6, 7]
+      _state.others  = dadosSis.others  || {};
+      _state.schema  = dadosSis.schema  || {};
+      _state.form    = dadosSis.form    || {};
+      _state.usuario = dadosSis.usuario || {};
+      _state.status  = dadosSis.status  || {}; // Inicializa modos se vierem do BE
+      _state.mensagens = {
+        sucesso: dadosSis.msgSucesso || null,
+        erro: dadosSis.msgErro || null,
+        avisos: dadosSis.avisos || []
+      };
+
+      // 2. Deletar os dados do HTML para segurança e performance
+      elemento.remove(); 
+      console.log('Dados do Back-End carregados e elemento removido.');
+
+    } catch (e) {
+      console.error("Erro ao processar dados do Back-End: JSON inválido.", e);
+    }
+  }
+}
+
+export function __debugState() {
+  return structuredClone(_state); [cite: 8]
+}
+
+
+Para melhorar o seu arquivo sisVar.js, vamos focar em encapsulamento, limpeza de memória e na estruturação de um contrato de estado mais robusto.
+
+Abaixo está a proposta de melhoria seguindo os pontos solicitados:
+
+Proposta de sisVar.js Otimizado
+JavaScript
+
+// sisVar.js
+
+// 1. Contrato padronizado para o _state [cite: 1]
+const _state = {
+  usuario: {},
+  form: {},    // Dados dos campos (ex: { formId: { nome: 'João' } }) [cite: 3, 4]
+  schema: {},  // Definições de validação/campos [cite: 6]
+  others: {},  // Dados genéricos do backend [cite: 5, 6]
+  
+  // 3. Contrato para estados do formulário (Mode)
+  // Armazena se o form está em: 'novo', 'visualizar', 'editar', 'deletar'
+  status: {}, 
+  
+  // 1. Padronização de mensagens/notificações do backend
+  mensagens: {
+    sucesso: null,
+    erro: null,
+    avisos: []
+  }
+};
+
+const _dadosBE = 'sisDados'; // ID do elemento HTML [cite: 2]
+
+// --- Getters e Setters ---
+
+export function getFormStatus(formId) {
+  return _state.status[formId] || 'visualizar'; // 'visualizar' como padrão seguro
+}
+
+export function setFormStatus(formId, status) {
+  const modosValidos = ['novo', 'visualizar', 'editar', 'deletar'];
+  if (modosValidos.includes(status)) {
+    _state.status[formId] = status;
+  }
 }
 
 export function getForm(formId) {
-  return _state.form[formId] ?? {};
+  return _state.form[formId] ?? {}; [cite: 4, 5]
 }
 
-export function getDataBackEnd() {// Dados enviados pelo back-end
-  if(document.getElementById(_dadosBE)){
-    const dadosSis = JSON.parse(document.getElementById(_dadosBE).textContent)
-    _state.others = dadosSis.others || {}
-    _state.schema = dadosSis.schema || {}
-    _state.form = dadosSis.form || {}
-    _state.usuario = dadosSis.usuario || {}
+export function updateFormField(formId, name, value) {
+  if (!_state.form[formId]) {
+    _state.form[formId] = {}; [cite: 3]
   }
+  _state.form[formId][name] = value; [cite: 4]
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!! Apenas para debug !!!!!!!!!!!!!!!!!!!!!!!
-export function __debugState() {
-  return structuredClone(_state);
-}
-
-# refresh_varSis.js #
-
-export function criarAtualizadorForm({//Função que cria a função de atualização do form
-  formId,
-  setter,
-  form
-}) {
-  return function atualizarSisVarForm(event) {//Função que atualiza o valor do form após o evento
-    const el = event.target;
-    if (!el.name) return;
-
-    queueMicrotask(() => {
-      const value = getDataForm(el, form);
-      setter(formId, el.name, value);
-    });
-  };
-}
-
-//Captura os valores do form de acordo com o tipo do input
-export function getDataForm(el, form) {
-  switch (el.type) {
-
-    case 'checkbox':
-      return el.checked;
-
-    case 'radio': {
-      const checked = form.querySelector(
-        `input[type="radio"][name="${el.name}"]:checked`
-      );
-      return checked ? checked.value : null;
-    }
-
-    case 'select-multiple':
-      return Array.from(el.selectedOptions).map(opt => opt.value);
-
-    case 'number':
-      return el.value === '' ? null : Number(el.value);
-
-    default:
-      return el.value;
-  }
-}
-
-# base.html #
-
-{% load static %}
-
-<!DOCTYPE html>
-
-<html lang="pt-br">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-        <title>{% block title %}{% endblock %}</title>
-
-        <!-- Bootstrap CSS -->
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-
-        <!-- CSS global -->
-        <link rel="stylesheet" href="{% static '/css/styles.css' %}">
-        
-        {{ sisVar|json_script:"sisDados" }}
-    </head>
-
-    <body class="bg-light">
-        <nav id="navbase" class="navbar navbar-expand-lg navbar-dark bg-dark">
-            <div class="container-fluid">
-                <a class="navbar-brand" href="/">SacBase</a>
-            </div>
-        </nav>
-
-        <div class="container-fluid">
-            <div class="row">
-
-                <!-- Sidebar -->
-                <aside class="col-md-2 d-none d-md-block bg-white border-end min-vh-100">
-                    <div class="p-3">
-                        <h6 class="text-muted">Menu</h6>
-                        <ul class="nav flex-column">
-                            <li class="nav-item"><a class="nav-link" href="/">Dashboard</a></li>
-                            <li class="nav-item"><a class="nav-link" href="/rel/">Relatórios</a></li>
-                        </ul>
-                    </div>
-                </aside>
-
-                <!-- Conteúdo -->
-                <main class="col-md-10 ms-sm-auto px-4 py-4">
-
-                    <!-- Mensagens do Django -->
-                    {% if messages %}
-                        {% for message in messages %}
-                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                                {{ message }}
-                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                    
-                    <h1 class="mb-4">{% block page_title %}{% endblock %}</h1>
-                    {% block content %}{% endblock %}
-                </main>
-            </div>
-        </div>
-
-        <footer class="text-center py-3 bg-white border-top">
-            <small>&copy; {% now "Y" %} - SaBase</small>
-        </footer>
-
-        <!-- Bootstrap JS -->
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
-        <!-- JS global -->
-        <script type="module" src="{% static 'js/base.js' %}"></script>
-       {% block scripts %}{% endblock %}
-
-    </body>
-
-    <div id="global-loader" class="d-none fade-in">
-        <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
-            <span class="visually-hidden">Carregando...</span>
-        </div>
-    </div>
-</html>
-
-# base.js #
-
-import { getDataBackEnd, getUsuario } from "/static/js/sisVar.js";
-
-export async function inicializarNavbarUsuario() {
+// 2. Melhoria no getDataBackEnd com limpeza de HTML e Segurança
+export function getDataBackEnd() {
+  const elemento = document.getElementById(_dadosBE); [cite: 5]
+  
+  if (elemento) {
     try {
-        // Garante que os dados do backend foram carregados
-        await getDataBackEnd();
+      const dadosSis = JSON.parse(elemento.textContent); [cite: 5]
+      
+      // Mapeamento seguro para o estado [cite: 5, 6, 7]
+      _state.others  = dadosSis.others  || {};
+      _state.schema  = dadosSis.schema  || {};
+      _state.form    = dadosSis.form    || {};
+      _state.usuario = dadosSis.usuario || {};
+      _state.status  = dadosSis.status  || {}; // Inicializa modos se vierem do BE
+      _state.mensagens = {
+        sucesso: dadosSis.msgSucesso || null,
+        erro: dadosSis.msgErro || null,
+        avisos: dadosSis.avisos || []
+      };
 
-        const usuario = getUsuario();
+      // 2. Deletar os dados do HTML para segurança e performance
+      elemento.remove(); 
+      console.log('Dados do Back-End carregados e elemento removido.');
 
-        // Se não estiver autenticado, não faz nada
-        if (!usuario || !usuario.autenticado) {
-            return;
-        }
-
-        // Localiza a navbar existente
-        const navbarContainer = document.getElementById("navbase");
-
-        // Cria o elemento do dropdown
-        const dropdownHtml = `
-            <div class="dropdown ms-auto">
-                <a class="nav-link dropdown-toggle text-light d-flex align-items-center"
-                   href="#"
-                   role="button"
-                   data-bs-toggle="dropdown"
-                   aria-expanded="false">
-                    <i class="bi bi-person-circle me-2"></i>
-                </a>
-
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li class="dropdown-item-text fw-bold">
-                        ${usuario.nome}
-                    </li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li>
-                        <a class="dropdown-item" href="/alterar-senha">
-                            Alterar senha
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item" href="/app/usuario/logout/">
-                            Logout
-                        </a>
-                    </li>
-                </ul>
-            </div>
-        `;
-
-        // Insere no final da navbar (lado direito)
-        navbarContainer.insertAdjacentHTML("beforeend", dropdownHtml);
-
-    } catch (erro) {
-        console.error("Erro ao inicializar navbar de usuário:", erro);
+    } catch (e) {
+      console.error("Erro ao processar dados do Back-End: JSON inválido.", e);
     }
+  }
 }
 
-// Auto-executa ao carregar o módulo
-document.addEventListener("DOMContentLoaded", () => {
-    inicializarNavbarUsuario();
-});
+export function __debugState() {
+  return structuredClone(_state); [cite: 8]
+}
+Principais Melhorias Implementadas
+
+Segurança (Ponto 2): O uso de elemento.remove() após o processamento impede que o JSON com informações do sistema (como a estrutura do usuário ou schemas) fique exposto no DOM para qualquer script ou extensão de navegador.
+
+Gestão de Modos (Ponto 3): Adicionei o objeto status e a função setFormStatus. Isso permite que seu código de UI (CSS ou JS) saiba exatamente o que habilitar ou desabilitar (ex: se o status for visualizar, os inputs podem ser travados).
+
+Tratamento de Mensagens (Ponto 1): O contrato agora prevê mensagens.sucesso e mensagens.erro. Isso facilita a criação de um componente de "Toast" ou alerta automático que lê o estado assim que ele é carregado do backend.
+
+
+Robustez: Adicionado um bloco try/catch no JSON.parse para evitar que uma falha no backend trave toda a execução do seu JavaScript frontal.
+
+Próximo Passo: Gostaria que eu mostrasse como integrar o status do formulário (novo, editar) com as funções do seu arquivo refresh_varSis.js para bloquear campos automaticamente?
