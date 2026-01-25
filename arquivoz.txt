@@ -27,6 +27,7 @@
         - base.js
         - refresh_varSis.js
         - sisVar.js
+        - input_rules.js
     - base.html
 
 3 - Lógica do sistema
@@ -34,7 +35,7 @@
     - Todos os formulários consomem e alimentam a variável;
     - Só a variável é enviada para o servidor;
     - O servidor sempre envia sisVar por meio do context_processors.py
-    - A variável é recebido do servidor pelo front end a partir da ilha de dados {{ sisVar|json_script:"sisDados" }}
+    - A variável é recebida do servidor pelo front end a partir da ilha de dados {{ sisVar|json_script:"sisDados" }}
     - getDataBackEnd() trata os dados vindos do servidor e alimenta a sisVar inicialmente no front end
 
 # context_processors.py #
@@ -47,7 +48,8 @@ def sisvar_global(request):
             "nome": request.user.username if request.user.is_authenticated else None,
         },
         "schema": {},
-        "form": {},
+        "form": {}, # formId: {estado:{novo|visualizar|editar|excluir}, update: data|null, campos: {campo1: valor1, campo2: valor2...}}
+        "mensagens": {}, # sucesso|erro|aviso:{ignorar: true|false, conteudo: ["mensagem", ...]}
         "others": {},
     }
 
@@ -57,52 +59,6 @@ def sisvar_global(request):
             base[key] = value
 
     return {"sisVar": base}
-
-# middleware.py #
-
-from django.shortcuts import redirect
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework_simplejwt.exceptions import InvalidToken
-
-ROTAS_PUBLICAS = [
-    "/app/usuario/login/",
-    "/app/usuario/logout/",
-    "/static/",
-]
-
-class JWTAuthMiddleware:
-
-    def __init__(self, get_response):
-        self.get_response = get_response
-        self.jwt_auth = JWTAuthentication()
-
-    def __call__(self, request):
-        path = request.path
-
-        token = request.COOKIES.get("access_token")
-
-        if token:
-            try:
-                validated = self.jwt_auth.get_validated_token(token)
-                request.user = self.jwt_auth.get_user(validated)
-                request.user_data = validated.payload
-            except InvalidToken:
-                pass
-
-        if any(path.startswith(r) for r in ROTAS_PUBLICAS):
-            return self.get_response(request)
-
-        if not token:
-            return redirect("/app/usuario/login/")
-
-        try:
-            validated = self.jwt_auth.get_validated_token(token)
-            request.user = self.jwt_auth.get_user(validated)
-            request.user_data = validated.payload
-        except InvalidToken:
-            return redirect("/app/usuario/login/")
-
-        return self.get_response(request)
 
 # usuario/models.py #
 
@@ -126,14 +82,13 @@ class Usuarios(AbstractUser):
 
 # sisVar.js #
 
-const _state = {
-  usuario: {},
-  form: {},
-  schema: {},
-  others: {}
-};
+const _state = {};
 
-const _dadosBE = 'sisDados';// ID do elemento HTML que contem os dados do back-end
+const _dadosBE = 'sisDados'; // ID do elemento HTML
+
+export function getForm(formId) {
+  return _state.form[formId] ?? {};
+}
 
 export function getSchema(formId) {
   return _state.schema[formId];
@@ -143,29 +98,78 @@ export function getUsuario() {
   return _state.usuario;
 }
 
+export function getMesangens(mensagemExtra = null) {
+    const mensagens = mensagemExtra || _state.mensagens;
+    const container = document.getElementById("container-mensagens");
+    container.innerHTML = '';
+    
+    if (!container || !mensagens) return;
+
+    const config = {
+        sucesso: { classe: 'success' },
+        erro:    { classe: 'danger' },
+        aviso:   { classe: 'warning' }
+    };
+
+    // Função interna para evitar repetição de código na renderização
+    const renderizar = (tipo, dados) => {
+        if (dados.conteudo && dados.conteudo.length > 0) {
+            const podeIgnorar = dados.ignorar !== false;
+            
+            dados.conteudo.forEach(msg => {
+                const alerta = document.createElement('div');
+                alerta.className = `alert alert-${config[tipo]?.classe || 'secondary'} fade show`;
+                
+                if (podeIgnorar) {
+                    alerta.classList.add('alert-dismissible');
+                }
+
+                alerta.innerHTML = `
+                    ${msg}
+                    ${podeIgnorar ? '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' : ''}
+                `;
+                
+                container.appendChild(alerta);
+            });
+        }
+    };
+
+    // Se for uma mensagem extra (fetch), tratamos como um único objeto de mensagem
+    if (mensagemExtra) {
+        // Assume o formato {sucesso: {conteudo: [], ignorar: true}}
+        Object.entries(mensagemExtra).forEach(([tipo, dados]) => renderizar(tipo, dados));
+    } else {
+        // Processa o estado global vindo do context_processors.py
+        Object.entries(mensagens).forEach(([tipo, dados]) => renderizar(tipo, dados));
+    }
+}
+
 export function updateFormField(formId, name, value) {
   if (!_state.form[formId]) {
-    _state.form[formId] = {};
+    alert(`Formulário ${formId} não encontrado no estado. Verifique o back-end.`);
+    return;
+  };
+  _state.form[formId]["campos"][name] = value;
+}
+
+export function getDataBackEnd() {
+  const elemento = document.getElementById(_dadosBE); 
+  
+  if (elemento) {
+    try {
+      const dataBack = JSON.parse(elemento.textContent);
+
+      // "Hidrata" o objeto _state mantendo a mesma referência de memória
+      Object.assign(_state, dataBack);
+
+      // Limpa o elemento do DOM após a leitura
+      elemento.remove(); 
+    } catch (e) {
+      console.error("Erro ao processar dados do Back-End: JSON inválido.", e);
+    }
   }
-
-  _state.form[formId][name] = value;
 }
 
-export function getForm(formId) {
-  return _state.form[formId] ?? {};
-}
-
-export function getDataBackEnd() {// Dados enviados pelo back-end
-  if(document.getElementById(_dadosBE)){
-    const dadosSis = JSON.parse(document.getElementById(_dadosBE).textContent)
-    _state.others = dadosSis.others || {}
-    _state.schema = dadosSis.schema || {}
-    _state.form = dadosSis.form || {}
-    _state.usuario = dadosSis.usuario || {}
-  }
-}
-
-// !!!!!!!!!!!!!!!!!!!!!!! Apenas para debug !!!!!!!!!!!!!!!!!!!!!!!
 export function __debugState() {
   return structuredClone(_state);
 }
@@ -259,15 +263,8 @@ export function getDataForm(el, form) {
                 <!-- Conteúdo -->
                 <main class="col-md-10 ms-sm-auto px-4 py-4">
 
-                    <!-- Mensagens do Django -->
-                    {% if messages %}
-                        {% for message in messages %}
-                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                                {{ message }}
-                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                            </div>
-                        {% endfor %}
-                    {% endif %}
+                    <!-- Mensagens ao Usuário -->
+                    <div id="container-mensagens" class="mt-3"></div>
                     
                     <h1 class="mb-4">{% block page_title %}{% endblock %}</h1>
                     {% block content %}{% endblock %}
@@ -297,7 +294,7 @@ export function getDataForm(el, form) {
 
 # base.js #
 
-import { getDataBackEnd, getUsuario } from "/static/js/sisVar.js";
+import { getDataBackEnd, getUsuario, getMesangens } from "/static/js/sisVar.js";
 
 export async function inicializarNavbarUsuario() {
     try {
@@ -305,6 +302,8 @@ export async function inicializarNavbarUsuario() {
         await getDataBackEnd();
 
         const usuario = getUsuario();
+
+        getMesangens();
 
         // Se não estiver autenticado, não faz nada
         if (!usuario || !usuario.autenticado) {
@@ -356,3 +355,153 @@ export async function inicializarNavbarUsuario() {
 document.addEventListener("DOMContentLoaded", () => {
     inicializarNavbarUsuario();
 });
+
+# input_rules.js #
+
+/**
+ * Inicializa e aplica regras de formatação e máscaras
+ * em inputs com a classe 'smart-input'.
+ *
+ * @param {Function} onChange Callback opcional (input, value)
+ */
+export function initSmartInputs(onChange) {
+    document.querySelectorAll('.smart-input').forEach(input => {
+
+        // === Configurações principais ===
+        const textCase = input.dataset.textcase;
+        const allow = input.dataset.allow;
+        const deny  = input.dataset.deny;
+
+        const mask = input.dataset.mask;
+        const maskValueMode = input.dataset.maskValue || 'formatted'; // formatted | raw
+
+        const maxLength = input.maxLength > 0 ? input.maxLength : null;
+
+        // === Regex pré-compilada ===
+        const allowRegex = allow ? new RegExp(`[^${allow}]`, 'g') : null;
+        const denyRegex  = deny  ? new RegExp(`[${deny}]`, 'g') : null;
+
+        input.addEventListener('input', () => {
+            const originalValue = input.value;
+            let value = originalValue;
+
+            // === Regras base (core) ===
+
+            // Espaços iniciais
+            if (value.length > 0) {
+                value = value.replace(/^\s+/, '');
+            }
+
+            // Regras de caracteres
+            if (allowRegex) {
+                value = value.replace(allowRegex, '');
+            }
+            if (denyRegex) {
+                value = value.replace(denyRegex, '');
+            }
+
+            // Capitalização
+            switch (textCase) {
+                case 'upper':
+                    value = value.toUpperCase();
+                    break;
+                case 'lower':
+                    value = value.toLowerCase();
+                    break;
+            }
+
+            // Limite de caracteres (autoridade máxima)
+            if (maxLength && value.length > maxLength) {
+                value = value.slice(0, maxLength);
+            }
+
+            // === Máscara (opcional e não intrusiva) ===
+            let formattedValue = value;
+            let rawValue = value;
+
+            if (mask) {
+                const result = tryApplyMask(value, mask);
+
+                if (result) {
+                    formattedValue = result.formatted;
+                    rawValue = result.raw;
+                }
+            }
+
+            // Atualiza DOM apenas se mudou
+            if (formattedValue !== originalValue) {
+                input.value = formattedValue;
+            }
+
+            // === Notifica a aplicação ===
+            if (typeof onChange === 'function') {
+                const emittedValue =
+                    mask && maskValueMode === 'raw'
+                        ? rawValue
+                        : formattedValue;
+
+                onChange(input, emittedValue);
+            }
+        });
+    });
+}
+
+/**
+ * Tenta aplicar uma máscara sem interferir nas regras principais.
+ * Retorna null se a máscara não for aplicável.
+ */
+function tryApplyMask(value, mask) {
+    switch (mask) {
+        case 'pt-phone':
+            return maskPtPhone(value);
+
+        case 'pt-postcode':
+            return maskPtPostcode(value);
+
+        default:
+            return null;
+    }
+}
+
+/**
+ * Máscara telefone PT: 000 000 000
+ * Aplica apenas se o valor contiver apenas dígitos e espaços
+ */
+function maskPtPhone(value) {
+    if (!/^[\d\s]*$/.test(value)) return null;
+
+    const digits = value.replace(/\s+/g, '');
+
+    // Aplica progressivamente, sem cortar
+    const parts = [];
+    if (digits.length > 0) parts.push(digits.slice(0, 3));
+    if (digits.length > 3) parts.push(digits.slice(3, 6));
+    if (digits.length > 6) parts.push(digits.slice(6));
+
+    return {
+        raw: digits,
+        formatted: parts.join(' ')
+    };
+}
+
+/**
+ * Máscara código postal PT: 0000-000
+ * Aplica apenas se o valor contiver apenas dígitos ou hífen
+ */
+function maskPtPostcode(value) {
+    if (!/^[\d-]*$/.test(value)) return null;
+
+    const digits = value.replace(/-/g, '');
+
+    if (digits.length <= 4) {
+        return {
+            raw: digits,
+            formatted: digits
+        };
+    }
+
+    return {
+        raw: digits,
+        formatted: `${digits.slice(0, 4)}-${digits.slice(4)}`
+    };
+}

@@ -1,4 +1,4 @@
-import { updateFormField, getForm } from "/static/js/sisVar.js";
+import { updateFormField, getForm, getMesangens } from "/static/js/sisVar.js";
 import { criarAtualizadorForm } from "/static/js/refresh_varSis.js";
 import { AppLoader } from "/static/js/loader.js";
 
@@ -41,13 +41,12 @@ form.addEventListener("submit", async e => {
       window.location.href = "/app/home/";
     } else {
       // Erro de credenciais ou validação
-      console.log(data.error);
-      alert("Erro: " + data.error);
+      getMesangens(data.mensagens);
       AppLoader.hide(); // LIBERA A TELA para o usuário tentar novamente
     }
   } catch (err) {
     // Erro de rede ou servidor fora do ar
-    console.error("Erro na requisição:", err);
+    alert("Erro na requisição:", err);
     AppLoader.hide(); // LIBERA A TELA em caso de falha técnica
   }
 });

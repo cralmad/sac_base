@@ -7,34 +7,39 @@ from rest_framework_simplejwt.tokens import RefreshToken
 User = get_user_model()
 
 def login_view(request):
-    schema = {
+    
+    request.sisvar_extra = {}
+
+    schema = { "loginForm": {
         'username': {'type': 'string', 'maxlength': 50, 'required': True},
         'password': {'type': 'password', 'required': True}
+        }
     }
 
-    request.sisvar_extra = {"schema": schema}
+    formulario = {"loginForm": {"estado": "novo", "update": None, "campos": {}}}
     
     # ---------- GET ----------
     if request.method == "GET":
 
+        request.sisvar_extra |= {"schema": schema} | {"form": formulario}  
         return render(request, "login.html")
 
     # ---------- POST ----------
     try:
         payload = request.sisvar_front
-        form = payload["form"]["loginForm"]
+        form = payload["form"]["loginForm"]["campos"]
         username = form.get("username")
         password = form.get("password")
     except (KeyError, json.JSONDecodeError):
         return JsonResponse(
-            {"success": False, "error": "Payload inválido"},
+            {"mensagens": {"erro": {"ignorar": False, "conteudo": ["Payload inválido"]}}},
             status=400
         )
 
     user = authenticate(username=username, password=password)
     if not user:
         return JsonResponse(
-            {"success": False, "error": "Credenciais inválidas"},
+            {"mensagens": {"erro": {"ignorar": True, "conteudo": ["Credenciais inválidas"]}}},
             status=401
         )
 

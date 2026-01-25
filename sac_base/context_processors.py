@@ -6,7 +6,8 @@ def sisvar_global(request):
             "nome": request.user.username if request.user.is_authenticated else None,
         },
         "schema": {},
-        "form": {},
+        "form": {}, # formId: {estado:{novo|visualizar|editar|excluir}, update: data|null, campos: {campo1: valor1, campo2: valor2...}}
+        "mensagens": {}, # sucesso|erro|aviso:{ignorar: true|false, conteudo: ["mensagem", ...]}
         "others": {},
     }
 
@@ -17,7 +18,7 @@ def sisvar_global(request):
 
     return {"sisVar": base}
 
-'''na view
+'''Adicionar conteúdo em sisVar na view
     def home(request):
         request.sisvar_extra = {
             "others": {"pagina": "home"}
