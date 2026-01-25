@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ### Projeto SacBase ###
 
 1 - Base de desenvolvimento
@@ -89,13 +90,46 @@ const _dadosBE = 'sisDados'; // ID do elemento HTML
 export function getForm(formId) {
   return _state.form[formId] ?? {};
 }
+=======
+// sisVar.js
 
-export function getSchema(formId) {
-  return _state.schema[formId];
+// 1. Contrato padronizado para o _state [cite: 1]
+const _state = {
+  usuario: {},
+  form: {},    // Dados dos campos (ex: { formId: { nome: 'João' } }) [cite: 3, 4]
+  schema: {},  // Definições de validação/campos [cite: 6]
+  others: {},  // Dados genéricos do backend [cite: 5, 6]
+  
+  // 3. Contrato para estados do formulário (Mode)
+  // Armazena se o form está em: 'novo', 'visualizar', 'editar', 'deletar'
+  status: {}, 
+  
+  // 1. Padronização de mensagens/notificações do backend
+  mensagens: {
+    sucesso: null,
+    erro: null,
+    avisos: []
+  }
+};
+
+const _dadosBE = 'sisDados'; // ID do elemento HTML [cite: 2]
+>>>>>>> 4a21043dd0ca08379f11e4355a23191cde67e6ea
+
+// --- Getters e Setters ---
+
+export function getFormStatus(formId) {
+  return _state.status[formId] || 'visualizar'; // 'visualizar' como padrão seguro
 }
 
-export function getUsuario() {
-  return _state.usuario;
+export function setFormStatus(formId, status) {
+  const modosValidos = ['novo', 'visualizar', 'editar', 'deletar'];
+  if (modosValidos.includes(status)) {
+    _state.status[formId] = status;
+  }
+}
+
+export function getForm(formId) {
+  return _state.form[formId] ?? {}; [cite: 4, 5]
 }
 
 export function getMesangens(mensagemExtra = null) {
@@ -146,6 +180,7 @@ export function getMesangens(mensagemExtra = null) {
 
 export function updateFormField(formId, name, value) {
   if (!_state.form[formId]) {
+<<<<<<< HEAD
     alert(`Formulário ${formId} não encontrado no estado. Verifique o back-end.`);
     return;
   };
@@ -167,9 +202,103 @@ export function getDataBackEnd() {
     } catch (e) {
       console.error("Erro ao processar dados do Back-End: JSON inválido.", e);
     }
+=======
+    _state.form[formId] = {}; [cite: 3]
+  }
+  _state.form[formId][name] = value; [cite: 4]
+}
+
+// 2. Melhoria no getDataBackEnd com limpeza de HTML e Segurança
+export function getDataBackEnd() {
+  const elemento = document.getElementById(_dadosBE); [cite: 5]
+  
+  if (elemento) {
+    try {
+      const dadosSis = JSON.parse(elemento.textContent); [cite: 5]
+      
+      // Mapeamento seguro para o estado [cite: 5, 6, 7]
+      _state.others  = dadosSis.others  || {};
+      _state.schema  = dadosSis.schema  || {};
+      _state.form    = dadosSis.form    || {};
+      _state.usuario = dadosSis.usuario || {};
+      _state.status  = dadosSis.status  || {}; // Inicializa modos se vierem do BE
+      _state.mensagens = {
+        sucesso: dadosSis.msgSucesso || null,
+        erro: dadosSis.msgErro || null,
+        avisos: dadosSis.avisos || []
+      };
+
+      // 2. Deletar os dados do HTML para segurança e performance
+      elemento.remove(); 
+      console.log('Dados do Back-End carregados e elemento removido.');
+
+    } catch (e) {
+      console.error("Erro ao processar dados do Back-End: JSON inválido.", e);
+    }
   }
 }
 
+export function __debugState() {
+  return structuredClone(_state); [cite: 8]
+}
+
+
+Para melhorar o seu arquivo sisVar.js, vamos focar em encapsulamento, limpeza de memória e na estruturação de um contrato de estado mais robusto.
+
+Abaixo está a proposta de melhoria seguindo os pontos solicitados:
+
+Proposta de sisVar.js Otimizado
+JavaScript
+
+// sisVar.js
+
+// 1. Contrato padronizado para o _state [cite: 1]
+const _state = {
+  usuario: {},
+  form: {},    // Dados dos campos (ex: { formId: { nome: 'João' } }) [cite: 3, 4]
+  schema: {},  // Definições de validação/campos [cite: 6]
+  others: {},  // Dados genéricos do backend [cite: 5, 6]
+  
+  // 3. Contrato para estados do formulário (Mode)
+  // Armazena se o form está em: 'novo', 'visualizar', 'editar', 'deletar'
+  status: {}, 
+  
+  // 1. Padronização de mensagens/notificações do backend
+  mensagens: {
+    sucesso: null,
+    erro: null,
+    avisos: []
+  }
+};
+
+const _dadosBE = 'sisDados'; // ID do elemento HTML [cite: 2]
+
+// --- Getters e Setters ---
+
+export function getFormStatus(formId) {
+  return _state.status[formId] || 'visualizar'; // 'visualizar' como padrão seguro
+}
+
+export function setFormStatus(formId, status) {
+  const modosValidos = ['novo', 'visualizar', 'editar', 'deletar'];
+  if (modosValidos.includes(status)) {
+    _state.status[formId] = status;
+  }
+}
+
+export function getForm(formId) {
+  return _state.form[formId] ?? {}; [cite: 4, 5]
+}
+
+export function updateFormField(formId, name, value) {
+  if (!_state.form[formId]) {
+    _state.form[formId] = {}; [cite: 3]
+>>>>>>> 4a21043dd0ca08379f11e4355a23191cde67e6ea
+  }
+  _state.form[formId][name] = value; [cite: 4]
+}
+
+<<<<<<< HEAD
 export function __debugState() {
   return structuredClone(_state);
 }
@@ -297,12 +426,33 @@ export function getDataForm(el, form) {
 import { getDataBackEnd, getUsuario, getMesangens } from "/static/js/sisVar.js";
 
 export async function inicializarNavbarUsuario() {
+=======
+// 2. Melhoria no getDataBackEnd com limpeza de HTML e Segurança
+export function getDataBackEnd() {
+  const elemento = document.getElementById(_dadosBE); [cite: 5]
+  
+  if (elemento) {
+>>>>>>> 4a21043dd0ca08379f11e4355a23191cde67e6ea
     try {
-        // Garante que os dados do backend foram carregados
-        await getDataBackEnd();
+      const dadosSis = JSON.parse(elemento.textContent); [cite: 5]
+      
+      // Mapeamento seguro para o estado [cite: 5, 6, 7]
+      _state.others  = dadosSis.others  || {};
+      _state.schema  = dadosSis.schema  || {};
+      _state.form    = dadosSis.form    || {};
+      _state.usuario = dadosSis.usuario || {};
+      _state.status  = dadosSis.status  || {}; // Inicializa modos se vierem do BE
+      _state.mensagens = {
+        sucesso: dadosSis.msgSucesso || null,
+        erro: dadosSis.msgErro || null,
+        avisos: dadosSis.avisos || []
+      };
 
-        const usuario = getUsuario();
+      // 2. Deletar os dados do HTML para segurança e performance
+      elemento.remove(); 
+      console.log('Dados do Back-End carregados e elemento removido.');
 
+<<<<<<< HEAD
         getMesangens();
 
         // Se não estiver autenticado, não faz nada
@@ -348,9 +498,15 @@ export async function inicializarNavbarUsuario() {
 
     } catch (erro) {
         console.error("Erro ao inicializar navbar de usuário:", erro);
+=======
+    } catch (e) {
+      console.error("Erro ao processar dados do Back-End: JSON inválido.", e);
+>>>>>>> 4a21043dd0ca08379f11e4355a23191cde67e6ea
     }
+  }
 }
 
+<<<<<<< HEAD
 // Auto-executa ao carregar o módulo
 document.addEventListener("DOMContentLoaded", () => {
     inicializarNavbarUsuario();
@@ -505,3 +661,20 @@ function maskPtPostcode(value) {
         formatted: `${digits.slice(0, 4)}-${digits.slice(4)}`
     };
 }
+=======
+export function __debugState() {
+  return structuredClone(_state); [cite: 8]
+}
+Principais Melhorias Implementadas
+
+Segurança (Ponto 2): O uso de elemento.remove() após o processamento impede que o JSON com informações do sistema (como a estrutura do usuário ou schemas) fique exposto no DOM para qualquer script ou extensão de navegador.
+
+Gestão de Modos (Ponto 3): Adicionei o objeto status e a função setFormStatus. Isso permite que seu código de UI (CSS ou JS) saiba exatamente o que habilitar ou desabilitar (ex: se o status for visualizar, os inputs podem ser travados).
+
+Tratamento de Mensagens (Ponto 1): O contrato agora prevê mensagens.sucesso e mensagens.erro. Isso facilita a criação de um componente de "Toast" ou alerta automático que lê o estado assim que ele é carregado do backend.
+
+
+Robustez: Adicionado um bloco try/catch no JSON.parse para evitar que uma falha no backend trave toda a execução do seu JavaScript frontal.
+
+Próximo Passo: Gostaria que eu mostrasse como integrar o status do formulário (novo, editar) com as funções do seu arquivo refresh_varSis.js para bloquear campos automaticamente?
+>>>>>>> 4a21043dd0ca08379f11e4355a23191cde67e6ea
