@@ -1,16 +1,21 @@
 import { updateFormField, getForm, getMesangens } from "/static/js/sisVar.js";
+import { initSmartInputs } from "/static/js/input_rules.js";
 import { criarAtualizadorForm } from "/static/js/refresh_varSis.js";
 import { AppLoader } from "/static/js/loader.js";
 
-const form = document.getElementById("loginForm");
+const form = document.getElementById("alterarSenhaForm");
 
 const updater = criarAtualizadorForm({
-  formId: "loginForm",
+  formId: "alterarSenhaForm",
   setter: updateFormField,
   form
 });
 
 form.addEventListener("input", updater);
+
+initSmartInputs((input, value) => {
+    updateFormField("alterarSenhaForm", input.name, value);
+});
 
 form.addEventListener("submit", async e => {
   e.preventDefault();
@@ -20,12 +25,12 @@ form.addEventListener("submit", async e => {
 
   const sisVarPayload = {
     form: {
-      loginForm: getForm("loginForm")
+      alterarSenhaForm: getForm("alterarSenhaForm")
     }
   };
 
   try {
-    const res = await fetch("/app/usuario/login/", {
+    const res = await fetch("/app/usuario/alterarsenha/", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -38,7 +43,8 @@ form.addEventListener("submit", async e => {
 
     if (data.success) {
       // O redirecionamento mata a página atual, então o loader some sozinho
-      window.location.href = "/app/home/";
+      getMesangens(data.mensagens);
+      AppLoader.hide(); // LIBERA A TELA para o usuário tentar novamente
     } else {
       // Erro de credenciais ou validação
       getMesangens(data.mensagens);
@@ -46,7 +52,7 @@ form.addEventListener("submit", async e => {
     }
   } catch (err) {
     // Erro de rede ou servidor fora do ar
-    alert("Erro na requisição:", err);
+    getMesangens(data.mensagens);
     AppLoader.hide(); // LIBERA A TELA em caso de falha técnica
   }
 });

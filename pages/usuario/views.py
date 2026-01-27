@@ -1,8 +1,10 @@
 import json
 from django.http import JsonResponse
-from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth import authenticate, get_user_model, update_session_auth_hash
 from django.shortcuts import render, redirect
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.core.exceptions import ValidationError
+from django.contrib.auth.password_validation import validate_password
 
 User = get_user_model()
 
@@ -107,3 +109,88 @@ def cadastro_view(request):
     )
 
     return redirect("/login/")
+
+def alterar_senha_view(request):
+    template = "alterarsenha.html"
+    
+    # Esquema para validação no front-end (opcional, seguindo o padrão do login)
+    schema = {
+        "alterarSenhaForm": {
+            'senha_atual': {'type': 'password', 'required': True},
+            'nova_senha': {'type': 'password', 'required': True},
+            'confirmar_senha': {'type': 'password', 'required': True}
+        }
+    }
+
+    # ---------- GET ----------
+    if request.method == "GET":
+        request.sisvar_extra = {
+            "schema": schema,
+            "form": {
+                "alterarSenhaForm": {
+                    "estado": "editar",
+                    "update": None,
+                    "campos": {
+                        "senha_atual": "",
+                        "nova_senha": "",
+                        "confirmar_senha": "",
+                    }
+                }
+            }
+        }
+        return render(request, template)
+
+    # ---------- POST ----------
+    try:
+        payload = request.sisvar_front
+        form = payload.get("form", {}).get("alterarSenhaForm", {}).get("campos", {})
+        
+        senha_atual = form.get("senha_atual")
+        nova_senha = form.get("nova_senha")
+        confirmar = form.get("confirmar_senha")
+    except (KeyError, json.JSONDecodeError, AttributeError):
+        return JsonResponse(
+            {"mensagens": {"erro": {"ignorar": False, "conteudo": ["Payload inválido"]}}},
+            status=400
+        )
+
+    mensagens_erro = []
+    user = request.user
+
+    # Validações de Negócio
+    if not user.is_authenticated:
+        return JsonResponse({"mensagens": {"erro": {"ignorar": False, "conteudo": ["Usuário não autenticado"]}}}, status=401)
+
+    if not user.check_password(senha_atual):
+        mensagens_erro.append("Senha atual inválida.")
+
+    if nova_senha != confirmar:
+        mensagens_erro.append("Nova senha e confirmação não coincidem.")
+
+    try:
+        validate_password(nova_senha, user)
+    except ValidationError as e:
+        mensagens_erro.extend(e.messages)
+
+    # Retorno de Erros em formato JSON
+    if mensagens_erro:
+        return JsonResponse(
+            {"mensagens": {"erro": {"ignorar": False, "conteudo": mensagens_erro}}},
+            status=400
+        )
+
+    # Persistência
+    user.set_password(nova_senha)
+    user.save()
+    update_session_auth_hash(request, user)
+
+    # Retorno de Sucesso em formato JSON
+    return JsonResponse({
+        "success": True,
+        "mensagens": {
+            "sucesso": {
+                "ignorar": False,
+                "conteudo": ["Senha alterada com sucesso."]
+            }
+        }
+    })

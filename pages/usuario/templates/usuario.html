@@ -16,8 +16,6 @@
     {% if erro %}<p>{{ erro }}</p>{% endif %}
 </form>
 
-<button id="teste" type="button" class="btn btn-primary">TESTE</button>
-
 {% block scripts %}
     {{ sisVar|json_script:"sisDados" }}
     <script type="module" src="{% static 'usuario/js/scripts.js' %}"></script>

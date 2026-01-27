@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}SacBase - Senha{% endblock %}
+
+<link rel="stylesheet" href="{% static 'usuario/css/stylespass.css' %}">
+{% block page_title %}Alterar Senha{% endblock %}
+{% block content %}
+
+<form id="alterarSenhaForm" method="POST">
+    {% csrf_token %}
+
+    <div class="mb-3">
+        <label class="form-label">Senha Atual</label>
+        <input type="password" name="senha_atual" class="form-control smart-input"
+               data-allow="A-Za-z0-9@#%!*_" maxlength="20" required/>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Nova Senha</label>
+        <input type="password" name="nova_senha" class="form-control smart-input"
+               data-allow="A-Za-z0-9@#%!*_" maxlength="20" required/>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Confirmar Nova Senha</label>
+        <input type="password" name="confirmar_senha" class="form-control smart-input"
+               data-allow="A-Za-z0-9@#%!*_" maxlength="20" required/>
+    </div>
+
+    <button class="btn btn-primary show-loader" type="submit">Alterar Senha</button>
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="{% static 'usuario/js/scriptspass.js' %}"></script>
+{% endblock %}

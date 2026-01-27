@@ -34,7 +34,7 @@ export async function inicializarNavbarUsuario() {
                     </li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
-                        <a class="dropdown-item" href="/alterar-senha">
+                        <a class="dropdown-item" href="/app/usuario/alterarsenha/">
                             Alterar senha
                         </a>
                     </li>
@@ -59,3 +59,19 @@ export async function inicializarNavbarUsuario() {
 document.addEventListener("DOMContentLoaded", () => {
     inicializarNavbarUsuario();
 });
+
+
+/*****************DEBUG**********************/
+import { __debugState } from '/static/js/sisVar.js';
+
+window.__DEBUG__ = {
+  get state() {
+    return __debugState();
+  }
+};
+
+function exibir() {
+  console.log(window.__DEBUG__.state);
+}
+
+document.getElementById('teste').addEventListener('click', exibir);
