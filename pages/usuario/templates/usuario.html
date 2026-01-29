@@ -1,24 +1,50 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Cadastro de Grupo de Clientes{% endblock %}
+{% block title %}SacBase - Usuario{% endblock %}
 
-{% block estilo %}<link rel="stylesheet" href="{% static 'usuario/css/styles.css' %}">{% endblock %}
-
+<link rel="stylesheet" href="{% static 'usuario/css/stylesuser.css' %}">
+{% block page_title %}Cadastro de Usuário{% endblock %}
 {% block content %}
 
-<form id="loginForm" method="post">
+<form id="cadUsuario" method="POST">
     {% csrf_token %}
-    <input name="username" placeholder="Usuário">
-    <input name="email" placeholder="Email">
-    <input type="password" name="password" placeholder="Senha">
-    <button type="submit">Cadastrar</button>
-    {% if erro %}<p>{{ erro }}</p>{% endif %}
+
+    <div class="mb-3">
+        <label class="form-label">Nome</label>
+        <input type="text" name="nome" class="form-control smart-input"
+               data-allow="A-Za-z0-9" maxlength="20" required/>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">E-mail</label>
+        <input type="password" name="email" class="form-control smart-input"
+               data-allow="A-Za-z0-9@_-" maxlength="60" required/>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Usuário</label>
+        <input type="text" name="usuario" class="form-control smart-input"
+               data-allow="A-Za-z0-9" maxlength="20" required/>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Senha</label>
+        <input type="password" name="nova_senha" class="form-control smart-input"
+               data-deny="&quot;&apos;" maxlength="20" required/>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Confirmar Senha</label>
+        <input type="password" name="confirmar_senha" class="form-control smart-input"
+               data-deny="&quot;&apos;" maxlength="20" required/>
+    </div>
+
+    <button class="btn btn-primary show-loader" type="submit">SALVAR</button>
 </form>
 
-{% block scripts %}
-    {{ sisVar|json_script:"sisDados" }}
-    <script type="module" src="{% static 'usuario/js/scripts.js' %}"></script>
 {% endblock %}
 
+{% block scripts %}
+  <script type="module" src="{% static 'usuario/js/scriptsuser.js' %}"></script>
 {% endblock %}

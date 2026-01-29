@@ -2,7 +2,6 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 class Usuarios(AbstractUser):
-    nome = models.CharField(max_length=150)
 
     class Meta:
         db_table = 'usuarios'
@@ -10,7 +9,8 @@ class Usuarios(AbstractUser):
     def sisvar_payload(self):
         return {
             "id": self.id,
-            "nome": self.nome,
+            "nome": self.first_name,
+            "username": self.username,
             "permissoes": list(
                 self.get_all_permissions()
             )
