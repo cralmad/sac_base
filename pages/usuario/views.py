@@ -5,6 +5,8 @@ from django.shortcuts import render, redirect
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.exceptions import ValidationError
 from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.hashers import make_password
+from pages.usuario.models import Usuarios
 
 User = get_user_model()
 
@@ -80,35 +82,117 @@ def logout_view(request):
 
 
 def cadastro_view(request):
-    if request.method == "GET":
+    template = "usuario.html"
+    nomeForm = "cadUsuario"
 
-        usuario = {
-            "autenticado": getattr(request.user, "is_authenticated", False),
-            "id": getattr(request.user, "id", None),
-            "nome": getattr(request.user, "username", None),
-            "permissoes": list(getattr(request.user, "get_all_permissions", lambda: [])())
+    schema = {
+        nomeForm: {
+            "username": {'type': 'string', 'maxlength': 20, 'required': True},
+            "first_name": {'type': 'string', 'maxlength': 30, 'required': True},
+            "email": {'type': 'string', 'maxlength': 60, 'required': True},
+            "password": {'type': 'password', 'required': True},
+            "confirmpass": {'type': 'password', 'required': True},
+            "ativo": {'type': 'boolean', 'required': False}
         }
+    }
 
-        return render(
-            request,
-            "usuario.html",
-            {"sisVar": {"usuario": usuario}}
-        )
+    # ---------- GET ----------
+    if request.method == "GET":
+        request.sisvar_extra = {
+            "schema": schema,
+            "form": {
+                nomeForm: {
+                    "estado": "novo",
+                    "update": None,
+                    "campos": {
+                        "id": None,
+                        "username": "",
+                        "first_name": "",
+                        "email": "",
+                        "password": "",
+                        "confirmpass": "",
+                        "ativo": None
+                    }
+                }
+            }
+        }
+        return render(request, template)
 
-    username = request.POST.get("username")
-    email = request.POST.get("email")
-    password = request.POST.get("password")
+    dataFront = request.sisvar_front
+    form = dataFront.get("form", {}).get(nomeForm, {})
+    campos = form.get("campos", {})
+    estado = form.get("estado", "")
 
-    if User.objects.filter(username=username).exists():
-        return render(request, "usuario.html", {"erro": "Usuário já existe"})
+    id_user = campos.get("id", None)
+    nome_user = campos.get("username")
+    nome = campos.get("first_name")
+    email = campos.get("email")
+    password = campos.get("password")
+    ativo = campos.get("ativo")
+    confirmpass = campos.get("confirmpass")
+    reg_user = None
+    
+    if id_user: reg_user = Usuarios.objects.get(id=id_user)
 
-    User.objects.create_user(
-        username=username,
-        email=email,
-        password=password
-    )
+    # Validações do formulário  ###############################################
+    if User.objects.filter(username=nome_user).exists():
+        return JsonResponse({
+            "mensagens": {
+                "erro": {
+                    "conteudo": ["Usuário já existe"],
+                    "ignorar": False
+                }
+            }
+        })
+    ############################################################################
 
-    return redirect("/login/")
+    match estado:
+        case 'novo':
+            usuario = Usuarios.objects.create(
+                username=nome_user,
+                first_name=nome,
+                email=email,
+                password=make_password(password),
+                is_active=ativo if ativo is not None else True
+            )
+        
+        case 'editar':
+            reg_user.first_name = nome_user
+            reg_user.email = email
+
+            if campos.get("password"):
+                reg_user.password = make_password(campos["password"])
+
+            reg_user.save()
+
+        case 'excluir':
+            reg_user.is_active = False
+            reg_user.save()
+
+    # ===== RESPOSTA JSON (editar / visualizar / excluir) =====
+    return JsonResponse({
+        "form": {
+            nomeForm: {
+                "estado": "visualizar",
+                "update": usuario.date_joined,
+                "campos": {
+                    "id": usuario.id,
+                    "username": usuario.username,
+                    "first_name": usuario.first_name,
+                    "email": usuario.email,
+                    "password": "",
+                    "confirmpass": "",
+                    "ativo": usuario.is_active
+                }
+            }
+        },
+        "mensagens": {
+            "sucesso": {
+                "ignorar": True,
+                "conteudo": ["Operação realizada com sucesso!"]
+            }
+        }
+    })
 
 def alterar_senha_view(request):
     template = "alterarsenha.html"

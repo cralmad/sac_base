@@ -9,37 +9,46 @@
 
 <form id="cadUsuario" method="POST">
     {% csrf_token %}
+    <div class="container-md-3 my-3 mx-auto">
+        <div class="row g-3"> 
+            
+            <div class="col-12 col-sm-5">
+                <label class="form-label mb-0">Nome</label>
+                <input type="text" name="first_name" class="form-control smart-input"
+                    data-deny="&quot;&apos;" maxlength="30" required/>
+            </div>
 
-    <div class="mb-3">
-        <label class="form-label">Nome</label>
-        <input type="text" name="nome" class="form-control smart-input"
-               data-allow="A-Za-z0-9" maxlength="20" required/>
+            <div class="col-12 col-sm-5">
+                <label class="form-label mb-0">Usuário</label>
+                <input type="text" name="username" class="form-control smart-input"
+                    data-deny="&quot;&apos; " maxlength="20" required/>
+            </div>
+
+            <div class="col-12 col-sm-10">
+                <label class="form-label mb-0">E-mail</label>
+                <input type="email" name="email" class="form-control smart-input"
+                    data-deny="&quot;&apos; " maxlength="60" required/>
+            </div>
+
+            <div class="col-12 col-sm-5">
+                <label class="form-label mb-0">Senha</label>
+                <input type="password" name="password" class="form-control smart-input"
+                    data-deny="&quot;&apos; " maxlength="20" required/>
+            </div>
+
+            <div class="col-12 col-sm-5">
+                <label class="form-label mb-0">Confirmar Senha</label>
+                <input type="password" name="confirmpass" class="form-control smart-input"
+                    data-deny="&quot;&apos; " maxlength="20" required/>
+            </div>
+
+            <div class="col-12 form-check form-switch ms-3">
+                <input class="form-check-input smart-input" type="checkbox" name="ativo" id="flexCheckDefault">
+                <label class="form-check-label mb-0" for="flexCheckDefault">Usuário Ativo</label>
+            </div>
+        </div>
     </div>
-
-    <div class="mb-3">
-        <label class="form-label">E-mail</label>
-        <input type="password" name="email" class="form-control smart-input"
-               data-allow="A-Za-z0-9@_-" maxlength="60" required/>
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Usuário</label>
-        <input type="text" name="usuario" class="form-control smart-input"
-               data-allow="A-Za-z0-9" maxlength="20" required/>
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Senha</label>
-        <input type="password" name="nova_senha" class="form-control smart-input"
-               data-deny="&quot;&apos;" maxlength="20" required/>
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Confirmar Senha</label>
-        <input type="password" name="confirmar_senha" class="form-control smart-input"
-               data-deny="&quot;&apos;" maxlength="20" required/>
-    </div>
-
+    
     <button class="btn btn-primary show-loader" type="submit">SALVAR</button>
 </form>
 
