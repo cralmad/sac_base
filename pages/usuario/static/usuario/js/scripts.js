@@ -1,4 +1,4 @@
-import { updateFormField, getForm, getMesangens } from "/static/js/sisVar.js";
+import { updateFormField, getForm, updateState } from "/static/js/sisVar.js";
 import { criarAtualizadorForm } from "/static/js/refresh_varSis.js";
 import { AppLoader } from "/static/js/loader.js";
 
@@ -41,7 +41,7 @@ form.addEventListener("submit", async e => {
       window.location.href = "/app/home/";
     } else {
       // Erro de credenciais ou validação
-      getMesangens(data.mensagens);
+      updateState(data);
       AppLoader.hide(); // LIBERA A TELA para o usuário tentar novamente
     }
   } catch (err) {

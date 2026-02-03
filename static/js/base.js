@@ -1,4 +1,4 @@
-import { getDataBackEnd, getUsuario, getMesangens } from "/static/js/sisVar.js";
+import { getDataBackEnd, getUsuario, renderMensagens } from "/static/js/sisVar.js";
 
 export async function inicializarNavbarUsuario() {
     try {
@@ -7,7 +7,7 @@ export async function inicializarNavbarUsuario() {
 
         const usuario = getUsuario();
 
-        getMesangens();
+        renderMensagens();
 
         // Se não estiver autenticado, não faz nada
         if (!usuario || !usuario.autenticado) {

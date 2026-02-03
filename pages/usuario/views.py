@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.hashers import make_password
 from pages.usuario.models import Usuarios
+from sac_base.form_validador import SchemaValidator
 
 User = get_user_model()
 
@@ -122,6 +123,19 @@ def cadastro_view(request):
     form = dataFront.get("form", {}).get(nomeForm, {})
     campos = form.get("campos", {})
     estado = form.get("estado", "")
+
+    # Validação dos campos do formulário ################################
+    validator = SchemaValidator(schema[nomeForm])
+    if not validator.validate(campos):
+            return JsonResponse({
+                "others": {
+                    nomeForm: {
+                        "erros": validator.get_errors()
+                    }
+                },
+                "mensagens": {"erro": {"conteudo": ["Existem erros no formulário."]}}
+            }, status=400)
+    #######################################################################
 
     id_user = campos.get("id", None)
     nome_user = campos.get("username")

@@ -14,12 +14,13 @@ export function getUsuario() {
   return _state.usuario;
 }
 
-export function getMesangens(mensagemExtra = null) {
-    const mensagens = mensagemExtra || _state.mensagens;
+export function renderMensagens() {
+    const mensagens = _state.mensagens;
     const container = document.getElementById("container-mensagens");
-    container.innerHTML = '';
     
     if (!container || !mensagens) return;
+    
+    container.innerHTML = '';
 
     const config = {
         sucesso: { classe: 'success' },
@@ -50,14 +51,7 @@ export function getMesangens(mensagemExtra = null) {
         }
     };
 
-    // Se for uma mensagem extra (fetch), tratamos como um único objeto de mensagem
-    if (mensagemExtra) {
-        // Assume o formato {sucesso: {conteudo: [], ignorar: true}}
-        Object.entries(mensagemExtra).forEach(([tipo, dados]) => renderizar(tipo, dados));
-    } else {
-        // Processa o estado global vindo do context_processors.py
-        Object.entries(mensagens).forEach(([tipo, dados]) => renderizar(tipo, dados));
-    }
+    Object.entries(mensagens).forEach(([tipo, dados]) => renderizar(tipo, dados));
 }
 
 export function updateFormField(formId, name, value) {
@@ -84,6 +78,31 @@ export function getDataBackEnd() {
       console.error("Erro ao processar dados do Back-End: JSON inválido.", e);
     }
   }
+}
+
+/**
+  Atualiza o estado global com novos dados vindos do Back-End.
+ * @param {Object} newData - Objeto vindo do JsonResponse do Back-End
+ */
+export function updateState(newData) {
+  if (!newData || typeof newData !== 'object') return;
+
+  // Percorremos as chaves enviadas pelo Back-End (ex: "form", "mensagens")
+  Object.entries(newData).forEach(([key, value]) => {
+    
+    // Se a chave for "form", fazemos um merge dos formulários específicos
+    // para não apagar outros formulários que já estão no estado.
+    if (key === 'form' && _state.form) {
+      Object.assign(_state.form, value);
+    } 
+    
+    else {
+      _state[key] = value;
+    }
+  });
+
+  // Gatilho automático: se vieram mensagens novas, renderiza na tela
+  if (newData.mensagens) {renderMensagens();}
 }
 
 export function __debugState() {
