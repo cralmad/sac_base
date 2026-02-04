@@ -88,8 +88,8 @@ def cadastro_view(request):
 
     schema = {
         nomeForm: {
-            "username": {'type': 'string', 'maxlength': 20, 'required': True},
-            "first_name": {'type': 'string', 'maxlength': 30, 'required': True},
+            "username": {'type': 'string', 'maxlength': 20, 'minlength': 3, 'required': True},
+            "first_name": {'type': 'string', 'maxlength': 30, 'minlength': 3, 'required': True},
             "email": {'type': 'string', 'maxlength': 60, 'required': True},
             "password": {'type': 'password', 'required': True},
             "confirmpass": {'type': 'password', 'required': True},
@@ -127,14 +127,14 @@ def cadastro_view(request):
     # Validação dos campos do formulário ################################
     validator = SchemaValidator(schema[nomeForm])
     if not validator.validate(campos):
-            return JsonResponse({
-                "others": {
-                    nomeForm: {
-                        "erros": validator.get_errors()
-                    }
-                },
-                "mensagens": {"erro": {"conteudo": ["Existem erros no formulário."]}}
-            }, status=400)
+        errosList = validator.get_errors()
+        errosForm = [
+            f"{campo} - {', '.join(erros)}"
+            for campo, erros in errosList.items()
+        ]
+        return JsonResponse({
+            "mensagens": {"erro": {"conteudo": [errosForm], "ignorar": False}}
+        }, status=400)
     #######################################################################
 
     id_user = campos.get("id", None)
@@ -158,6 +158,15 @@ def cadastro_view(request):
                 }
             }
         })
+    if password != confirmpass:
+        return JsonResponse({
+            "mensagens": {
+                "erro": {
+                    "conteudo": ["Senha e confirmação de senha não coincidem"],
+                    "ignorar": False
+                }
+            }
+        })
     ############################################################################
 
     match estado:
@@ -167,7 +176,7 @@ def cadastro_view(request):
                 first_name=nome,
                 email=email,
                 password=make_password(password),
-                is_active=ativo if ativo is not None else True
+                is_active=(ativo == True)
             )
         
         case 'editar':
