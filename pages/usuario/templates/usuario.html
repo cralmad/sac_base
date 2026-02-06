@@ -7,7 +7,7 @@
 {% block page_title %}Cadastro de Usuário{% endblock %}
 {% block content %}
 
-<form id="cadUsuario" method="POST">
+<form id="cadUsuario" data-form-lock="cadUsuario" method="POST">
     {% csrf_token %}
     <div class="container-md-3 my-3 mx-auto">
         <div class="row g-3"> 
@@ -49,7 +49,7 @@
         </div>
     </div>
     
-    <button class="btn btn-primary show-loader" type="submit">SALVAR</button>
+    <button class="btn btn-primary show-loader" data-show-on="novo,editar" type="submit">SALVAR</button>
 </form>
 
 {% endblock %}
