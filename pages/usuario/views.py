@@ -301,3 +301,47 @@ def alterar_senha_view(request):
             }
         }
     })
+
+def cons_usuario(request):
+    nomeForm = "consUsuario"
+
+    if request.method == "POST":
+        dataFront = request.sisvar_front
+        form = dataFront.get("form", {}).get(nomeForm, {})
+        campos = form.get("campos", {})
+
+        id_selecionado = campos.get('id_selecionado')
+
+        if id_selecionado:
+            try:
+                user = Usuarios.objects.get(id=id_selecionado)
+                return JsonResponse({
+                    "form": {
+                        nomeForm: {
+                            "estado": "visualizar",
+                            "update": user.date_joined,
+                            "campos": {
+                                "id": user.id,
+                                "username": user.username,
+                                "first_name": user.first_name,
+                                "email": user.email,
+                                "password": "",
+                                "confirmpass": "",
+                                "ativo": user.is_active
+                            }
+                        }
+                    }
+                })
+            except Usuarios.DoesNotExist:
+                return JsonResponse({"erro": "Registro não encontrado"}, status=404)
+
+        nome = campos.get('nome_filtro', '').strip()
+        username = campos.get('user_filtro', '').strip()
+
+        filtros = {}
+        if nome: filtros['nome__icontains'] = nome
+        if username: filtros['username__icontains'] = username
+
+        usuarios = Usuarios.objects.filter(**filtros).values('id', 'nome', 'username')
+        
+        return JsonResponse({"registros": list(usuarios)})

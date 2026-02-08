@@ -49,3 +49,104 @@ form.addEventListener("submit", async e => {
     AppLoader.hide(); // LIBERA A TELA
   }
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Seletores de Elementos
+    const divPrincipal = document.getElementById('cadUsuario');
+    const divPesquisa = document.getElementById('div-pesquisa');
+    const btnAbrirPesquisa = document.getElementById('btn-abrir-pesquisa');
+    const btnVoltarPrincipal = document.getElementById('btn-voltar-principal');
+    const formFiltro = document.getElementById('consUsuario');
+    const tabelaCorpo = document.getElementById('tabela-corpo');
+
+    // Utilitário para alternar visualização usando classes do Bootstrap
+    const alternarTelas = () => {
+        divPrincipal.classList.toggle('d-none');
+        divPesquisa.classList.toggle('d-none');
+    };
+
+    // Event Listeners para Navegação
+    btnAbrirPesquisa.addEventListener('click', alternarTelas);
+    btnVoltarPrincipal.addEventListener('click', alternarTelas);
+
+    // Lógica de Busca (POST conforme diretriz 3.2)
+    formFiltro.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (typeof loader !== 'undefined') loader.show();
+
+        const payload = {
+            nome_filtro: document.getElementById('filtro_nome').value,
+            user_filtro: document.getElementById('filtro_user').value
+        };
+
+        try {
+            const response = await fetch('/usuario/pesquisa/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+            renderizarTabela(data.registros);
+        } catch (error) {
+            console.error('Erro na busca:', error);
+        } finally {
+            if (typeof loader !== 'undefined') loader.hide();
+        }
+    });
+
+    // Renderização com Event Delegation (Evita múltiplos listeners)
+    function renderizarTabela(registros) {
+        tabelaCorpo.innerHTML = registros.map(reg => `
+            <tr>
+                <td>${reg.id}</td>
+                <td>${reg.nome}</td>
+                <td>${reg.username}</td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-info btn-selecionar" data-id="${reg.id}">
+                        Selecionar
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    // Captura o clique no botão selecionar (Dinâmico)
+    tabelaCorpo.addEventListener('click', async (e) => {
+        if (e.target.classList.contains('btn-selecionar')) {
+            const id = e.target.getAttribute('data-id');
+            await carregarRegistro(id);
+        }
+    });
+
+    async function carregarRegistro(id) {
+        if (typeof loader !== 'undefined') loader.show();
+
+        try {
+            const response = await fetch('/usuario/pesquisa/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ id_selecionado: id })
+            });
+
+            const res = await response.json();
+
+            if (res.estado === "visualizar") {
+                document.getElementById('id_nome').value = res.dados.nome;
+                
+                // Aplica regras do input_rules.js se disponível
+                if (window.inputRules) window.inputRules.applyAll();
+
+                alternarTelas(); // Volta ao form principal
+            }
+        } finally {
+            if (typeof loader !== 'undefined') loader.hide();
+        }
+    }
+});

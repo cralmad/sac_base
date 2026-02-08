@@ -50,7 +50,67 @@
     </div>
     
     <button class="btn btn-primary show-loader" data-show-on="novo,editar" type="submit">SALVAR</button>
+    <button type="button" id="btn-abrir-pesquisa" class="btn btn-secondary"><i class="bi bi-search"></i> Pesquisar</button>
 </form>
+
+<div id="div-pesquisa" class="container d-none">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <span>Consultar Usuários</span>
+            <button type="button" id="btn-voltar-principal" class="btn-close btn-close-white"></button>
+        </div>
+        <div class="card-body">
+            <form id="consUsuario" method="POST">
+                <div class="container-md-3 my-3 mx-auto">
+                    <div class="row g-3"> 
+                        <div class="col-12 col-sm-5">
+                            <label class="form-label mb-0">Nome</label>
+                            <input type="text" name="first_name_cons" class="form-control smart-input"
+                                data-deny="&quot;&apos;" data-textcase="upper" maxlength="30"/>
+                        </div>
+
+                        <div class="col-12 col-sm-5">
+                            <label class="form-label mb-0">Usuário</label>
+                            <input type="text" name="username_cons" class="form-control smart-input"
+                                data-deny="&quot;&apos; " maxlength="20"/>
+                        </div>
+
+                        <div class="col-12 col-sm-10">
+                            <label class="form-label mb-0">E-mail</label>
+                            <input type="email" name="email_cons" class="form-control smart-input"
+                                data-deny="&quot;&apos; " maxlength="60"/>
+                        </div>
+
+                        <div class="col-12 form-check form-switch ms-3">
+                            <input class="form-check-input smart-input" type="checkbox" name="ativo_cons" id="flexCheckDefault">
+                            <label class="form-check-label mb-0" for="flexCheckDefault">Usuário Ativo</label>
+                        </div>
+
+                        <div class="col-md-2 d-grid gap-2 d-md-flex">
+                            <button type="button" class="btn btn-success" onclick="executarBusca()">Filtrar</button>
+                            <button type="button" class="btn btn-outline-danger" onclick="alternarTela('principal')">Voltar</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <div class="table-responsive mt-4">
+                <table class="table table-hover table-sm border">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Nome</th>
+                            <th>Usuário</th>
+                            <th class="text-center">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-corpo">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% endblock %}
 
