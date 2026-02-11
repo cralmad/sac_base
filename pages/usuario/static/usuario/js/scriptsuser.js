@@ -4,6 +4,7 @@ import { criarAtualizadorForm } from "/static/js/refresh_varSis.js";
 import { AppLoader } from "/static/js/loader.js";
 
 const nomeForm = "cadUsuario";
+const nomeFormCons = "consUsuario";
 const form = document.getElementById(nomeForm);
 
 const updater = criarAtualizadorForm({
@@ -52,11 +53,12 @@ form.addEventListener("submit", async e => {
 
 document.addEventListener('DOMContentLoaded', () => {
     // Seletores de Elementos
-    const divPrincipal = document.getElementById('cadUsuario');
+    const divPrincipal = document.getElementById(nomeForm);
     const divPesquisa = document.getElementById('div-pesquisa');
     const btnAbrirPesquisa = document.getElementById('btn-abrir-pesquisa');
-    const btnVoltarPrincipal = document.getElementById('btn-voltar-principal');
-    const formFiltro = document.getElementById('consUsuario');
+    const btnVoltar = document.getElementById('btn-voltar');
+    const btnFechar = document.getElementById('btn-fechar');
+    const formFiltro = document.getElementById(nomeFormCons);
     const tabelaCorpo = document.getElementById('tabela-corpo');
 
     // Utilitário para alternar visualização usando classes do Bootstrap
@@ -67,34 +69,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Event Listeners para Navegação
     btnAbrirPesquisa.addEventListener('click', alternarTelas);
-    btnVoltarPrincipal.addEventListener('click', alternarTelas);
+    btnVoltar.addEventListener('click', alternarTelas);
+    btnFechar.addEventListener('click', alternarTelas);
 
     // Lógica de Busca (POST conforme diretriz 3.2)
     formFiltro.addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (typeof loader !== 'undefined') loader.show();
 
-        const payload = {
-            nome_filtro: document.getElementById('filtro_nome').value,
-            user_filtro: document.getElementById('filtro_user').value
+        const sisVarPayload = {
+            form: {
+            [nomeFormCons]: getForm(nomeFormCons)
+            }
         };
 
         try {
-            const response = await fetch('/usuario/pesquisa/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: JSON.stringify(payload)
+            const res = await fetch("/app/usuario/cadastro/cons", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+            },
+            body: JSON.stringify(sisVarPayload)
             });
 
-            const data = await response.json();
+            const data = await res.json();
             renderizarTabela(data.registros);
-        } catch (error) {
-            console.error('Erro na busca:', error);
-        } finally {
-            if (typeof loader !== 'undefined') loader.hide();
+            AppLoader.hide(); // LIBERA A TELA
+
+        } catch (err) {
+            console.error("Erro na requisição:", err);
+            AppLoader.hide(); // LIBERA A TELA
         }
     });
 
@@ -126,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof loader !== 'undefined') loader.show();
 
         try {
-            const response = await fetch('/usuario/pesquisa/', {
+            const response = await fetch("/app/usuario/cadastro/cons/", {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -85,6 +85,7 @@ def logout_view(request):
 def cadastro_view(request):
     template = "usuario.html"
     nomeForm = "cadUsuario"
+    nomeFormCons = "consUsuario"
 
     schema = {
         nomeForm: {
@@ -94,6 +95,13 @@ def cadastro_view(request):
             "password": {'type': 'password', 'required': True},
             "confirmpass": {'type': 'password', 'required': True},
             "ativo": {'type': 'boolean', 'required': False}
+        },
+        nomeFormCons: {
+            "username_cons": {'type': 'string', 'maxlength': 20},
+            "first_name_cons": {'type': 'string', 'maxlength': 30},
+            "email_cons": {'type': 'string', 'maxlength': 60},
+            "ativo_cons": {'type': 'boolean'},
+            "id_selecionado": {'type': 'integer'}
         }
     }
 
@@ -113,6 +121,16 @@ def cadastro_view(request):
                         "password": "",
                         "confirmpass": "",
                         "ativo": None
+                    }
+                },
+                nomeFormCons: {
+                    "estado": "novo",
+                    "campos": {
+                        "username_cons": "",
+                        "first_name_cons": "",
+                        "email_cons": "",
+                        "ativo_cons": None,
+                        "id_selecionado": None
                     }
                 }
             }
@@ -302,7 +320,7 @@ def alterar_senha_view(request):
         }
     })
 
-def cons_usuario(request):
+def cadastro_cons_view(request):
     nomeForm = "consUsuario"
 
     if request.method == "POST":
@@ -335,13 +353,13 @@ def cons_usuario(request):
             except Usuarios.DoesNotExist:
                 return JsonResponse({"erro": "Registro não encontrado"}, status=404)
 
-        nome = campos.get('nome_filtro', '').strip()
-        username = campos.get('user_filtro', '').strip()
+        nome = campos.get('first_name_cons', '').strip()
+        username = campos.get('username_cons', '').strip()
 
         filtros = {}
-        if nome: filtros['nome__icontains'] = nome
+        if nome: filtros['first_name__icontains'] = nome
         if username: filtros['username__icontains'] = username
 
-        usuarios = Usuarios.objects.filter(**filtros).values('id', 'nome', 'username')
+        usuarios = Usuarios.objects.filter(**filtros).values('id', 'first_name', 'username')
         
         return JsonResponse({"registros": list(usuarios)})
