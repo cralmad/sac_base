@@ -107,10 +107,12 @@ document.addEventListener('DOMContentLoaded', () => {
         tabelaCorpo.innerHTML = registros.map(reg => `
             <tr>
                 <td>${reg.id}</td>
-                <td>${reg.nome}</td>
+                <td>${reg.first_name}</td>
                 <td>${reg.username}</td>
+                <td>${reg.email}</td>
+                <td>${reg.is_active}</td>
                 <td class="text-center">
-                    <button class="btn btn-sm btn-info btn-selecionar" data-id="${reg.id}">
+                    <button class="btn btn-sm btn-info btn-selecionar show-loader" data-id="${reg.id}">
                         Selecionar
                     </button>
                 </td>
@@ -127,30 +129,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     async function carregarRegistro(id) {
-        if (typeof loader !== 'undefined') loader.show();
+        updateFormField(nomeFormCons, 'id_selecionado', id);
+        const sisVarPayload = {
+            form: {
+            [nomeFormCons]: getForm(nomeFormCons)
+            }
+        };
 
         try {
-            const response = await fetch("/app/usuario/cadastro/cons/", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: JSON.stringify({ id_selecionado: id })
+            const res = await fetch("/app/usuario/cadastro/cons", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+            },
+            body: JSON.stringify(sisVarPayload)
             });
 
-            const res = await response.json();
+            const data = await res.json();
+            updateState(data);
+            AppLoader.hide(); // LIBERA A TELA
 
-            if (res.estado === "visualizar") {
-                document.getElementById('id_nome').value = res.dados.nome;
-                
-                // Aplica regras do input_rules.js se disponível
-                if (window.inputRules) window.inputRules.applyAll();
-
-                alternarTelas(); // Volta ao form principal
-            }
-        } finally {
-            if (typeof loader !== 'undefined') loader.hide();
+        } catch (err) {
+            console.error("Erro na requisição:", err);
+            AppLoader.hide(); // LIBERA A TELA
         }
     }
 });

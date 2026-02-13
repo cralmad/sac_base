@@ -321,16 +321,17 @@ def alterar_senha_view(request):
     })
 
 def cadastro_cons_view(request):
-    nomeForm = "consUsuario"
+    nomeForm = "cadUsuario"
+    nomeFormCons = "consUsuario"
 
     if request.method == "POST":
         dataFront = request.sisvar_front
-        form = dataFront.get("form", {}).get(nomeForm, {})
+        form = dataFront.get("form", {}).get(nomeFormCons, {})
         campos = form.get("campos", {})
 
-        id_selecionado = campos.get('id_selecionado')
+        id_selecionado = int(campos.get('id_selecionado') or 0)
 
-        if id_selecionado:
+        if id_selecionado != 0:
             try:
                 user = Usuarios.objects.get(id=id_selecionado)
                 return JsonResponse({
@@ -360,6 +361,6 @@ def cadastro_cons_view(request):
         if nome: filtros['first_name__icontains'] = nome
         if username: filtros['username__icontains'] = username
 
-        usuarios = Usuarios.objects.filter(**filtros).values('id', 'first_name', 'username')
+        usuarios = Usuarios.objects.filter(**filtros).values('id', 'first_name', 'username', 'email', 'is_active')
         
         return JsonResponse({"registros": list(usuarios)})
