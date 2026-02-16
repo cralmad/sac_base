@@ -1,4 +1,4 @@
-import { updateFormField, getForm, updateState } from "/static/js/sisVar.js";
+import { updateFormField, getForm, updateState, getCsrfToken } from "/static/js/sisVar.js";
 import { initSmartInputs } from "/static/js/input_rules.js";
 import { criarAtualizadorForm } from "/static/js/refresh_varSis.js";
 import { AppLoader } from "/static/js/loader.js";
@@ -6,6 +6,7 @@ import { AppLoader } from "/static/js/loader.js";
 const nomeForm = "cadUsuario";
 const nomeFormCons = "consUsuario";
 const form = document.getElementById(nomeForm);
+const form2 = document.getElementById(nomeFormCons);
 
 const updater = criarAtualizadorForm({
   formId: nomeForm,
@@ -17,6 +18,18 @@ form.addEventListener("input", updater);
 
 initSmartInputs((input, value) => {
     updateFormField(nomeForm, input.name, value);
+});
+
+const updater2 = criarAtualizadorForm({
+  formId: nomeFormCons,
+  setter: updateFormField,
+  form2
+});
+
+form2.addEventListener("input", updater2);
+
+initSmartInputs((input, value) => {
+    updateFormField(nomeFormCons, input.name, value);
 });
 
 form.addEventListener("submit", async e => {
@@ -87,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+                "X-CSRFToken": getCsrfToken()
             },
             body: JSON.stringify(sisVarPayload)
             });
@@ -141,13 +154,14 @@ document.addEventListener('DOMContentLoaded', () => {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+                "X-CSRFToken": getCsrfToken()
             },
             body: JSON.stringify(sisVarPayload)
             });
 
             const data = await res.json();
             updateState(data);
+            alternarTelas(); // Volta para a tela principal
             AppLoader.hide(); // LIBERA A TELA
 
         } catch (err) {

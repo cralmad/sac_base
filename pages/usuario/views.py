@@ -356,10 +356,14 @@ def cadastro_cons_view(request):
 
         nome = campos.get('first_name_cons', '').strip()
         username = campos.get('username_cons', '').strip()
+        userAtivo = campos.get('ativo_cons', False)
+        email = campos.get('email_cons', '').strip()
 
         filtros = {}
         if nome: filtros['first_name__icontains'] = nome
         if username: filtros['username__icontains'] = username
+        if email: filtros['email'] = email
+        filtros['is_active'] = userAtivo
 
         usuarios = Usuarios.objects.filter(**filtros).values('id', 'first_name', 'username', 'email', 'is_active')
         

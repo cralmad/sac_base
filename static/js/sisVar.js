@@ -1,24 +1,35 @@
-// 1. Definição do Estado com Proxy Reativo
-let _rawState = { form: {}, schema: {}, mensagens: {}, usuario: {} };
+// 1.
+// Definição do Estado com Proxy Reativo
+
+let _rawState = {
+  form: {},
+  schema: {},
+  mensagens: {},
+  usuario: {},
+  // Local centralizado para metadados e tokens de segurança
+  others: {
+    csrf_token_value: ""
+  }
+};
 
 const _state = new Proxy(_rawState, {
   set(target, property, value, receiver) {
+
     const result = Reflect.set(target, property, value, receiver);
 
     // Gatilho: Se a chave "form" ou qualquer parte dela mudar
     if (property === 'form') {
-        Object.keys(value).forEach(formId => {
-            // Verifica se existe o campo "estado" dentro do formId
-            const estado = value[formId]?.estado;
-            if (estado) {
-                applyFormState(formId, estado);
-            }
-        });
+      Object.keys(value).forEach(formId => {
+        const estado = value[formId]?.estado;
+        if (estado) {
+          applyFormState(formId, estado);
+        }
+      });
     }
 
     // Gatilho automático para mensagens
     if (property === 'mensagens') {
-        renderMensagens();
+      renderMensagens();
     }
 
     return result;
@@ -27,107 +38,139 @@ const _state = new Proxy(_rawState, {
 
 const _dadosBE = 'sisDados';
 
-// 2. Controlador de Interface (DOM)
-/* Certifique-se de que seus formulários sigam o padrão de atributos:
-<form data-form-lock="nomeForm">
-<button data-show-on="novo,editar">Salvar</button>
-<input data-keep-enabled="true"> (para campos de busca ou filtros que nunca travam).*/
+// 2.
+// Controlador de Interface (DOM)
+
 function applyFormState(formId, estado) {
-    const form = document.querySelector(`[data-form-lock="${formId}"]`);
-    if (!form) return;
 
-    const isDisabled = (estado === 'visualizar');
+  const form = document.querySelector(`[data-form-lock="${formId}"]`);
+  if (!form) return;
 
-    // Seleciona campos, exceto os marcados com data-keep-enabled
-    const inputs = form.querySelectorAll('input:not([data-keep-enabled]), select:not([data-keep-enabled]), textarea:not([data-keep-enabled]), button:not([data-keep-enabled])');
+  const isDisabled = (estado === 'visualizar');
 
-    inputs.forEach(input => {
-        // Se o elemento tem controle de visibilidade, não mexemos no 'disabled'
-        if (input.hasAttribute('data-show-on')) return;
-        input.disabled = isDisabled;
-    });
+  if (estado === 'visualizar') {
+    clearFormFields(form);
+  }
 
-    // Gerencia visibilidade de botões (Bootstrap 5 d-none)
-    const actionButtons = form.querySelectorAll('[data-show-on]');
-    actionButtons.forEach(btn => {
-        const allowedStates = btn.getAttribute('data-show-on').split(',');
-        allowedStates.includes(estado) 
-            ? btn.classList.remove('d-none') 
-            : btn.classList.add('d-none');
-    });
+  const elements = form.querySelectorAll('input, select, textarea, button[type="submit"]');
+  elements.forEach(el => {
+    el.disabled = isDisabled;
+  });
+}
+
+function clearFormFields(form) {
+  const inputs = form.querySelectorAll('input:not([type="hidden"]), select, textarea');
+  inputs.forEach(input => {
+    if (input.type === 'checkbox' || input.type === 'radio') {
+      input.checked = false;
+    } else {
+      input.value = '';
+    }
+  });
 }
 
 // --- Funções Exportadas ---
 
-export function getForm(formId) {
-  return _state.form[formId] ?? {};
+export function getForm(formId = null) {
+  if (formId) return _state.form[formId] || null;
+  return _state.form;
 }
 
-export function getSchema(formId) {
-  return _state.schema[formId];
+export function getSchema(schemaId = null) {
+  if (schemaId) return _state.schema[schemaId] || null;
+  return _state.schema;
 }
 
 export function getUsuario() {
   return _state.usuario;
 }
 
+/**
+ * Recupera o token CSRF atual guardado no estado
+ */
+export function getCsrfToken() {
+  return _state.others?.csrf_token_value || "";
+}
+
 export function renderMensagens() {
-    const mensagens = _state.mensagens;
-    const container = document.getElementById("container-mensagens");
-    
-    if (!container || !mensagens) return;
-    
-    container.innerHTML = '';
-    const config = { sucesso: { classe: 'success' }, erro: { classe: 'danger' }, aviso: { classe: 'warning' } };
+  const container = document.getElementById('alert-container');
+  if (!container) return;
 
-    const renderizar = (tipo, dados) => {
-        if (dados.conteudo && dados.conteudo.length > 0) {
-            const podeIgnorar = dados.ignorar !== false;
-            dados.conteudo.forEach(msg => {
-                const alerta = document.createElement('div');
-                alerta.className = `alert alert-${config[tipo]?.classe || 'secondary'} alert-dismissible fade show`;
-                alerta.innerHTML = `${msg}${podeIgnorar ? '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' : ''}`;
-                container.appendChild(alerta);
-            });
-        }
-    };
+  container.innerHTML = '';
 
-    Object.entries(mensagens).forEach(([tipo, dados]) => renderizar(tipo, dados));
+  const mensagens = _state.mensagens;
+
+  const config = {
+    sucesso: { classe: 'success' },
+    erro: { classe: 'danger' },
+    aviso: { classe: 'warning' },
+    info: { classe: 'info' }
+  };
+
+  const renderizar = (tipo, dados) => {
+    if (dados.conteudo && dados.conteudo.length > 0) {
+      const podeIgnorar = dados.ignorar !== false;
+
+      dados.conteudo.forEach(msg => {
+        const alerta = document.createElement('div');
+        alerta.className = `alert alert-${config[tipo]?.classe || 'secondary'} alert-dismissible fade show`;
+        alerta.innerHTML = `${msg}${podeIgnorar ? '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' : ''}`;
+        container.appendChild(alerta);
+      });
+    }
+  };
+
+  Object.entries(mensagens).forEach(([tipo, dados]) => renderizar(tipo, dados));
 }
 
 export function updateFormField(formId, name, value) {
   if (!_state.form[formId]) {
     console.error(`Formulário ${formId} não encontrado.`);
     return;
-  };
+  }
   _state.form[formId]["campos"][name] = value;
 }
 
 export function getDataBackEnd() {
-  const elemento = document.getElementById(_dadosBE); 
+  const elemento = document.getElementById(_dadosBE);
+
   if (elemento) {
     try {
       const dataBack = JSON.parse(elemento.textContent);
-      // Ao atualizar o _state, o Proxy será disparado
       updateState(dataBack);
-      elemento.remove(); 
+      elemento.remove();
     } catch (e) {
       console.error("Erro ao processar dados do Back-End.", e);
     }
   }
 }
 
+/**
+ * Atualiza o estado global.
+ * Se encontrar 'csrfToken' na raiz de newData, move-o para 'others.csrf_token_value'.
+ */
 export function updateState(newData) {
   if (!newData || typeof newData !== 'object') return;
 
-  // IMPORTANTE: Para disparar o Proxy de nível superior, 
-  // atualizamos as chaves principais.
+  // Intercepta o token vindo do Middleware antes de processar o loop
+  if (newData.csrfToken) {
+    _state.others.csrf_token_value = newData.csrfToken;
+    // Opcional: deletar de newData para não duplicar no estado se houver chave idêntica
+    // delete newData.csrfToken; 
+  }
+
   Object.entries(newData).forEach(([key, value]) => {
+    // Merge para formulários
     if (key === 'form' && _state.form) {
-        // Criamos uma nova referência para garantir que o Proxy perceba a mudança profunda
-        _state.form = { ..._state.form, ...value };
-    } else {
-        _state[key] = value;
+      _state.form = { ..._state.form, ...value };
+    } 
+    // Merge para a estrutura 'others'
+    else if (key === 'others' && _state.others) {
+      _state.others = { ..._state.others, ...value };
+    } 
+    // Impede que o csrfToken solto na raiz do JSON entre no estado global fora de 'others'
+    else if (key !== 'csrfToken') {
+      _state[key] = value;
     }
   });
 }

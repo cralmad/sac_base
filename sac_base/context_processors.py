@@ -1,3 +1,5 @@
+from django.middleware.csrf import get_token
+
 def sisvar_global(request):
     base = {
         "usuario": {
@@ -8,7 +10,7 @@ def sisvar_global(request):
         "schema": {},
         "form": {}, # formId: {estado:{novo|visualizar|editar|excluir}, update: data|null, campos: {campo1: valor1, campo2: valor2...}}
         "mensagens": {}, # sucesso|erro|aviso:{ignorar: true|false, conteudo: ["mensagem", ...]}
-        "others": {},
+        "others": {'csrf_token_value': get_token(request)},
     }
 
     # Se a view já tiver colocado algo em request.sisvar, mescla
