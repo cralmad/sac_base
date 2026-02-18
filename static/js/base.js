@@ -1,5 +1,57 @@
-import { getDataBackEnd, getUsuario, renderMensagens } from "/static/js/sisVar.js";
+import { 
+  getDataBackEnd, 
+  getUsuario, 
+  renderMensagens,
+  getCsrfToken 
+} from "/static/js/sisVar.js";
 
+/**
+ * Função utilitária para fazer requisições POST com CSRF token
+ * Centraliza a lógica de requisição e tratamento de erros
+ * Reutilizável em toda a aplicação
+ * 
+ * @param {string} url - URL do endpoint
+ * @param {object} payload - Dados a enviar
+ * @returns {Promise<{success: boolean, data: any, error: string | null}>}
+ */
+export async function fazerRequisicao(url, payload) {
+  try {
+    const csrfToken = getCsrfToken();
+    
+    if (!csrfToken) {
+      console.warn("CSRF token não encontrado! Tente recarregar a página.");
+    }
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrfToken || ""
+      },
+      body: JSON.stringify(payload)
+    });
+
+    // Se a resposta não for JSON válido (exceto erros esperados 400, 401)
+    if (!response.ok && response.status !== 400 && response.status !== 401) {
+      throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return { success: true, data };
+
+  } catch (err) {
+    console.error("Erro na requisição:", err);
+    return { 
+      success: false, 
+      error: err.message,
+      data: null
+    };
+  }
+}
+
+/**
+ * Inicializa a navbar com informações do usuário autenticado
+ */
 export async function inicializarNavbarUsuario() {
     try {
         // Garante que os dados do backend foram carregados
@@ -59,7 +111,6 @@ export async function inicializarNavbarUsuario() {
 document.addEventListener("DOMContentLoaded", () => {
     inicializarNavbarUsuario();
 });
-
 
 /*****************DEBUG**********************/
 import { __debugState } from '/static/js/sisVar.js';

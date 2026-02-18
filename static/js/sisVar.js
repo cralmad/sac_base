@@ -123,6 +123,47 @@ export function renderMensagens() {
   Object.entries(mensagens).forEach(([tipo, dados]) => renderizar(tipo, dados));
 }
 
+/**
+ * Define uma mensagem no estado global sisVar
+ * Dispara renderMensagens automaticamente via Proxy
+ * 
+ * @param {string} tipo - 'sucesso', 'erro', 'aviso' ou 'info'
+ * @param {string|array} conteudo - Mensagem ou array de mensagens
+ * @param {boolean} ignorar - Se pode ignorar/fechar a mensagem (padrão: true)
+ * 
+ * @example
+ * // Mensagem única
+ * definirMensagem('sucesso', 'Operação realizada com sucesso!');
+ * 
+ * @example
+ * // Array de mensagens
+ * definirMensagem('erro', ['Erro 1', 'Erro 2', 'Erro 3']);
+ * 
+ * @example
+ * // Mensagem que não pode ser fechada
+ * definirMensagem('aviso', 'Ação irreversível!', false);
+ */
+export function definirMensagem(tipo, conteudo, ignorar = true) {
+  const tiposValidos = ['sucesso', 'erro', 'aviso', 'info'];
+  
+  if (!tiposValidos.includes(tipo)) {
+    console.warn(`Tipo de mensagem inválido: "${tipo}". Tipos válidos: ${tiposValidos.join(', ')}`);
+    return;
+  }
+
+  // Normaliza conteudo para array
+  const mensagens = Array.isArray(conteudo) ? conteudo : [conteudo];
+  
+  // Atualiza o estado das mensagens (dispara renderMensagens automaticamente via Proxy)
+  _state.mensagens = {
+    ..._state.mensagens,
+    [tipo]: {
+      conteudo: mensagens,
+      ignorar: ignorar
+    }
+  };
+}
+
 export function updateFormField(formId, name, value) {
   if (!_state.form[formId]) {
     console.error(`Formulário ${formId} não encontrado.`);
@@ -155,8 +196,7 @@ export function updateState(newData) {
   // Intercepta o token vindo do Middleware antes de processar o loop
   if (newData.csrfToken) {
     _state.others.csrf_token_value = newData.csrfToken;
-    // Opcional: deletar de newData para não duplicar no estado se houver chave idêntica
-    // delete newData.csrfToken; 
+    delete newData.csrfToken;
   }
 
   Object.entries(newData).forEach(([key, value]) => {
@@ -168,13 +208,32 @@ export function updateState(newData) {
     else if (key === 'others' && _state.others) {
       _state.others = { ..._state.others, ...value };
     } 
-    // Impede que o csrfToken solto na raiz do JSON entre no estado global fora de 'others'
+    // Merge para a estrutura 'mensagens'
+    else if (key === 'mensagens' && _state.mensagens) {
+      _state.mensagens = { ..._state.mensagens, ...value };
+    }
+    // Atribuição direta para outras chaves
     else if (key !== 'csrfToken') {
       _state[key] = value;
     }
   });
 }
 
+/**
+ * Limpa todas as mensagens do estado
+ */
+export function clearMessages() {
+  _state.mensagens = {
+    sucesso: { conteudo: [], ignorar: true },
+    erro: { conteudo: [], ignorar: true },
+    aviso: { conteudo: [], ignorar: true },
+    info: { conteudo: [], ignorar: true }
+  };
+}
+
+/**
+ * Debug: retorna uma cópia segura do estado para inspeção
+ */
 export function __debugState() {
   return structuredClone(_rawState);
 }
