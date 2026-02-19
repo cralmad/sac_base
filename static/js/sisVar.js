@@ -164,6 +164,61 @@ export function definirMensagem(tipo, conteudo, ignorar = true) {
   };
 }
 
+/**
+ * Hidrata os campos de um formulário com os dados do sisVar
+ * Preenche os inputs HTML com os valores armazenados no estado
+ * 
+ * @param {string} formId - ID do formulário (deve corresponder a data-form-lock)
+ * @returns {boolean} - true se hidratado com sucesso, false caso contrário
+ * 
+ * @example
+ * hidratarFormulario('cadUsuario'); // Preenche todos os inputs do formulário
+ */
+export function hidratarFormulario(formId) {
+  const form = document.querySelector(`[data-form-lock="${formId}"]`);
+  if (!form) {
+    console.warn(`Formulário com data-form-lock="${formId}" não encontrado no DOM`);
+    return false;
+  }
+
+  const formData = _state.form[formId];
+  if (!formData || !formData.campos) {
+    console.warn(`Dados do formulário "${formId}" não encontrados no sisVar`);
+    return false;
+  }
+
+  // Percorre todos os inputs do formulário
+  const inputs = form.querySelectorAll('input, select, textarea');
+  
+  inputs.forEach(input => {
+    const fieldName = input.name;
+    const fieldValue = formData.campos[fieldName];
+
+    if (fieldValue !== undefined && fieldValue !== null) {
+      switch (input.type) {
+        case 'checkbox':
+          input.checked = Boolean(fieldValue);
+          break;
+        
+        case 'radio':
+          if (input.value === String(fieldValue)) {
+            input.checked = true;
+          }
+          break;
+        
+        case 'number':
+          input.value = fieldValue !== null ? Number(fieldValue) : '';
+          break;
+        
+        default:
+          input.value = fieldValue;
+      }
+    }
+  });
+
+  return true;
+}
+
 export function updateFormField(formId, name, value) {
   if (!_state.form[formId]) {
     console.error(`Formulário ${formId} não encontrado.`);

@@ -3,7 +3,8 @@ import {
   getForm, 
   updateState,
   clearMessages,
-  definirMensagem
+  definirMensagem,
+  hidratarFormulario
 } from "/static/js/sisVar.js";
 import { fazerRequisicao } from "/static/js/base.js";
 import { initSmartInputs } from "/static/js/input_rules.js";
@@ -146,18 +147,24 @@ document.addEventListener('DOMContentLoaded', () => {
     tabelaCorpo.innerHTML = '';
 
     if (!Array.isArray(registros) || registros.length === 0) {
-      tabelaCorpo.innerHTML = '<tr><td colspan="5" class="text-center">Nenhum registro encontrado</td></tr>';
+      tabelaCorpo.innerHTML = '<tr><td colspan="6" class="text-center">Nenhum registro encontrado</td></tr>';
       return;
     }
 
     registros.forEach(registro => {
       const linha = document.createElement('tr');
+      const ativoStatus = registro.is_active ? '✓' : '✗';
+      const alivoBadge = registro.is_active ? 'bg-success' : 'bg-danger';
+      
       linha.innerHTML = `
         <td>${registro.id || ''}</td>
-        <td>${registro.username || ''}</td>
         <td>${registro.first_name || ''}</td>
+        <td>${registro.username || ''}</td>
         <td>${registro.email || ''}</td>
         <td>
+          <span class="badge ${alivoBadge}">${ativoStatus}</span>
+        </td>
+        <td class="text-center">
           <button class="btn btn-sm btn-primary btn-selecionar" data-id="${registro.id}">
             Selecionar
           </button>
@@ -207,6 +214,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Atualiza sisVar com os dados do usuário
     updateState(resultado.data);
+
+    // Hidrata o formulário principal com os dados carregados
+    hidratarFormulario(nomeForm);
 
     // Alterna para a tela principal (com dados carregados)
     alternarTelas();
