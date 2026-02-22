@@ -46,16 +46,30 @@ function applyFormState(formId, estado) {
   const form = document.querySelector(`[data-form-lock="${formId}"]`);
   if (!form) return;
 
-  const isDisabled = (estado === 'visualizar');
-
+  // Limpa campos apenas ao entrar em 'visualizar'
   if (estado === 'visualizar') {
     clearFormFields(form);
   }
 
-  const elements = form.querySelectorAll('input, select, textarea, button[type="submit"]');
-  elements.forEach(el => {
+  // Habilita/desabilita inputs conforme o estado
+  const isDisabled = (estado === 'visualizar');
+  const inputs = form.querySelectorAll('input, select, textarea');
+  inputs.forEach(el => {
     el.disabled = isDisabled;
   });
+
+  // Controla visibilidade dos botões via data-show-on
+  const botoes = form.querySelectorAll('button[data-show-on]');
+  botoes.forEach(btn => {
+    const estados = btn.dataset.showOn.split(',').map(s => s.trim());
+    btn.classList.toggle('d-none', !estados.includes(estado));
+  });
+
+  // Regra especial: botão Salvar (submit) fica desabilitado no estado 'editar'
+  const btnSalvar = form.querySelector('button[type="submit"]');
+  if (btnSalvar) {
+    btnSalvar.disabled = (estado === 'editar');
+  }
 }
 
 function clearFormFields(form) {
@@ -283,6 +297,44 @@ export function clearMessages() {
     erro: { conteudo: [], ignorar: true },
     aviso: { conteudo: [], ignorar: true },
     info: { conteudo: [], ignorar: true }
+  };
+}
+
+/**
+ * Define o estado de um formulário no sisVar.
+ * Ponto único de entrada para mudança de estado — nunca altere o estado diretamente.
+ * O Proxy reativo dispara applyFormState() automaticamente.
+ * 
+ * Estados válidos: 'novo' | 'editar' | 'visualizar'
+ * 
+ * @param {string} formId - ID do formulário (ex: 'cadUsuario')
+ * @param {string} estado - Novo estado do formulário
+ * 
+ * @example
+ * setFormState('cadUsuario', 'editar');
+ * setFormState('cadUsuario', 'novo');
+ * setFormState('cadUsuario', 'visualizar');
+ */
+export function setFormState(formId, estado) {
+  const estadosValidos = ['novo', 'editar', 'visualizar'];
+
+  if (!estadosValidos.includes(estado)) {
+    console.warn(`Estado inválido: "${estado}". Estados válidos: ${estadosValidos.join(', ')}`);
+    return;
+  }
+
+  if (!_state.form[formId]) {
+    console.warn(`Formulário "${formId}" não encontrado no sisVar.`);
+    return;
+  }
+
+  // Atualiza o estado via Proxy — dispara applyFormState automaticamente
+  _state.form = {
+    ..._state.form,
+    [formId]: {
+      ..._state.form[formId],
+      estado
+    }
   };
 }
 

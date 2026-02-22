@@ -4,7 +4,8 @@ import {
   updateState,
   clearMessages,
   definirMensagem,
-  hidratarFormulario
+  hidratarFormulario,
+  setFormState
 } from "/static/js/sisVar.js";
 import { fazerRequisicao } from "/static/js/base.js";
 import { initSmartInputs } from "/static/js/input_rules.js";
@@ -92,6 +93,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnAbrirPesquisa = document.getElementById('btn-abrir-pesquisa');
   const btnVoltar = document.getElementById('btn-voltar');
   const btnFechar = document.getElementById('btn-fechar');
+  const btnEditar = document.getElementById('btn-editar');
+  const btnNovo = document.getElementById('btn-novo');
   const formFiltro = document.getElementById(nomeFormCons);
   const tabelaCorpo = document.getElementById('tabela-corpo');
 
@@ -105,6 +108,24 @@ document.addEventListener('DOMContentLoaded', () => {
   btnAbrirPesquisa.addEventListener('click', alternarTelas);
   btnVoltar.addEventListener('click', alternarTelas);
   btnFechar.addEventListener('click', alternarTelas);
+
+  /**
+   * Botão Editar:
+   * - Altera o estado do formulário para 'editar' no sisVar
+   * - O Proxy de sisVar aplica: habilita inputs, oculta Editar/Novo, mostra Salvar (desabilitado)
+   */
+  btnEditar.addEventListener('click', () => {
+    setFormState(nomeForm, 'editar');
+  });
+
+  /**
+   * Botão Novo:
+   * - Altera o estado do formulário para 'novo' no sisVar
+   * - O Proxy de sisVar aplica: habilita inputs, limpa campos, mostra Salvar (habilitado)
+   */
+  btnNovo.addEventListener('click', () => {
+    setFormState(nomeForm, 'novo');
+  });
 
   /**
    * Lógica de Busca - Listagem de Usuários
@@ -190,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   /**
-   * Carrega dados do usuário selecionado
+   * Carrega dados do usuário selecionado e altera o estado para 'visualizar'
    */
   async function carregarRegistro(id) {
     clearMessages();
@@ -217,6 +238,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Hidrata o formulário principal com os dados carregados
     hidratarFormulario(nomeForm);
+
+    // Altera o estado para 'visualizar' — o Proxy aplica as mudanças visuais automaticamente
+    setFormState(nomeForm, 'visualizar');
 
     // Alterna para a tela principal (com dados carregados)
     alternarTelas();
