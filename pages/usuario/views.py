@@ -345,7 +345,8 @@ def cadastro_cons_view(request):
 
         if id_selecionado:
             try:
-                usuario = Usuarios.objects.get(id=id_selecionado)
+                # is_superuser=False garante que superusuários nunca sejam retornados
+                usuario = Usuarios.objects.get(id=id_selecionado, is_superuser=False)
                 return JsonResponse({
                     "form": {
                         nomeForm: {
@@ -377,7 +378,8 @@ def cadastro_cons_view(request):
         if nome:     filtros['first_name__icontains'] = nome
         if username: filtros['username__icontains']   = username
         if email:    filtros['email']                 = email
-        filtros['is_active'] = userAtivo
+        filtros['is_active']    = userAtivo
+        filtros['is_superuser'] = False  # exclui superusuários de todos os resultados
 
         usuarios = Usuarios.objects.filter(**filtros).values(
             'id', 'first_name', 'username', 'email', 'is_active'

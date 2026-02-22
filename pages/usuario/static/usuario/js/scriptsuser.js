@@ -164,6 +164,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (resultado.data?.registros && resultado.data.registros.length > 0) {
       renderizarTabela(resultado.data.registros);
     } else {
+      // Limpa a tabela e exibe mensagem quando não há resultados
+      tabelaCorpo.innerHTML = '';
       definirMensagem('info', 'Nenhum usuário encontrado');
     }
 

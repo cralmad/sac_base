@@ -110,7 +110,7 @@ export function getCsrfToken() {
 }
 
 export function renderMensagens() {
-  const container = document.getElementById('alert-container');
+  const container = document.getElementById('container-mensagens');
   if (!container) return;
 
   container.innerHTML = '';
