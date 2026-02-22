@@ -67,8 +67,8 @@ function applyFormState(formId, estado) {
     btn.classList.toggle('d-none', !estados.includes(estado));
   });
 
-  // Atualiza o sufixo do título da página — presente em base.html para todos os formulários.
-  // Apenas o estado 'editar' exibe a indicação; nos demais o sufixo é apagado.
+  // Atualiza o sufixo do título da página.
+  // Apenas o estado 'editar' exibe a indica��ão; nos demais o sufixo é apagado.
   const pageTitleSuffix = document.getElementById('page-title-suffix');
   if (pageTitleSuffix) {
     pageTitleSuffix.textContent = estado === 'editar' ? ' — Edição de Registro' : '';
@@ -147,18 +147,6 @@ export function renderMensagens() {
  * @param {string} tipo - 'sucesso', 'erro', 'aviso' ou 'info'
  * @param {string|array} conteudo - Mensagem ou array de mensagens
  * @param {boolean} ignorar - Se pode ignorar/fechar a mensagem (padrão: true)
- * 
- * @example
- * // Mensagem única
- * definirMensagem('sucesso', 'Operação realizada com sucesso!');
- * 
- * @example
- * // Array de mensagens
- * definirMensagem('erro', ['Erro 1', 'Erro 2', 'Erro 3']);
- * 
- * @example
- * // Mensagem que não pode ser fechada
- * definirMensagem('aviso', 'Ação irreversível!', false);
  */
 export function definirMensagem(tipo, conteudo, ignorar = true) {
   const tiposValidos = ['sucesso', 'erro', 'aviso', 'info'];
@@ -168,10 +156,8 @@ export function definirMensagem(tipo, conteudo, ignorar = true) {
     return;
   }
 
-  // Normaliza conteudo para array
   const mensagens = Array.isArray(conteudo) ? conteudo : [conteudo];
   
-  // Atualiza o estado das mensagens (dispara renderMensagens automaticamente via Proxy)
   _state.mensagens = {
     ..._state.mensagens,
     [tipo]: {
@@ -182,14 +168,52 @@ export function definirMensagem(tipo, conteudo, ignorar = true) {
 }
 
 /**
- * Hidrata os campos de um formulário com os dados do sisVar
- * Preenche os inputs HTML com os valores armazenados no estado
- * 
- * @param {string} formId - ID do formulário (deve corresponder a data-form-lock)
- * @returns {boolean} - true se hidratado com sucesso, false caso contrário
- * 
+ * Abre o modal de confirmação global definido em base.html.
+ * Reutilizável em qualquer página — não requer nenhum código adicional nos scripts de página.
+ *
+ * @param {object} opcoes
+ * @param {string}   opcoes.titulo      - Título do modal
+ * @param {string}   opcoes.mensagem    - Texto da pergunta exibida ao usuário
+ * @param {Function} opcoes.onConfirmar - Callback executado se o usuário clicar em "Sim"
+ *
  * @example
- * hidratarFormulario('cadUsuario'); // Preenche todos os inputs do formulário
+ * confirmar({
+ *   titulo: 'Salvar registro',
+ *   mensagem: 'Deseja salvar as alterações?',
+ *   onConfirmar: () => form.dispatchEvent(new Event('submit'))
+ * });
+ */
+export function confirmar({ titulo, mensagem, onConfirmar }) {
+  const modalEl = document.getElementById('modal-confirmacao');
+  if (!modalEl) {
+    console.warn('Modal #modal-confirmacao não encontrado. Verifique o base.html.');
+    if (confirm(`${titulo}\n\n${mensagem}`)) onConfirmar();
+    return;
+  }
+
+  document.getElementById('modal-confirmacao-titulo').textContent = titulo;
+  document.getElementById('modal-confirmacao-mensagem').textContent = mensagem;
+
+  const modal = bootstrap.Modal.getInstance(modalEl) ?? new bootstrap.Modal(modalEl);
+
+  const btnSim = document.getElementById('modal-confirmacao-btn-sim');
+
+  // Clona o botão para remover listeners anteriores e evitar acúmulo de handlers
+  const novoBtn = btnSim.cloneNode(true);
+  btnSim.parentNode.replaceChild(novoBtn, btnSim);
+
+  novoBtn.addEventListener('click', () => {
+    // Sinaliza que a confirmação foi dada, mas aguarda o modal fechar completamente
+    // antes de executar o callback — evita o erro de aria-hidden com foco ativo
+    modalEl.addEventListener('hidden.bs.modal', () => onConfirmar(), { once: true });
+    modal.hide();
+  });
+
+  modal.show();
+}
+
+/**
+ * Hidrata os campos de um formulário com os dados do sisVar
  */
 export function hidratarFormulario(formId) {
   const form = document.querySelector(`[data-form-lock="${formId}"]`);
@@ -204,7 +228,6 @@ export function hidratarFormulario(formId) {
     return false;
   }
 
-  // Percorre todos os inputs do formulário
   const inputs = form.querySelectorAll('input, select, textarea');
   
   inputs.forEach(input => {
@@ -265,26 +288,21 @@ export function getDataBackEnd() {
 export function updateState(newData) {
   if (!newData || typeof newData !== 'object') return;
 
-  // Intercepta o token vindo do Middleware antes de processar o loop
   if (newData.csrfToken) {
     _state.others.csrf_token_value = newData.csrfToken;
     delete newData.csrfToken;
   }
 
   Object.entries(newData).forEach(([key, value]) => {
-    // Merge para formulários
     if (key === 'form' && _state.form) {
       _state.form = { ..._state.form, ...value };
     } 
-    // Merge para a estrutura 'others'
     else if (key === 'others' && _state.others) {
       _state.others = { ..._state.others, ...value };
     } 
-    // Merge para a estrutura 'mensagens'
     else if (key === 'mensagens' && _state.mensagens) {
       _state.mensagens = { ..._state.mensagens, ...value };
     }
-    // Atribuição direta para outras chaves
     else if (key !== 'csrfToken') {
       _state[key] = value;
     }
@@ -305,8 +323,6 @@ export function clearMessages() {
 
 /**
  * Define o estado de um formulário no sisVar.
- * Ponto único de entrada para mudança de estado — nunca altere o estado diretamente.
- * O Proxy reativo dispara applyFormState() automaticamente.
  * 
  * Estados válidos: 'novo' | 'editar' | 'visualizar'
  * 
@@ -314,9 +330,6 @@ export function clearMessages() {
  *   'novo'       → reconstrói campos a partir do schema (valores iniciais) e zera update
  *   'editar'     → mantém campos e update intactos; habilita inputs
  *   'visualizar' → desabilita inputs; hidratarFormulario() deve ser chamado antes
- * 
- * @param {string} formId - ID do formulário (ex: 'cadUsuario')
- * @param {string} estado - Novo estado do formulário
  */
 export function setFormState(formId, estado) {
   const estadosValidos = ['novo', 'editar', 'visualizar'];
@@ -331,24 +344,17 @@ export function setFormState(formId, estado) {
     return;
   }
 
-  // 'novo': reconstrói campos usando os valores iniciais do schema e zera update
   let camposAtualizados = _state.form[formId].campos;
   let updateAtualizado = _state.form[formId].update ?? null;
 
   if (estado === 'novo') {
     const schema = _state.schema[formId] ?? {};
-
-    // Para cada campo do schema, usa o 'value' definido como valor inicial.
-    // Campos sem 'value' no schema recebem null.
     camposAtualizados = Object.fromEntries(
       Object.entries(schema).map(([campo, regras]) => [campo, regras.value ?? null])
     );
-
-    // Zera o update — não há registro sendo editado
     updateAtualizado = null;
   }
 
-  // Atualiza o estado via Proxy — dispara applyFormState automaticamente
   _state.form = {
     ..._state.form,
     [formId]: {
@@ -362,17 +368,6 @@ export function setFormState(formId, estado) {
 
 /**
  * Define ou atualiza o schema de validação/configuração de um formulário.
- * O schema é o contrato do formulário: define campos, regras e valores iniciais.
- *
- * @param {string} formId - ID do formulário
- * @param {object} schema - Objeto com as definições dos campos
- *
- * @example
- * setSchema('cadUsuario', {
- *   first_name: { required: true, maxLength: 30, value: '' },
- *   username:   { required: true, maxLength: 20, value: '' },
- *   ativo:      { tipo: 'boolean', value: true },
- * });
  */
 export function setSchema(formId, schema) {
   _state.schema = {

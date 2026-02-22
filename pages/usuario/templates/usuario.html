@@ -49,7 +49,6 @@
         </div>
     </div>
     
-    <!-- data-show-on="novo,editar": visível em ambos; o disabled cuida do estado editar -->
     <button id="btn-salvar" class="btn btn-primary show-loader" data-show-on="novo,editar" type="submit">
         <i class="bi bi-save"></i> Salvar
     </button>
@@ -58,6 +57,10 @@
     </button>
     <button id="btn-novo" type="button" data-show-on="visualizar" class="btn btn-success d-none">
         <i class="bi bi-plus-circle"></i> Novo
+    </button>
+    <!-- Cancelar: visível em 'novo' e 'editar' — reinicia o formulário sem salvar -->
+    <button id="btn-cancelar" type="button" data-show-on="novo,editar" class="btn btn-outline-secondary d-none">
+        <i class="bi bi-x-circle"></i> Cancelar
     </button>
     <button type="button" id="btn-abrir-pesquisa" class="btn btn-secondary">
         <i class="bi bi-search"></i> Pesquisar

@@ -5,7 +5,8 @@ import {
   clearMessages,
   definirMensagem,
   hidratarFormulario,
-  setFormState
+  setFormState,
+  confirmar
 } from "/static/js/sisVar.js";
 import { fazerRequisicao } from "/static/js/base.js";
 import { initSmartInputs } from "/static/js/input_rules.js";
@@ -43,7 +44,8 @@ initSmartInputs((input, value) => {
 });
 
 /**
- * Submissão do formulário de cadastro
+ * Submissão do formulário de cadastro.
+ * Interceptada para exibir confirmação antes de enviar.
  */
 form.addEventListener("submit", async e => {
   e.preventDefault();
@@ -56,23 +58,29 @@ form.addEventListener("submit", async e => {
     return;
   }
 
-  const sisVarPayload = {
-    form: {
-      [nomeForm]: formData
+  // Confirmação antes de salvar
+  confirmar({
+    titulo: 'Confirmar Salvamento',
+    mensagem: 'Deseja salvar o registro?',
+    onConfirmar: async () => {
+      const sisVarPayload = {
+        form: {
+          [nomeForm]: formData
+        }
+      };
+
+      const resultado = await fazerRequisicao("/app/usuario/cadastro/", sisVarPayload);
+
+      if (!resultado.success) {
+        definirMensagem('erro', `Erro ao enviar dados: ${resultado.error}`, false);
+        AppLoader.hide();
+        return;
+      }
+
+      updateState(resultado.data);
+      AppLoader.hide();
     }
-  };
-
-  const resultado = await fazerRequisicao("/app/usuario/cadastro/", sisVarPayload);
-
-  if (!resultado.success) {
-    definirMensagem('erro', `Erro ao enviar dados: ${resultado.error}`, false);
-    AppLoader.hide();
-    return;
-  }
-
-  updateState(resultado.data);
-
-  AppLoader.hide();
+  });
 });
 
 // Inicialização ao carregar o DOM
@@ -84,6 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnFechar = document.getElementById('btn-fechar');
   const btnEditar = document.getElementById('btn-editar');
   const btnNovo = document.getElementById('btn-novo');
+  const btnCancelar = document.getElementById('btn-cancelar');
   const formFiltro = document.getElementById(nomeFormCons);
   const tabelaCorpo = document.getElementById('tabela-corpo');
 
@@ -110,6 +119,19 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   btnNovo.addEventListener('click', () => {
     setFormState(nomeForm, 'novo');
+  });
+
+  /**
+   * Botão Cancelar: pede confirmação e, se confirmado, reinicia para o estado 'novo'
+   */
+  btnCancelar.addEventListener('click', () => {
+    confirmar({
+      titulo: 'Confirmar Cancelamento',
+      mensagem: 'Deseja cancelar? Os dados não salvos serão perdidos.',
+      onConfirmar: () => {
+        setFormState(nomeForm, 'novo');
+      }
+    });
   });
 
   /**
