@@ -66,8 +66,13 @@ function applyFormState(formId, estado) {
     const estados = btn.dataset.showOn.split(',').map(s => s.trim());
     btn.classList.toggle('d-none', !estados.includes(estado));
   });
-  // Nota: o botão Salvar é sempre habilitado quando visível.
-  // A visibilidade já é controlada pelo data-show-on="novo,editar" no HTML.
+
+  // Atualiza o sufixo do título da página — presente em base.html para todos os formulários.
+  // Apenas o estado 'editar' exibe a indicação; nos demais o sufixo é apagado.
+  const pageTitleSuffix = document.getElementById('page-title-suffix');
+  if (pageTitleSuffix) {
+    pageTitleSuffix.textContent = estado === 'editar' ? ' — Edição de Registro' : '';
+  }
 }
 
 function clearFormFields(form) {

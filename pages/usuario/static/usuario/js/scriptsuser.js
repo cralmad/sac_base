@@ -48,10 +48,8 @@ initSmartInputs((input, value) => {
 form.addEventListener("submit", async e => {
   e.preventDefault();
 
-  // Limpa mensagens anteriores
   clearMessages();
 
-  // Valida se o formulário tem dados
   const formData = getForm(nomeForm);
   if (!formData || !formData.campos || Object.keys(formData.campos).length === 0) {
     definirMensagem('aviso', 'Preencha o formulário antes de enviar');
@@ -67,27 +65,18 @@ form.addEventListener("submit", async e => {
   const resultado = await fazerRequisicao("/app/usuario/cadastro/", sisVarPayload);
 
   if (!resultado.success) {
-    // Erro de rede ou servidor
     definirMensagem('erro', `Erro ao enviar dados: ${resultado.error}`, false);
     AppLoader.hide();
     return;
   }
 
-  // Atualiza sisVar com resposta (inclui novo CSRF token e mensagens!)
   updateState(resultado.data);
 
-  if (resultado.data?.success) {
-    // Sucesso! Mensagem já foi renderizada via updateState
-    AppLoader.hide();
-  } else {
-    // Erro de validação do servidor - mensagens já vêm na resposta
-    AppLoader.hide();
-  }
+  AppLoader.hide();
 });
 
 // Inicialização ao carregar o DOM
 document.addEventListener('DOMContentLoaded', () => {
-  // Seletores de Elementos
   const divPrincipal = document.getElementById(nomeForm);
   const divPesquisa = document.getElementById('div-pesquisa');
   const btnAbrirPesquisa = document.getElementById('btn-abrir-pesquisa');
@@ -98,30 +87,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const formFiltro = document.getElementById(nomeFormCons);
   const tabelaCorpo = document.getElementById('tabela-corpo');
 
-  // Utilitário para alternar visualização usando classes do Bootstrap
   const alternarTelas = () => {
     divPrincipal.classList.toggle('d-none');
     divPesquisa.classList.toggle('d-none');
   };
 
-  // Event Listeners para Navegação
   btnAbrirPesquisa.addEventListener('click', alternarTelas);
   btnVoltar.addEventListener('click', alternarTelas);
   btnFechar.addEventListener('click', alternarTelas);
 
   /**
-   * Botão Editar:
-   * - Altera o estado do formulário para 'editar' no sisVar
-   * - O Proxy de sisVar aplica: habilita inputs, oculta Editar/Novo, mostra Salvar (desabilitado)
+   * Botão Editar: muda estado para 'editar'
+   * applyFormState cuida de tudo: inputs, botões e sufixo do título
    */
   btnEditar.addEventListener('click', () => {
     setFormState(nomeForm, 'editar');
   });
 
   /**
-   * Botão Novo:
-   * - Altera o estado do formulário para 'novo' no sisVar
-   * - O Proxy de sisVar aplica: habilita inputs, limpa campos, mostra Salvar (habilitado)
+   * Botão Novo: muda estado para 'novo'
+   * applyFormState cuida de tudo: inputs, botões e sufixo do título
    */
   btnNovo.addEventListener('click', () => {
     setFormState(nomeForm, 'novo');
@@ -149,7 +134,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Atualiza sisVar
     updateState(resultado.data);
 
     if (resultado.data?.registros && resultado.data.registros.length > 0) {
@@ -216,7 +200,6 @@ document.addEventListener('DOMContentLoaded', () => {
   async function carregarRegistro(id) {
     clearMessages();
 
-    // Atualiza o campo de ID no formulário
     updateFormField(nomeFormCons, 'id_selecionado', id);
 
     const sisVarPayload = {
@@ -233,16 +216,12 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Atualiza sisVar com os dados do usuário
     updateState(resultado.data);
-
-    // Hidrata o formulário principal com os dados carregados
     hidratarFormulario(nomeForm);
 
-    // Altera o estado para 'visualizar' — o Proxy aplica as mudanças visuais automaticamente
+    // applyFormState cuida de tudo automaticamente — incluindo o sufixo do título
     setFormState(nomeForm, 'visualizar');
 
-    // Alterna para a tela principal (com dados carregados)
     alternarTelas();
     AppLoader.hide();
   }
