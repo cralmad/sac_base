@@ -89,12 +89,12 @@ def cadastro_view(request):
 
     schema = {
         nomeForm: {
-            "username": {'type': 'string', 'maxlength': 20, 'minlength': 3, 'required': True},
-            "first_name": {'type': 'string', 'maxlength': 30, 'minlength': 3, 'required': True},
-            "email": {'type': 'string', 'maxlength': 60, 'required': True},
-            "password": {'type': 'password', 'required': True},
-            "confirmpass": {'type': 'password', 'required': True},
-            "ativo": {'type': 'boolean', 'required': False}
+            "username": {'type': 'string', 'maxlength': 20, 'minlength': 3, 'required': True, 'value': ''},
+            "first_name": {'type': 'string', 'maxlength': 30, 'minlength': 3, 'required': True, 'value': ''},
+            "email": {'type': 'string', 'maxlength': 60, 'required': True, 'value': ''},
+            "password": {'type': 'password', 'required': True, 'value': ''},
+            "confirmpass": {'type': 'password', 'required': True, 'value': ''},
+            "ativo": {'type': 'boolean', 'required': False, 'value': None}
         },
         nomeFormCons: {
             "username_cons": {'type': 'string', 'maxlength': 20},

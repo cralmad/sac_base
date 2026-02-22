@@ -46,12 +46,14 @@ function applyFormState(formId, estado) {
   const form = document.querySelector(`[data-form-lock="${formId}"]`);
   if (!form) return;
 
-  // Limpa campos apenas ao entrar em 'visualizar'
-  if (estado === 'visualizar') {
+  // 'novo': limpa o DOM e habilita inputs
+  // 'editar': apenas habilita inputs (dados carregados permanecem no DOM)
+  // 'visualizar': desabilita inputs (hidratarFormulario() deve ter sido chamado antes)
+  if (estado === 'novo') {
     clearFormFields(form);
   }
 
-  // Habilita/desabilita inputs conforme o estado
+  // Habilita inputs em 'novo' e 'editar'; desabilita em 'visualizar'
   const isDisabled = (estado === 'visualizar');
   const inputs = form.querySelectorAll('input, select, textarea');
   inputs.forEach(el => {
@@ -64,12 +66,8 @@ function applyFormState(formId, estado) {
     const estados = btn.dataset.showOn.split(',').map(s => s.trim());
     btn.classList.toggle('d-none', !estados.includes(estado));
   });
-
-  // Regra especial: botão Salvar (submit) fica desabilitado no estado 'editar'
-  const btnSalvar = form.querySelector('button[type="submit"]');
-  if (btnSalvar) {
-    btnSalvar.disabled = (estado === 'editar');
-  }
+  // Nota: o botão Salvar é sempre habilitado quando visível.
+  // A visibilidade já é controlada pelo data-show-on="novo,editar" no HTML.
 }
 
 function clearFormFields(form) {
@@ -307,13 +305,13 @@ export function clearMessages() {
  * 
  * Estados válidos: 'novo' | 'editar' | 'visualizar'
  * 
+ * Efeitos colaterais por estado:
+ *   'novo'       → reconstrói campos a partir do schema (valores iniciais) e zera update
+ *   'editar'     → mantém campos e update intactos; habilita inputs
+ *   'visualizar' → desabilita inputs; hidratarFormulario() deve ser chamado antes
+ * 
  * @param {string} formId - ID do formulário (ex: 'cadUsuario')
  * @param {string} estado - Novo estado do formulário
- * 
- * @example
- * setFormState('cadUsuario', 'editar');
- * setFormState('cadUsuario', 'novo');
- * setFormState('cadUsuario', 'visualizar');
  */
 export function setFormState(formId, estado) {
   const estadosValidos = ['novo', 'editar', 'visualizar'];
@@ -328,13 +326,53 @@ export function setFormState(formId, estado) {
     return;
   }
 
+  // 'novo': reconstrói campos usando os valores iniciais do schema e zera update
+  let camposAtualizados = _state.form[formId].campos;
+  let updateAtualizado = _state.form[formId].update ?? null;
+
+  if (estado === 'novo') {
+    const schema = _state.schema[formId] ?? {};
+
+    // Para cada campo do schema, usa o 'value' definido como valor inicial.
+    // Campos sem 'value' no schema recebem null.
+    camposAtualizados = Object.fromEntries(
+      Object.entries(schema).map(([campo, regras]) => [campo, regras.value ?? null])
+    );
+
+    // Zera o update — não há registro sendo editado
+    updateAtualizado = null;
+  }
+
   // Atualiza o estado via Proxy — dispara applyFormState automaticamente
   _state.form = {
     ..._state.form,
     [formId]: {
       ..._state.form[formId],
-      estado
+      estado,
+      update: updateAtualizado,
+      campos: camposAtualizados
     }
+  };
+}
+
+/**
+ * Define ou atualiza o schema de validação/configuração de um formulário.
+ * O schema é o contrato do formulário: define campos, regras e valores iniciais.
+ *
+ * @param {string} formId - ID do formulário
+ * @param {object} schema - Objeto com as definições dos campos
+ *
+ * @example
+ * setSchema('cadUsuario', {
+ *   first_name: { required: true, maxLength: 30, value: '' },
+ *   username:   { required: true, maxLength: 20, value: '' },
+ *   ativo:      { tipo: 'boolean', value: true },
+ * });
+ */
+export function setSchema(formId, schema) {
+  _state.schema = {
+    ..._state.schema,
+    [formId]: schema
   };
 }
 
