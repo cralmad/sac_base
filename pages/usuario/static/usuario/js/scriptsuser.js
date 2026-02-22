@@ -58,11 +58,14 @@ form.addEventListener("submit", async e => {
     return;
   }
 
-  // Confirmação antes de salvar
   confirmar({
     titulo: 'Confirmar Salvamento',
     mensagem: 'Deseja salvar o registro?',
     onConfirmar: async () => {
+
+      // Loader ativado APÓS a confirmação — não bloqueia o modal
+      AppLoader.show();
+
       const sisVarPayload = {
         form: {
           [nomeForm]: formData
@@ -240,11 +243,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateState(resultado.data);
     hidratarFormulario(nomeForm);
-
-    // applyFormState cuida de tudo automaticamente — incluindo o sufixo do título
     setFormState(nomeForm, 'visualizar');
 
     alternarTelas();
+
+    // Zera o id_selecionado no sisVar para que a próxima pesquisa por filtros
+    // não reutilize o ID do registro recém-carregado
+    updateFormField(nomeFormCons, 'id_selecionado', null);
+
     AppLoader.hide();
   }
 });

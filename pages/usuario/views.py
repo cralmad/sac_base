@@ -89,16 +89,16 @@ def cadastro_view(request):
 
     schema = {
         nomeForm: {
-            "username": {'type': 'string', 'maxlength': 20, 'minlength': 3, 'required': True, 'value': ''},
-            "first_name": {'type': 'string', 'maxlength': 30, 'minlength': 3, 'required': True, 'value': ''},
-            "email": {'type': 'string', 'maxlength': 60, 'required': True, 'value': ''},
-            "password": {'type': 'password', 'required': True, 'value': ''},
-            "confirmpass": {'type': 'password', 'required': True, 'value': ''},
-            "ativo": {'type': 'boolean', 'required': False, 'value': None}
+            "username":    {'type': 'string',  'maxlength': 20, 'minlength': 3, 'required': True,  'value': ''},
+            "first_name":  {'type': 'string',  'maxlength': 30, 'minlength': 3, 'required': True,  'value': ''},
+            "email":       {'type': 'string',  'maxlength': 60, 'required': True,  'value': ''},
+            "password":    {'type': 'password', 'required': True,  'value': ''},
+            "confirmpass": {'type': 'password', 'required': True,  'value': ''},
+            "ativo":       {'type': 'boolean', 'required': False, 'value': None}
         },
         nomeFormCons: {
             "username_cons": {'type': 'string', 'maxlength': 20},
-            "first_name_cons": {'type': 'string', 'maxlength': 30},
+            "first_name_cons":{'type': 'string', 'maxlength': 30},
             "email_cons": {'type': 'string', 'maxlength': 60},
             "ativo_cons": {'type': 'boolean'},
             "id_selecionado": {'type': 'integer'}
@@ -137,93 +137,106 @@ def cadastro_view(request):
         }
         return render(request, template)
 
+    # ---------- POST ----------
     dataFront = request.sisvar_front
-    form = dataFront.get("form", {}).get(nomeForm, {})
-    campos = form.get("campos", {})
-    estado = form.get("estado", "")
+    form      = dataFront.get("form", {}).get(nomeForm, {})
+    campos    = form.get("campos", {})
+    estado    = form.get("estado", "")
 
-    # Validação dos campos do formulário ################################
+    # Validação de schema #####################################################
     validator = SchemaValidator(schema[nomeForm])
     if not validator.validate(campos):
-        errosList = validator.get_errors()
         errosForm = [
             f"{campo} - {', '.join(erros)}"
-            for campo, erros in errosList.items()
+            for campo, erros in validator.get_errors().items()
         ]
         return JsonResponse({
-            "mensagens": {"erro": {"conteudo": [errosForm], "ignorar": False}}
+            "mensagens": {"erro": {"conteudo": errosForm, "ignorar": False}}
         }, status=400)
-    #######################################################################
+    ###########################################################################
 
-    id_user = campos.get("id", None)
-    nome_user = campos.get("username")
-    nome = campos.get("first_name")
-    email = campos.get("email")
-    password = campos.get("password")
-    ativo = campos.get("ativo")
+    id_user     = campos.get("id")
+    nome_user   = campos.get("username")
+    nome        = campos.get("first_name")
+    email       = campos.get("email")
+    password    = campos.get("password")
     confirmpass = campos.get("confirmpass")
-    reg_user = None
-    
-    if id_user: reg_user = Usuarios.objects.get(id=id_user)
+    ativo       = campos.get("ativo")
+    usuario     = None
 
-    # Validações do formulário  ###############################################
-    if User.objects.filter(username=nome_user).exists():
+    # Carrega o registro existente quando há ID (editar) ######################
+    if id_user:
+        try:
+            usuario = Usuarios.objects.get(id=id_user)
+        except Usuarios.DoesNotExist:
+            return JsonResponse({
+                "mensagens": {"erro": {"conteudo": ["Registro não encontrado"], "ignorar": False}}
+            }, status=404)
+    ###########################################################################
+
+    # Validações de negócio ###################################################
+
+    # Username duplicado — exclui o próprio registro na edição
+    qs_username = User.objects.filter(username=nome_user)
+    if id_user:
+        qs_username = qs_username.exclude(id=id_user)
+    if qs_username.exists():
         return JsonResponse({
-            "mensagens": {
-                "erro": {
-                    "conteudo": ["Usuário já existe"],
-                    "ignorar": False
-                }
-            }
-        })
-    if password != confirmpass:
-        return JsonResponse({
-            "mensagens": {
-                "erro": {
-                    "conteudo": ["Senha e confirmação de senha não coincidem"],
-                    "ignorar": False
-                }
-            }
-        })
-    ############################################################################
+            "mensagens": {"erro": {"conteudo": ["Usuário já existe"], "ignorar": False}}
+        }, status=422)
+
+    # Senhas coincidem (obrigatório em 'novo'; opcional em 'editar' se informada)
+    if estado == 'novo' or password:
+        if password != confirmpass:
+            return JsonResponse({
+                "mensagens": {"erro": {"conteudo": ["Senha e confirmação de senha não coincidem"], "ignorar": False}}
+            }, status=422)
+
+    ###########################################################################
 
     match estado:
+
         case 'novo':
             usuario = Usuarios.objects.create(
                 username=nome_user,
                 first_name=nome,
                 email=email,
                 password=make_password(password),
-                is_active=(ativo == True)
+                is_active=bool(ativo)
             )
-        
+
         case 'editar':
-            reg_user.first_name = nome_user
-            reg_user.email = email
+            usuario.username   = nome_user
+            usuario.first_name = nome
+            usuario.email      = email
+            usuario.is_active  = bool(ativo)
 
-            if campos.get("password"):
-                reg_user.password = make_password(campos["password"])
+            # Senha só é alterada se o usuário informou um novo valor
+            if password:
+                usuario.password = make_password(password)
 
-            reg_user.save()
+            usuario.save()
 
-        case 'excluir':
-            reg_user.is_active = False
-            reg_user.save()
+        case _:
+            return JsonResponse({
+                "mensagens": {"erro": {"conteudo": [f"Estado inválido: '{estado}'"], "ignorar": False}}
+            }, status=400)
 
-    # ===== RESPOSTA JSON (editar / visualizar / excluir) =====
+    # ===== RESPOSTA JSON =====
     return JsonResponse({
+        "success": True,
         "form": {
             nomeForm: {
                 "estado": "visualizar",
                 "update": usuario.date_joined,
                 "campos": {
-                    "id": usuario.id,
-                    "username": usuario.username,
-                    "first_name": usuario.first_name,
-                    "email": usuario.email,
-                    "password": "",
+                    "id":          usuario.id,
+                    "username":    usuario.username,
+                    "first_name":  usuario.first_name,
+                    "email":       usuario.email,
+                    "password":    "",
                     "confirmpass": "",
-                    "ativo": usuario.is_active
+                    "ativo":       usuario.is_active
                 }
             }
         },
@@ -235,14 +248,14 @@ def cadastro_view(request):
         }
     })
 
+
 def alterar_senha_view(request):
     template = "alterarsenha.html"
     
-    # Esquema para validação no front-end (opcional, seguindo o padrão do login)
     schema = {
         "alterarSenhaForm": {
-            'senha_atual': {'type': 'password', 'required': True},
-            'nova_senha': {'type': 'password', 'required': True},
+            'senha_atual':     {'type': 'password', 'required': True},
+            'nova_senha':      {'type': 'password', 'required': True},
             'confirmar_senha': {'type': 'password', 'required': True}
         }
     }
@@ -267,12 +280,11 @@ def alterar_senha_view(request):
 
     # ---------- POST ----------
     try:
-        payload = request.sisvar_front
-        form = payload.get("form", {}).get("alterarSenhaForm", {}).get("campos", {})
-        
-        senha_atual = form.get("senha_atual")
-        nova_senha = form.get("nova_senha")
-        confirmar = form.get("confirmar_senha")
+        payload       = request.sisvar_front
+        form          = payload.get("form", {}).get("alterarSenhaForm", {}).get("campos", {})
+        senha_atual   = form.get("senha_atual")
+        nova_senha    = form.get("nova_senha")
+        confirmar     = form.get("confirmar_senha")
     except (KeyError, json.JSONDecodeError, AttributeError):
         return JsonResponse(
             {"mensagens": {"erro": {"ignorar": False, "conteudo": ["Payload inválido"]}}},
@@ -282,9 +294,11 @@ def alterar_senha_view(request):
     mensagens_erro = []
     user = request.user
 
-    # Validações de Negócio
     if not user.is_authenticated:
-        return JsonResponse({"mensagens": {"erro": {"ignorar": False, "conteudo": ["Usuário não autenticado"]}}}, status=401)
+        return JsonResponse(
+            {"mensagens": {"erro": {"ignorar": False, "conteudo": ["Usuário não autenticado"]}}},
+            status=401
+        )
 
     if not user.check_password(senha_atual):
         mensagens_erro.append("Senha atual inválida.")
@@ -297,19 +311,16 @@ def alterar_senha_view(request):
     except ValidationError as e:
         mensagens_erro.extend(e.messages)
 
-    # Retorno de Erros em formato JSON
     if mensagens_erro:
         return JsonResponse(
             {"mensagens": {"erro": {"ignorar": False, "conteudo": mensagens_erro}}},
             status=400
         )
 
-    # Persistência
     user.set_password(nova_senha)
     user.save()
     update_session_auth_hash(request, user)
 
-    # Retorno de Sucesso em formato JSON
     return JsonResponse({
         "success": True,
         "mensagens": {
@@ -320,51 +331,56 @@ def alterar_senha_view(request):
         }
     })
 
+
 def cadastro_cons_view(request):
-    nomeForm = "cadUsuario"
+    nomeForm     = "cadUsuario"
     nomeFormCons = "consUsuario"
 
     if request.method == "POST":
         dataFront = request.sisvar_front
-        form = dataFront.get("form", {}).get(nomeFormCons, {})
-        campos = form.get("campos", {})
+        form      = dataFront.get("form", {}).get(nomeFormCons, {})
+        campos    = form.get("campos", {})
 
         id_selecionado = int(campos.get('id_selecionado') or 0)
 
-        if id_selecionado != 0:
+        if id_selecionado:
             try:
-                user = Usuarios.objects.get(id=id_selecionado)
+                usuario = Usuarios.objects.get(id=id_selecionado)
                 return JsonResponse({
                     "form": {
                         nomeForm: {
                             "estado": "visualizar",
-                            "update": user.date_joined,
+                            "update": usuario.date_joined,
                             "campos": {
-                                "id": user.id,
-                                "username": user.username,
-                                "first_name": user.first_name,
-                                "email": user.email,
-                                "password": "",
+                                "id":          usuario.id,
+                                "username":    usuario.username,
+                                "first_name":  usuario.first_name,
+                                "email":       usuario.email,
+                                "password":    "",
                                 "confirmpass": "",
-                                "ativo": user.is_active
+                                "ativo":       usuario.is_active
                             }
                         }
                     }
                 })
             except Usuarios.DoesNotExist:
-                return JsonResponse({"erro": "Registro não encontrado"}, status=404)
+                return JsonResponse({
+                    "mensagens": {"erro": {"conteudo": ["Registro não encontrado"], "ignorar": False}}
+                }, status=404)
 
-        nome = campos.get('first_name_cons', '').strip()
-        username = campos.get('username_cons', '').strip()
+        nome      = campos.get('first_name_cons', '').strip()
+        username  = campos.get('username_cons', '').strip()
         userAtivo = campos.get('ativo_cons', False)
-        email = campos.get('email_cons', '').strip()
+        email     = campos.get('email_cons', '').strip()
 
         filtros = {}
-        if nome: filtros['first_name__icontains'] = nome
-        if username: filtros['username__icontains'] = username
-        if email: filtros['email'] = email
+        if nome:     filtros['first_name__icontains'] = nome
+        if username: filtros['username__icontains']   = username
+        if email:    filtros['email']                 = email
         filtros['is_active'] = userAtivo
 
-        usuarios = Usuarios.objects.filter(**filtros).values('id', 'first_name', 'username', 'email', 'is_active')
-        
+        usuarios = Usuarios.objects.filter(**filtros).values(
+            'id', 'first_name', 'username', 'email', 'is_active'
+        )
+
         return JsonResponse({"registros": list(usuarios)})
