@@ -225,13 +225,19 @@ document.addEventListener('DOMContentLoaded', () => {
   async function carregarRegistro(id) {
     clearMessages();
 
+    // Grava o ID, captura o payload como cópia profunda e zera imediatamente
     updateFormField(nomeFormCons, 'id_selecionado', id);
 
+    // structuredClone garante uma cópia independente do estado atual —
+    // zerar o sisVar depois não afeta o payload já enviado
     const sisVarPayload = {
       form: {
-        [nomeFormCons]: getForm(nomeFormCons)
+        [nomeFormCons]: structuredClone(getForm(nomeFormCons))
       }
     };
+
+    // Zera antes da requisição: qualquer filtro posterior já encontra o campo limpo
+    updateFormField(nomeFormCons, 'id_selecionado', null);
 
     const resultado = await fazerRequisicao("/app/usuario/cadastro/cons", sisVarPayload);
 
@@ -244,13 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateState(resultado.data);
     hidratarFormulario(nomeForm);
     setFormState(nomeForm, 'visualizar');
-
     alternarTelas();
-
-    // Zera o id_selecionado no sisVar para que a próxima pesquisa por filtros
-    // não reutilize o ID do registro recém-carregado
-    updateFormField(nomeFormCons, 'id_selecionado', null);
-
     AppLoader.hide();
   }
 });
