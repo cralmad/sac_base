@@ -7,7 +7,8 @@
 {% block page_title %}Alterar Senha{% endblock %}
 {% block content %}
 
-<form id="alterarSenhaForm" method="POST">
+<!-- ✅ ADICIONADO: data-form-lock -->
+<form id="alterarSenhaForm" data-form-lock="alterarSenhaForm" method="POST">
     {% csrf_token %}
 
     <div class="mb-3">
