@@ -1,38 +1,46 @@
-// static/js/loader.js - VERSÃO CORRIGIDA E SEGURA
+// static/js/loader.js - VERSÃO CORRIGIDA
 
 export const AppLoader = {
     element: null,
     hideTimeout: null,
     isVisible: false,
+    isInitialized: false,
 
     init() {
+        // Previne múltiplas inicializações
+        if (this.isInitialized) return;
+        
         this.element = document.getElementById('global-loader');
+        
         if (!this.element) {
-            console.error('❌ #global-loader não encontrado no DOM!');
+            console.error('❌ CRÍTICO: #global-loader não encontrado no DOM!');
             return;
         }
-        console.log('✅ AppLoader inicializado');
+        
+        console.log('✅ AppLoader inicializado com sucesso');
+        this.isInitialized = true;
         this.attachListeners();
     },
 
     show() {
+        // ✅ Auto-inicializa se ainda não foi feito
+        if (!this.isInitialized) {
+            this.init();
+        }
+
         if (!this.element) return;
         
-        // Evita múltiplas chamadas
         if (this.isVisible) return;
         
         console.log('📍 AppLoader.show()');
         this.isVisible = true;
         
-        // Remove classe d-none para exibir
         this.element.classList.remove('d-none');
         
-        // Limpa timeout anterior
         if (this.hideTimeout) {
             clearTimeout(this.hideTimeout);
         }
         
-        // AUTO-HIDE após 15 segundos (segurança contra travamentos)
         this.hideTimeout = setTimeout(() => {
             console.warn('⚠️ Loader auto-hidden após 15s');
             this.hide();
@@ -40,18 +48,20 @@ export const AppLoader = {
     },
 
     hide() {
+        // ✅ Auto-inicializa se ainda não foi feito
+        if (!this.isInitialized) {
+            this.init();
+        }
+
         if (!this.element) return;
         
-        // Evita múltiplas chamadas
         if (!this.isVisible) return;
         
         console.log('📍 AppLoader.hide()');
         this.isVisible = false;
         
-        // Adiciona classe d-none para esconder
         this.element.classList.add('d-none');
         
-        // Limpa timeout
         if (this.hideTimeout) {
             clearTimeout(this.hideTimeout);
             this.hideTimeout = null;
@@ -65,9 +75,8 @@ export const AppLoader = {
 
             const form = target.closest('form');
             
-            // Valida formulário antes de mostrar loader
             if (form && !form.checkValidity()) {
-                return; // Deixa o navegador mostrar erros nativos
+                return;
             }
 
             this.show();
@@ -81,11 +90,17 @@ export const AppLoader = {
     }
 };
 
-// Inicializa quando o módulo é carregado
+// ✅ MUDA: Não inicializa aqui! Espera por chamada explícita ou auto-init
+// AppLoader.init(); // ❌ REMOVIDO
+
+// ✅ Inicializa quando o DOM está totalmente pronto
 if (document.readyState === 'loading') {
-    // DOM ainda está carregando
-    document.addEventListener('DOMContentLoaded', () => AppLoader.init());
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('🔧 Inicializando AppLoader após DOMContentLoaded');
+        AppLoader.init();
+    });
 } else {
-    // DOM já foi carregado
+    // DOM já carregou (raro em módulos, mas acontece)
+    console.log('🔧 Inicializando AppLoader imediatamente');
     AppLoader.init();
 }

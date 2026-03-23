@@ -5,14 +5,10 @@ import {
   getCsrfToken 
 } from "/static/js/sisVar.js";
 
+import { AppLoader } from "/static/js/loader.js"; // ✅ ADICIONAR IMPORT
+
 /**
  * Função utilitária para fazer requisições POST com CSRF token
- * Centraliza a lógica de requisição e tratamento de erros
- * Reutilizável em toda a aplicação
- * 
- * @param {string} url - URL do endpoint
- * @param {object} payload - Dados a enviar
- * @returns {Promise<{success: boolean, data: any, error: string | null}>}
  */
 export async function fazerRequisicao(url, payload) {
   try {
@@ -31,7 +27,6 @@ export async function fazerRequisicao(url, payload) {
       body: JSON.stringify(payload)
     });
 
-    // Se a resposta não for JSON válido (exceto erros esperados 400, 401)
     if (!response.ok && response.status !== 400 && response.status !== 401) {
       throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
     }
@@ -54,22 +49,18 @@ export async function fazerRequisicao(url, payload) {
  */
 export async function inicializarNavbarUsuario() {
     try {
-        // Garante que os dados do backend foram carregados
         await getDataBackEnd();
 
         const usuario = getUsuario();
 
         renderMensagens();
 
-        // Se não estiver autenticado, não faz nada
         if (!usuario || !usuario.autenticado) {
             return;
         }
 
-        // Localiza a navbar existente
         const navbarContainer = document.getElementById("navbase");
 
-        // Cria o elemento do dropdown
         const dropdownHtml = `
             <div class="dropdown ms-auto">
                 <a class="nav-link dropdown-toggle text-light d-flex align-items-center"
@@ -99,7 +90,6 @@ export async function inicializarNavbarUsuario() {
             </div>
         `;
 
-        // Insere no final da navbar (lado direito)
         navbarContainer.insertAdjacentHTML("beforeend", dropdownHtml);
 
     } catch (erro) {
@@ -107,8 +97,10 @@ export async function inicializarNavbarUsuario() {
     }
 }
 
-// Auto-executa ao carregar o módulo
+// ✅ Inicializa AppLoader E navbar quando DOM está pronto
 document.addEventListener("DOMContentLoaded", () => {
+    console.log('🔧 DOMContentLoaded disparado - inicializando AppLoader');
+    AppLoader.init(); // ✅ ADICIONAR AQUI
     inicializarNavbarUsuario();
 });
 
@@ -125,4 +117,9 @@ function exibir() {
   console.log(window.__DEBUG__.state);
 }
 
-document.getElementById('teste').addEventListener('click', exibir);
+document.addEventListener('DOMContentLoaded', () => {
+  const testeBtn = document.getElementById('teste');
+  if (testeBtn) {
+    testeBtn.addEventListener('click', exibir);
+  }
+});
