@@ -1,7 +1,7 @@
-// Responsável por gerenciar o loader global da aplicação (um spinner que indica que algo está carregando)
-// O loader é exibido quando o usuário clica em elementos com a classe 'show-loader'
+// Responsável por gerenciar o loader global da aplicação
 export const AppLoader = {
     element: null,
+    hideTimeout: null, // Novo: controlar timeout
 
     init() {
         this.element = document.getElementById('global-loader');
@@ -9,11 +9,32 @@ export const AppLoader = {
     },
 
     show() {
-        if (this.element) this.element.classList.remove('d-none');
+        if (this.element) {
+            this.element.classList.remove('d-none');
+            
+            // Limpa timeout anterior se existir
+            if (this.hideTimeout) {
+                clearTimeout(this.hideTimeout);
+            }
+            
+            // Auto-hide após 10 segundos (segurança contra travamentos)
+            this.hideTimeout = setTimeout(() => {
+                this.hide();
+                console.warn("Loader auto-hidden after timeout");
+            }, 10000);
+        }
     },
 
     hide() {
-        if (this.element) this.element.classList.add('d-none');
+        if (this.element) {
+            this.element.classList.add('d-none');
+            
+            // Limpa o timeout se existir
+            if (this.hideTimeout) {
+                clearTimeout(this.hideTimeout);
+                this.hideTimeout = null;
+            }
+        }
     },
 
     attachListeners() {
@@ -21,12 +42,8 @@ export const AppLoader = {
             const target = e.target.closest('.show-loader');
             if (!target) return;
 
-            // Se o elemento estiver dentro de um formulário
             const form = target.closest('form');
-            
-            // Se existir um formulário e ele for INVÁLIDO (campos required vazios, etc)
             if (form && !form.checkValidity()) {
-                // Não faz nada, deixa o navegador mostrar os avisos de erro nativos
                 return;
             }
 

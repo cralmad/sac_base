@@ -24,10 +24,9 @@ form.addEventListener("submit", async e => {
 
   const campos = getForm("alterarSenhaForm");
   
-  // VALIDAÇÃO FRONTEND (Opcional mas recomendado)
   if (!campos.campos.senha_atual || !campos.campos.nova_senha || !campos.campos.confirmar_senha) {
     definirMensagem("aviso", ["Todos os campos são obrigatórios"], true);
-    AppLoader.hide();
+    AppLoader.hide(); // ✅ IMPORTANTE
     return;
   }
 
@@ -42,28 +41,26 @@ form.addEventListener("submit", async e => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-CSRFToken": getCsrfToken() // ✅ CORRIGIDO
+        "X-CSRFToken": getCsrfToken()
       },
       body: JSON.stringify(sisVarPayload)
     });
 
     const data = await res.json();
 
-    // ✅ CORRIGIDO: Atualiza estado completo via sisVar
     if (data.mensagens) {
       updateState(data);
     }
 
+    AppLoader.hide(); // ✅ SEMPRE CHAMAR
+
     if (res.ok && data.success) {
-      AppLoader.hide();
-      // Opcional: Redirecionar ou recarregar após sucesso
+      console.log("Senha alterada com sucesso!");
       // setTimeout(() => window.location.reload(), 1500);
-    } else {
-      AppLoader.hide();
     }
   } catch (err) {
     console.error("Erro ao alterar senha:", err);
     definirMensagem("erro", ["Erro ao conectar ao servidor. Tente novamente."], false);
-    AppLoader.hide();
+    AppLoader.hide(); // ✅ SEMPRE CHAMAR MESMO EM ERRO
   }
 });
