@@ -1,4 +1,5 @@
-﻿/* loader.css */
+﻿/* static/css/styles.css */
+
 #global-loader {
     position: fixed;
     top: 0;
@@ -9,10 +10,16 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 10000;
+    z-index: 9999; /* Reduzido de 10000 */
 }
 
-/* Opcional: Efeito suave de aparecimento */
+/* IMPORTANTE: Quando tem d-none, o loader NÃO DEVE OCUPAR ESPAÇO */
+#global-loader.d-none {
+    display: none !important; /* Bootstrap CSS override */
+    pointer-events: none !important; /* Bloqueia cliques mesmo se visível por bug */
+}
+
+/* Efeito de fade-in */
 .fade-in {
     animation: fadeIn 0.2s;
 }

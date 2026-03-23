@@ -1,5 +1,3 @@
-// pages/usuario/static/usuario/js/scriptspass.js - VERSÃO CORRIGIDA
-
 import { updateFormField, getForm, definirMensagem, updateState, getCsrfToken } from "/static/js/sisVar.js";
 import { initSmartInputs } from "/static/js/input_rules.js";
 import { criarAtualizadorForm } from "/static/js/refresh_varSis.js";
@@ -24,10 +22,10 @@ form.addEventListener("submit", async e => {
 
   const campos = getForm("alterarSenhaForm");
   
-  if (!campos.campos.senha_atual || !campos.campos.nova_senha || !campos.campos.confirmar_senha) {
+  // Validação básica
+  if (!campos || !campos.campos || !campos.campos.senha_atual || !campos.campos.nova_senha || !campos.campos.confirmar_senha) {
     definirMensagem("aviso", ["Todos os campos são obrigatórios"], true);
-    AppLoader.hide(); // ✅ IMPORTANTE
-    return;
+    return; // NÃO mostra loader se validação falhar
   }
 
   const sisVarPayload = {
@@ -35,6 +33,9 @@ form.addEventListener("submit", async e => {
       alterarSenhaForm: campos
     }
   };
+
+  // MOSTRA LOADER ANTES DE FAZER REQUEST
+  AppLoader.show();
 
   try {
     const res = await fetch("/app/usuario/alterarsenha/", {
@@ -48,19 +49,26 @@ form.addEventListener("submit", async e => {
 
     const data = await res.json();
 
+    // Atualiza estado com mensagens
     if (data.mensagens) {
       updateState(data);
     }
 
-    AppLoader.hide(); // ✅ SEMPRE CHAMAR
+    // ✅ SEMPRE ESCONDE O LOADER
+    AppLoader.hide();
 
     if (res.ok && data.success) {
-      console.log("Senha alterada com sucesso!");
-      // setTimeout(() => window.location.reload(), 1500);
+      console.log("✅ Senha alterada com sucesso!");
+      // Opcional: redirecionar após sucesso
+      // setTimeout(() => window.location.href = "/", 2000);
+    } else {
+      console.log("❌ Erro na operação");
     }
   } catch (err) {
-    console.error("Erro ao alterar senha:", err);
+    console.error("❌ Erro ao alterar senha:", err);
     definirMensagem("erro", ["Erro ao conectar ao servidor. Tente novamente."], false);
-    AppLoader.hide(); // ✅ SEMPRE CHAMAR MESMO EM ERRO
+    
+    // ✅ SEMPRE ESCONDE O LOADER MESMO EM ERRO
+    AppLoader.hide();
   }
 });
