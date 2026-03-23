@@ -38,6 +38,12 @@ const _state = new Proxy(_rawState, {
 
 const _dadosBE = 'sisDados';
 
+// Fix 1: Flag to prevent getDataBackEnd() from being called multiple times
+let _dadosBECarregados = false;
+
+// Fix 6: Track the pending hidden.bs.modal handler to avoid listener accumulation
+let _confirmarHiddenHandler = null;
+
 // 2.
 // Controlador de Interface (DOM)
 
@@ -89,8 +95,8 @@ function clearFormFields(form) {
 // --- Funções Exportadas ---
 
 export function getForm(formId = null) {
-  if (formId) return _state.form[formId] || null;
-  return _state.form;
+  if (formId) return _state.form[formId] ? structuredClone(_state.form[formId]) : null;
+  return structuredClone(_state.form);
 }
 
 export function getSchema(schemaId = null) {
@@ -202,10 +208,19 @@ export function confirmar({ titulo, mensagem, onConfirmar }) {
   const novoBtn = btnSim.cloneNode(true);
   btnSim.parentNode.replaceChild(novoBtn, btnSim);
 
+  // Remove qualquer handler 'hidden.bs.modal' pendente de uma chamada anterior
+  if (_confirmarHiddenHandler) {
+    modalEl.removeEventListener('hidden.bs.modal', _confirmarHiddenHandler);
+    _confirmarHiddenHandler = null;
+  }
+
   novoBtn.addEventListener('click', () => {
     // Sinaliza que a confirmação foi dada, mas aguarda o modal fechar completamente
     // antes de executar o callback — evita o erro de aria-hidden com foco ativo
-    modalEl.addEventListener('hidden.bs.modal', () => onConfirmar(), { once: true });
+    _confirmarHiddenHandler = () => {
+      onConfirmar();
+    };
+    modalEl.addEventListener('hidden.bs.modal', _confirmarHiddenHandler, { once: true });
     modal.hide();
   });
 
@@ -238,20 +253,24 @@ export function hidratarFormulario(formId) {
       switch (input.type) {
         case 'checkbox':
           input.checked = Boolean(fieldValue);
+          input.dispatchEvent(new Event('change', { bubbles: true }));
           break;
         
         case 'radio':
           if (input.value === String(fieldValue)) {
             input.checked = true;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
           }
           break;
         
         case 'number':
           input.value = fieldValue !== null ? Number(fieldValue) : '';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
           break;
         
         default:
           input.value = fieldValue;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
       }
     }
   });
@@ -262,12 +281,34 @@ export function hidratarFormulario(formId) {
 export function updateFormField(formId, name, value) {
   if (!_state.form[formId]) {
     console.error(`Formulário ${formId} não encontrado.`);
-    return;
+    return false;
   }
+
+  // Fix 5: Validate against schema if a validate function is defined
+  const schema = _state.schema?.[formId]?.[name];
+  if (schema && typeof schema.validate === 'function') {
+    const validation = schema.validate(value);
+    if (!validation.valid) {
+      console.warn(`Validação falhou para ${name}:`, validation.error);
+      return false;
+    }
+  }
+
   _state.form[formId]["campos"][name] = value;
+
+  // Fix 2 & 7: Dispatch CustomEvent so external components can react to field changes
+  document.dispatchEvent(new CustomEvent('sisvar:field-update', {
+    detail: { formId, name, value }
+  }));
+
+  return true;
 }
 
 export function getDataBackEnd() {
+  // Fix 1: Prevent multiple executions (race condition guard)
+  if (_dadosBECarregados) return;
+  _dadosBECarregados = true;
+
   const elemento = document.getElementById(_dadosBE);
 
   if (elemento) {
