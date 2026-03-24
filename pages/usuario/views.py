@@ -248,9 +248,10 @@ def cadastro_view(request):
 
 def alterar_senha_view(request):
     template = "alterarsenha.html"
+    nomeForm = "alterarSenhaForm"
 
     schema = {
-        "alterarSenhaForm": {
+        nomeForm: {
             'senha_atual':     {'type': 'password', 'required': True},
             'nova_senha':      {'type': 'password', 'required': True},
             'confirmar_senha': {'type': 'password', 'required': True}
@@ -262,7 +263,7 @@ def alterar_senha_view(request):
         request.sisvar_extra = {
             "schema": schema,
             "form": {
-                "alterarSenhaForm": {
+                nomeForm: {
                     "estado": "editar",
                     "update": None,
                     "campos": {
@@ -288,10 +289,11 @@ def alterar_senha_view(request):
 
     try:
         payload       = request.sisvar_front
-        form          = payload.get("form", {}).get("alterarSenhaForm", {}).get("campos", {})
-        senha_atual   = form.get("senha_atual")
-        nova_senha    = form.get("nova_senha")
-        confirmar     = form.get("confirmar_senha")
+        form          = payload.get("form", {}).get(nomeForm, {})
+        campos        = form.get("campos", {})
+        senha_atual   = campos.get("senha_atual")
+        nova_senha    = campos.get("nova_senha")
+        confirmar     = campos.get("confirmar_senha")
     except (KeyError, json.JSONDecodeError, AttributeError):
         return JsonResponse(
             {"mensagens": {"erro": {"ignorar": False, "conteudo": ["Payload inválido"]}}},
@@ -299,8 +301,8 @@ def alterar_senha_view(request):
         )
 
     # Validação de schema #####################################################
-    validator = SchemaValidator(schema["alterarSenhaForm"])
-    if not validator.validate(form):
+    validator = SchemaValidator(schema[nomeForm])
+    if not validator.validate(campos):
         errosForm = [
             f"{campo} - {', '.join(erros)}"
             for campo, erros in validator.get_errors().items()
@@ -336,6 +338,17 @@ def alterar_senha_view(request):
 
     return JsonResponse({
         "success": True,
+        "form": {
+            nomeForm: {
+                "estado": "editar",
+                "update": None,
+                "campos": {
+                    "senha_atual": "",
+                    "nova_senha": "",
+                    "confirmar_senha": "",
+                }
+            }
+        },
         "mensagens": {
             "sucesso": {
                 "ignorar": False,
@@ -398,5 +411,3 @@ def cadastro_cons_view(request):
         )
 
         return JsonResponse({"registros": list(usuarios)}
-        )
-        
