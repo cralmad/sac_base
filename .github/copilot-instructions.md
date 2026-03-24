@@ -290,9 +290,11 @@ Todo template **herda de `base.html`** e preenche os blocos obrigatórios:
 
 **Regras do template:**
 - Sempre usar `{% extends "base.html" %}` e `{% load static %}`
+- CSS da página deve ser declarado **dentro do `{% block estilo %}`** — nunca solto fora de um bloco
 - O `<form>` principal **deve ter** `id="nomeForm"` E `data-form-lock="nomeForm"` com os **mesmos valores**
 - Inputs usam a classe `smart-input` para ativar as regras de `input_rules.js`
 - Botões controlados por estado usam `data-show-on="estado1,estado2"` — a `sisVar` gerencia a visibilidade automaticamente
+- Layout usa **Mobile First** com Bootstrap grid: `col-12` como base, expandindo com `col-sm-*` e `col-md-*`
 
 ### Atributos de `smart-input` disponíveis:
 
@@ -311,7 +313,7 @@ Todo template **herda de `base.html`** e preenche os blocos obrigatórios:
 Cada página tem **um único arquivo JS** em `pages/<app>/static/<app>/js/scripts.js`:
 
 ```javascript
-// 1. IMPORTS — sempre com caminhos absolutos /static/...
+// 1. IMPORTS — sempre com caminhos absolutos /static/... 
 import {
   updateFormField, getForm, updateState,
   clearMessages, definirMensagem,
@@ -336,7 +338,7 @@ initSmartInputs((input, value) => { updateFormField(nomeForm, input.name, value)
 // 4. SUBMIT DO FORMULÁRIO PRINCIPAL
 form.addEventListener("submit", async e => {
   e.preventDefault();
-  clearMessages();
+  clearMessages(); // ← SEMPRE limpar mensagens antes de nova requisição
 
   const formData = getForm(nomeForm);
 
@@ -443,7 +445,7 @@ fazerRequisicao() → resultado.data
 | `setFormState(formId, estado)` | Muda estado do form (`novo` / `editar` / `visualizar`) |
 | `updateState(data)` | Mescla resposta JSON do servidor na sisVar inteira |
 | `hidratarFormulario(formId)` | Preenche o DOM com os dados de `sisVar.form[formId].campos` |
-| `clearMessages()` | Limpa todas as mensagens |
+| `clearMessages()` | Limpa todas as mensagens — **chamar sempre antes de nova requisição** |
 | `definirMensagem(tipo, conteudo, ignorar)` | Define mensagem (`sucesso` / `erro` / `aviso` / `info`) |
 | `renderMensagens()` | Renderiza as mensagens no `#container-mensagens` |
 | `confirmar({titulo, mensagem, onConfirmar})` | Abre modal de confirmação global |
@@ -458,7 +460,7 @@ O `JWTAuthMiddleware` (`pages/usuario/middleware.py`) intercepta **todas** as re
 2. Verifica `access_token` no cookie → autentica o `request.user`
 3. Se expirado, tenta renovar via `refresh_token` automaticamente
 4. Se não autorizado: redireciona para `/app/usuario/login/` (HTML) ou retorna `401` (API JSON)
-5. Em respostas JSON bem-sucedidas (200/201), injeta `csrfToken` no payload automaticamente
+5. Em **todas** as respostas JSON (incluindo erros), injeta `csrfToken` no payload automaticamente
 
 **Rotas públicas** (sem autenticação) são configuradas no middleware:
 ```python
@@ -544,7 +546,7 @@ Após a validação de schema, implemente validações de negócio (duplicidade,
 | Bloco | Onde aparece | Uso |
 |---|---|---|
 | `{% block title %}` | `<title>` | Título da aba do navegador |
-| `{% block estilo %}` | `<head>` | CSS específico da página |
+| `{% block estilo %}` | `<head>` | CSS específico da página — **usar sempre este bloco para `<link>` de CSS** |
 | `{% block page_title %}` | `<h1>` no main | Título visível da página |
 | `{% block content %}` | `<main>` | Conteúdo principal |
 | `{% block scripts %}` | Antes de `</body>` | JS específico da página (`type="module"`) |
@@ -564,7 +566,29 @@ Após a validação de schema, implemente validações de negócio (duplicidade,
 
 ---
 
-## 13. CRIANDO UM NOVO APP — CHECKLIST
+## 13. DIRETRIZES DE LAYOUT — MOBILE FIRST
+
+- Todo layout usa **Bootstrap 5 com abordagem Mobile First**
+- Colunas começam em `col-12` (mobile) e expandem com `col-sm-*`, `col-md-*`, `col-lg-*`
+- Campos de formulário são organizados em `<div class="container-md-3 my-3 mx-auto"> > <div class="row g-3">`
+- Botões em mobile ficam empilhados (`d-grid gap-2`) e lado a lado em desktop (`d-md-flex`)
+- Tabelas usam `table-responsive` para scroll horizontal em mobile
+
+**Exemplo de campo Mobile First:**
+```html
+<div class="container-md-3 my-3 mx-auto">
+  <div class="row g-3">
+    <div class="col-12 col-sm-5">  <!-- 100% mobile, ~50% tablet+ -->
+      <label class="form-label mb-0">Campo</label>
+      <input type="text" name="campo" class="form-control smart-input" />
+    </div>
+  </div>
+</div>
+```
+
+---
+
+## 14. CRIANDO UM NOVO APP — CHECKLIST
 
 ```
 1. [ ] python manage.py startapp <nome>
@@ -580,9 +604,12 @@ Após a validação de schema, implemente validações de negócio (duplicidade,
 5. [ ] Criar pages/<nome>/templates/<template>.html
          → {% extends "base.html" %}
          → Definir blocos: title, estilo, page_title, content, scripts
+         → CSS em {% block estilo %}, nunca solto fora de bloco
+         → Layout Mobile First: col-12 como base
 
 6. [ ] Criar pages/<nome>/static/<nome>/js/scripts.js
          → Importar de /static/js/sisVar.js, base.js, input_rules.js, etc.
+         → Chamar clearMessages() antes de toda requisição POST
 
 7. [ ] Criar pages/<nome>/static/<nome>/css/styles.css
 
