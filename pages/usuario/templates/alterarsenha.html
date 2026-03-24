@@ -3,36 +3,49 @@
 
 {% block title %}SacBase - Senha{% endblock %}
 
+{% block estilo %}
+  <link rel="stylesheet" href="{% static 'usuario/css/stylespass.css' %}">
+{% endblock %}
+
 {% block page_title %}Alterar Senha{% endblock %}
+
 {% block content %}
 
 <form id="alterarSenhaForm" data-form-lock="alterarSenhaForm" method="POST">
     {% csrf_token %}
 
-    <div class="mb-3">
-        <label class="form-label">Senha Atual</label>
-        <input type="password" name="senha_atual" class="form-control smart-input"
-               data-allow="A-Za-z0-9@#%!*_" maxlength="20" required/>
+    <div class="container-md-3 my-3 mx-auto">
+        <div class="row g-3">
+
+            <div class="col-12 col-sm-6">
+                <label class="form-label mb-0">Senha Atual</label>
+                <input type="password" name="senha_atual" class="form-control smart-input"
+                       data-allow="A-Za-z0-9@#%!*_" maxlength="20" required/>
+            </div>
+
+            <div class="col-12 col-sm-6">
+                <label class="form-label mb-0">Nova Senha</label>
+                <input type="password" name="nova_senha" class="form-control smart-input"
+                       data-allow="A-Za-z0-9@#%!*_" maxlength="20" required/>
+            </div>
+
+            <div class="col-12 col-sm-6">
+                <label class="form-label mb-0">Confirmar Nova Senha</label>
+                <input type="password" name="confirmar_senha" class="form-control smart-input"
+                       data-allow="A-Za-z0-9@#%!*_" maxlength="20" required/>
+            </div>
+
+        </div>
     </div>
 
-    <div class="mb-3">
-        <label class="form-label">Nova Senha</label>
-        <input type="password" name="nova_senha" class="form-control smart-input"
-               data-allow="A-Za-z0-9@#%!*_" maxlength="20" required/>
-    </div>
+    <button class="btn btn-primary" type="submit">
+        <i class="bi bi-save"></i> Alterar Senha
+    </button>
 
-    <div class="mb-3">
-        <label class="form-label">Confirmar Nova Senha</label>
-        <input type="password" name="confirmar_senha" class="form-control smart-input"
-               data-allow="A-Za-z0-9@#%!*_" maxlength="20" required/>
-    </div>
-
-    <button class="btn btn-primary show-loader" type="submit">Alterar Senha</button>
 </form>
 
 {% endblock %}
 
 {% block scripts %}
-  <link rel="stylesheet" href="{% static 'usuario/css/stylespass.css' %}">
   <script type="module" src="{% static 'usuario/js/scriptspass.js' %}"></script>
 {% endblock %}
