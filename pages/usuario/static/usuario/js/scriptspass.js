@@ -1,40 +1,34 @@
-import { updateFormField, getForm, definirMensagem, updateState, getCsrfToken } from "/static/js/sisVar.js";
+import { updateFormField, getForm, definirMensagem, updateState, clearMessages, getCsrfToken } from "/static/js/sisVar.js";
 import { initSmartInputs } from "/static/js/input_rules.js";
 import { criarAtualizadorForm } from "/static/js/refresh_varSis.js";
 import { AppLoader } from "/static/js/loader.js";
 
-const form = document.getElementById("alterarSenhaForm");
+const FORM_ID = "alterarSenhaForm";
+const form = document.getElementById(FORM_ID);
 
-const updater = criarAtualizadorForm({
-  formId: "alterarSenhaForm",
-  setter: updateFormField,
-  form
-});
-
+// ── Vínculo sisVar ↔ inputs ────────────────────────────────────────────────
+const updater = criarAtualizadorForm({ formId: FORM_ID, setter: updateFormField, form });
 form.addEventListener("input", updater);
 
 initSmartInputs((input, value) => {
-  updateFormField("alterarSenhaForm", input.name, value);
+  updateFormField(FORM_ID, input.name, value);
 });
 
+// ── Submit ─────────────────────────────────────────────────────────────────
 form.addEventListener("submit", async e => {
   e.preventDefault();
 
-  const campos = getForm("alterarSenhaForm");
-  
-  // Validação básica
-  if (!campos || !campos.campos || !campos.campos.senha_atual || !campos.campos.nova_senha || !campos.campos.confirmar_senha) {
+  // Limpa mensagens anteriores antes de qualquer nova requisição
+  clearMessages();
+
+  const campos = getForm(FORM_ID);
+
+  // Validação básica no front
+  if (!campos?.campos?.senha_atual || !campos?.campos?.nova_senha || !campos?.campos?.confirmar_senha) {
     definirMensagem("aviso", ["Todos os campos são obrigatórios"], true);
-    return; // NÃO mostra loader se validação falhar
+    return;
   }
 
-  const sisVarPayload = {
-    form: {
-      alterarSenhaForm: campos
-    }
-  };
-
-  // MOSTRA LOADER ANTES DE FAZER REQUEST
   AppLoader.show();
 
   try {
@@ -44,31 +38,18 @@ form.addEventListener("submit", async e => {
         "Content-Type": "application/json",
         "X-CSRFToken": getCsrfToken()
       },
-      body: JSON.stringify(sisVarPayload)
+      body: JSON.stringify({ form: { [FORM_ID]: campos } })
     });
 
     const data = await res.json();
 
-    // Atualiza estado com mensagens
-    if (data.mensagens) {
-      updateState(data);
-    }
+    // Atualiza sisVar (mensagens + estado)
+    updateState(data);
 
-    // ✅ SEMPRE ESCONDE O LOADER
-    AppLoader.hide();
-
-    if (res.ok && data.success) {
-      console.log("✅ Senha alterada com sucesso!");
-      // Opcional: redirecionar após sucesso
-      // setTimeout(() => window.location.href = "/", 2000);
-    } else {
-      console.log("❌ Erro na operação");
-    }
   } catch (err) {
-    console.error("❌ Erro ao alterar senha:", err);
+    console.error("Erro ao alterar senha:", err);
     definirMensagem("erro", ["Erro ao conectar ao servidor. Tente novamente."], false);
-    
-    // ✅ SEMPRE ESCONDE O LOADER MESMO EM ERRO
+  } finally {
     AppLoader.hide();
   }
 });
