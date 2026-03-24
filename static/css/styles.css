@@ -10,22 +10,28 @@
     justify-content: center;
     align-items: center;
     z-index: 99999;
-    pointer-events: auto; /* ✅ MUDE PARA auto */
-    transition: opacity 0.3s ease;
+
+    /* NÃO bloquear ponteiros por padrão (quando oculto) */
+    pointer-events: none;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    opacity: 0;
+    visibility: hidden;
 }
 
 /* Quando está oculto - CRÍTICO */
 #global-loader.d-none {
     display: none !important;
     visibility: hidden !important;
-    pointer-events: none !important; /* Bloqueia apenas quando oculto */
+    pointer-events: none !important;
     opacity: 0 !important;
 }
 
-/* Quando está visível */
+/* Quando está visível (d-none removido) */
 #global-loader:not(.d-none) {
+    display: flex;
     opacity: 1;
-    pointer-events: auto;
+    visibility: visible;
+    pointer-events: auto; /* passa a bloquear somente quando realmente visível */
 }
 
 /* Spinner */
