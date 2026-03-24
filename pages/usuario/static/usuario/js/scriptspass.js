@@ -1,4 +1,4 @@
-import { updateFormField, getForm, definirMensagem, updateState, clearMessages, getCsrfToken } from "/static/js/sisVar.js";
+import { updateFormField, getForm, definirMensagem, updateState, clearMessages, hidratarFormulario, getCsrfToken } from "/static/js/sisVar.js";
 import { initSmartInputs } from "/static/js/input_rules.js";
 import { criarAtualizadorForm } from "/static/js/refresh_varSis.js";
 import { AppLoader } from "/static/js/loader.js";
@@ -45,6 +45,11 @@ form.addEventListener("submit", async e => {
 
     // Atualiza sisVar (mensagens + estado)
     updateState(data);
+
+    // Limpa os campos do formulário somente em caso de sucesso
+    if (res.ok && data.success) {
+      hidratarFormulario(FORM_ID);
+    }
 
   } catch (err) {
     console.error("Erro ao alterar senha:", err);
