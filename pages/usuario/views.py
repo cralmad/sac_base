@@ -32,7 +32,7 @@ def login_view(request):
     # ---------- POST ----------
     try:
         payload = request.sisvar_front
-        form = payload["form"]["loginForm"]["campos"]
+        form = payload["form"]["loginForm"].get("campos")
         username = form.get("username")
         password = form.get("password")
     except (KeyError, json.JSONDecodeError):
@@ -74,13 +74,11 @@ def login_view(request):
 
     return response
 
-
 def logout_view(request):
     response = redirect("/login/")
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
     return response
-
 
 def cadastro_view(request):
     template = "usuario.html"
@@ -248,10 +246,9 @@ def cadastro_view(request):
         }
     })
 
-
 def alterar_senha_view(request):
     template = "alterarsenha.html"
-    
+
     schema = {
         "alterarSenhaForm": {
             'senha_atual':     {'type': 'password', 'required': True},
@@ -279,6 +276,16 @@ def alterar_senha_view(request):
         return render(request, template)
 
     # ---------- POST ----------
+
+    # Defesa em profundidade: o middleware já garante autenticação,
+    # mas verificamos aqui como salvaguarda adicional.
+    user = request.user
+    if not user.is_authenticated:
+        return JsonResponse(
+            {"mensagens": {"erro": {"ignorar": False, "conteudo": ["Usuário não autenticado"]}}},
+            status=401
+        )
+
     try:
         payload       = request.sisvar_front
         form          = payload.get("form", {}).get("alterarSenhaForm", {}).get("campos", {})
@@ -291,14 +298,19 @@ def alterar_senha_view(request):
             status=400
         )
 
-    mensagens_erro = []
-    user = request.user
+    # Validação de schema #####################################################
+    validator = SchemaValidator(schema["alterarSenhaForm"])
+    if not validator.validate(form):
+        errosForm = [
+            f"{campo} - {', '.join(erros)}"
+            for campo, erros in validator.get_errors().items()
+        ]
+        return JsonResponse({
+            "mensagens": {"erro": {"conteudo": errosForm, "ignorar": False}}
+        }, status=400)
+    ###########################################################################
 
-    if not user.is_authenticated:
-        return JsonResponse(
-            {"mensagens": {"erro": {"ignorar": False, "conteudo": ["Usuário não autenticado"]}}},
-            status=401
-        )
+    mensagens_erro = []
 
     if not user.check_password(senha_atual):
         mensagens_erro.append("Senha atual inválida.")
@@ -306,10 +318,11 @@ def alterar_senha_view(request):
     if nova_senha != confirmar:
         mensagens_erro.append("Nova senha e confirmação não coincidem.")
 
-    try:
-        validate_password(nova_senha, user)
-    except ValidationError as e:
-        mensagens_erro.extend(e.messages)
+    if nova_senha:
+        try:
+            validate_password(nova_senha, user)
+        except ValidationError as e:
+            mensagens_erro.extend(e.messages)
 
     if mensagens_erro:
         return JsonResponse(
@@ -330,7 +343,6 @@ def alterar_senha_view(request):
             }
         }
     })
-
 
 def cadastro_cons_view(request):
     nomeForm     = "cadUsuario"
@@ -385,4 +397,6 @@ def cadastro_cons_view(request):
             'id', 'first_name', 'username', 'email', 'is_active'
         )
 
-        return JsonResponse({"registros": list(usuarios)})
+        return JsonResponse({"registros": list(usuarios)}
+        )
+        
