@@ -81,18 +81,16 @@
             </div>
         </div>
 
+        <div id="global-loader" class="d-none fade-in">
+            <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+        </div>
         <!-- Bootstrap JS -->
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
         <!-- JS global -->
         <script type="module" src="{% static 'js/base.js' %}"></script>
        {% block scripts %}{% endblock %}
-
-        <div id="global-loader" class="d-none fade-in">
-            <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
-                <span class="visually-hidden">Carregando...</span>
-            </div>
-        </div>
-
     </body>
 </html>

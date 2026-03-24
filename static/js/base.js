@@ -99,9 +99,9 @@ export async function inicializarNavbarUsuario() {
 
 // ✅ Inicializa AppLoader E navbar quando DOM está pronto
 document.addEventListener("DOMContentLoaded", () => {
-    console.log('🔧 DOMContentLoaded disparado - inicializando AppLoader');
     AppLoader.init(); // ✅ ADICIONAR AQUI
     inicializarNavbarUsuario();
+    AppLoader.hide()
 });
 
 /*****************DEBUG**********************/

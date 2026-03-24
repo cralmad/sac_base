@@ -17,7 +17,9 @@ export const AppLoader = {
             return;
         }
         
-        console.log('✅ AppLoader inicializado com sucesso');
+        this.element.classList.add('d-none'); // Esconde inicialmente
+        this.isVisible = false;
+
         this.isInitialized = true;
         this.attachListeners();
     },
@@ -32,7 +34,6 @@ export const AppLoader = {
         
         if (this.isVisible) return;
         
-        console.log('📍 AppLoader.show()');
         this.isVisible = true;
         
         this.element.classList.remove('d-none');
@@ -56,8 +57,7 @@ export const AppLoader = {
         if (!this.element) return;
         
         if (!this.isVisible) return;
-        
-        console.log('📍 AppLoader.hide()');
+
         this.isVisible = false;
         
         this.element.classList.add('d-none');
@@ -89,18 +89,3 @@ export const AppLoader = {
         });
     }
 };
-
-// ✅ MUDA: Não inicializa aqui! Espera por chamada explícita ou auto-init
-// AppLoader.init(); // ❌ REMOVIDO
-
-// ✅ Inicializa quando o DOM está totalmente pronto
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log('🔧 Inicializando AppLoader após DOMContentLoaded');
-        AppLoader.init();
-    });
-} else {
-    // DOM já carregou (raro em módulos, mas acontece)
-    console.log('🔧 Inicializando AppLoader imediatamente');
-    AppLoader.init();
-}
