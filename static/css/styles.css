@@ -1,30 +1,42 @@
-﻿/* static/css/styles.css */
-
+﻿/* Loader Global */
 #global-loader {
     position: fixed;
     top: 0;
     left: 0;
     width: 100vw;
     height: 100vh;
-    background-color: rgba(0, 0, 0, 0.6);
+    background-color: rgba(0, 0, 0, 0.7);
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 9999; /* Reduzido de 10000 */
+    z-index: 99999;
+    pointer-events: auto; /* ✅ MUDE PARA auto */
+    transition: opacity 0.3s ease;
 }
 
-/* IMPORTANTE: Quando tem d-none, o loader NÃO DEVE OCUPAR ESPAÇO */
+/* Quando está oculto - CRÍTICO */
 #global-loader.d-none {
-    display: none !important; /* Bootstrap CSS override */
-    pointer-events: none !important; /* Bloqueia cliques mesmo se visível por bug */
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important; /* Bloqueia apenas quando oculto */
+    opacity: 0 !important;
 }
 
-/* Efeito de fade-in */
-.fade-in {
-    animation: fadeIn 0.2s;
+/* Quando está visível */
+#global-loader:not(.d-none) {
+    opacity: 1;
+    pointer-events: auto;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+/* Spinner */
+#global-loader .spinner-border {
+    width: 4rem;
+    height: 4rem;
+    border-width: 0.4em;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
