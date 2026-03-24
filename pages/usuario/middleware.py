@@ -23,7 +23,7 @@ class JWTAuthMiddleware:
     """
     Middleware de autenticação JWT que:
     - Gerencia tokens de acesso e refresh
-    - Injeta CSRF token automaticamente em respostas JSON
+    - Injeta CSRF token automaticamente em respostas JSON (sucesso e erro)
     - Captura dados do front-end em requisições JSON
     """
     
@@ -149,13 +149,9 @@ class JWTAuthMiddleware:
 
     def _inject_csrf_token(self, request, response):
         """
-        Injeta o CSRF token em respostas JSON com melhor tratamento de erros.
+        Injeta o CSRF token em todas as respostas JSON (sucesso e erro).
         """
         if not isinstance(response, JsonResponse):
-            return response
-
-        # Só injeta em respostas de sucesso
-        if response.status_code not in [200, 201]:
             return response
 
         try:
