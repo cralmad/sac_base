@@ -3,11 +3,9 @@
 
 {% block title %}SacBase - Senha{% endblock %}
 
-<link rel="stylesheet" href="{% static 'usuario/css/stylespass.css' %}">
 {% block page_title %}Alterar Senha{% endblock %}
 {% block content %}
 
-<!-- ✅ ADICIONADO: data-form-lock -->
 <form id="alterarSenhaForm" data-form-lock="alterarSenhaForm" method="POST">
     {% csrf_token %}
 
@@ -35,5 +33,6 @@
 {% endblock %}
 
 {% block scripts %}
+  <link rel="stylesheet" href="{% static 'usuario/css/stylespass.css' %}">
   <script type="module" src="{% static 'usuario/js/scriptspass.js' %}"></script>
 {% endblock %}
