@@ -98,10 +98,11 @@ export async function inicializarNavbarUsuario() {
 }
 
 // ✅ Inicializa AppLoader E navbar quando DOM está pronto
-document.addEventListener("DOMContentLoaded", () => {
-    AppLoader.init(); // ✅ ADICIONAR AQUI
-    inicializarNavbarUsuario();
-    AppLoader.hide()
+// AGUARDA a navbar terminar (async) antes de ocultar o loader
+document.addEventListener("DOMContentLoaded", async () => {
+    AppLoader.init();
+    await inicializarNavbarUsuario(); // ← await garante esperar a chamada de rede
+    AppLoader.hide();                 // ← só oculta após tudo carregar
 });
 
 /*****************DEBUG**********************/
