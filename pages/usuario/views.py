@@ -410,4 +410,4 @@ def cadastro_cons_view(request):
             'id', 'first_name', 'username', 'email', 'is_active'
         )
 
-        return JsonResponse({"registros": list(usuarios)}
+        return JsonResponse({"registros": list(usuarios)})
