@@ -5,8 +5,8 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('app/painel_adm/', admin.site.urls),
-    path('app/cad/', include('pages.cad_cliente.urls')),
-    path('app/cad/', include('pages.cad_grupo_cli.urls')),
+    path('app/cad/cliente/', include('pages.cad_cliente.urls')),
+    path('app/cad/grupo/', include('pages.cad_grupo_cli.urls')),
     path('app/', include('pages.usuario.urls')),
     path('', include('pages.home.urls')),
 ]
