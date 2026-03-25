@@ -1,2 +1,31 @@
+# Python
 *.pyc
-*Thumbs.db
+*.pyo
+*.pyd
+__pycache__/
+*.py[cod]
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+
+# Ambientes virtuais
+venv/
+.venv/
+env/
+.env/
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS
+Thumbs.db
+.DS_Store

@@ -619,3 +619,35 @@ Após a validação de schema, implemente validações de negócio (duplicidade,
 
 10.[ ] Rotas públicas: adicionar em ROTAS_PUBLICAS no middleware se necessário
 ```
+
+---
+
+## 15. PREFERÊNCIAS DE USO DO COPILOT
+
+### Antes de qualquer ação, sempre apresentar as opções disponíveis
+
+Sempre que o usuário pedir uma ação que envolva escrita de código ou alterações no repositório, **pausar e apresentar as opções abaixo antes de executar**, no seguinte formato:
+
+> **⚠️ Escolha como deseja proceder:**
+>
+> | Opção | Como funciona | Custo |
+> |---|---|---|
+> | ✍️ **githubwrite** | Commita os arquivos diretamente na branch/repo via ferramenta | ✅ Sem custo extra — **opção preferida** |
+> | 💬 **Código no chat** | Gero o código aqui, o usuário aplica manualmente | ✅ Sem custo extra |
+> | 🤖 **Copilot Agent** | Cria branch + PR de forma autônoma | ⚠️ Consome premium requests (limite 300/mês no plano Pro) |
+
+### Regras obrigatórias
+
+- **Nunca** usar o Copilot Coding Agent (PR automático) sem confirmação explícita do usuário.
+- **Sempre** informar o custo/benefício de cada opção antes de agir.
+- A opção preferida do usuário é **githubwrite** (commit direto, sem custo extra).
+- Só usar o Copilot Agent se o usuário **explicitamente** escolher essa opção após ver as alternativas.
+
+### Tabela de referência de custos
+
+| Ação | Custo |
+|---|---|
+| Análise de código, relatórios, perguntas | ✅ Sem custo extra |
+| Geração de código no chat | ✅ Sem custo extra |
+| **githubwrite** (commit direto no repo) | ✅ Sem custo extra — **preferido** |
+| **Copilot Coding Agent** (PR automático) | ⚠️ Consome premium requests |
