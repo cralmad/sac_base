@@ -1,4 +1,4 @@
-import { updateFormField, getForm, updateState, getUsuario } from "/static/js/sisVar.js";
+import { updateFormField, getForm, updateState } from "/static/js/sisVar.js";
 import { criarAtualizadorForm } from "/static/js/refresh_varSis.js";
 import { AppLoader } from "/static/js/loader.js";
 
@@ -29,7 +29,7 @@ form.addEventListener("submit", async e => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+        "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]")?.value
       },
       body: JSON.stringify(sisVarPayload)
     });
@@ -48,15 +48,5 @@ form.addEventListener("submit", async e => {
     // Erro de rede ou servidor fora do ar
     alert("Erro na requisição:", err);
     AppLoader.hide(); // LIBERA A TELA em caso de falha técnica
-  }
-});
-
-document.addEventListener("DOMContentLoaded", () => {
-  if (getUsuario().autenticado) {
-    form.classList.add("d-none");
-
-    const modalEl = document.getElementById("modalLogoutConfirm");
-    const modal = new bootstrap.Modal(modalEl, { backdrop: "static", keyboard: false });
-    modal.show();
   }
 });
