@@ -38,12 +38,16 @@ class JWTAuthMiddleware:
         # --- Lógica de Autenticação ---
         path = request.path
         is_public_route = any(path.startswith(r) for r in ROTAS_PUBLICAS)
-        
+
         if is_public_route:
+            # Mesmo em rotas públicas, tenta popular request.user com o token
+            # existente (sem bloquear), para que a view possa verificar
+            # request.user.is_authenticated e agir conforme necessário.
+            self._try_authenticate_silent(request)
             response = self.get_response(request)
             return self._inject_csrf_token(request, response)
 
-        # Autentica o usuário
+        # Autentica o usuário (bloqueia se não autenticado)
         auth_response = self._authenticate_user(request)
         if auth_response:
             return auth_response
@@ -51,6 +55,36 @@ class JWTAuthMiddleware:
         # Resposta padrão para usuários autenticados
         response = self.get_response(request)
         return self._inject_csrf_token(request, response)
+
+    def _try_authenticate_silent(self, request):
+        """
+        Tenta autenticar silenciosamente nas rotas públicas.
+        Não bloqueia nem redireciona em caso de falha — apenas popula
+        request.user se o token for válido.
+        """
+        token = request.COOKIES.get("access_token")
+        refresh_token_str = request.COOKIES.get("refresh_token")
+
+        if token:
+            try:
+                validated = self.jwt_auth.get_validated_token(token)
+                request.user = self.jwt_auth.get_user(validated)
+                return
+            except (InvalidToken, TokenError):
+                pass
+            except Exception as e:
+                logger.error(f"Erro ao autenticar silenciosamente (access): {e}")
+
+        if refresh_token_str:
+            try:
+                refresh = RefreshToken(refresh_token_str)
+                new_access = str(refresh.access_token)
+                validated = self.jwt_auth.get_validated_token(new_access)
+                request.user = self.jwt_auth.get_user(validated)
+            except (InvalidToken, TokenError):
+                pass
+            except Exception as e:
+                logger.error(f"Erro ao autenticar silenciosamente (refresh): {e}")
 
     def _extract_json_body(self, request):
         """Extrai dados JSON do corpo da requisição com segurança."""
