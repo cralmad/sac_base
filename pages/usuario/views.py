@@ -26,6 +26,10 @@ def login_view(request):
     # ---------- GET ----------
     if request.method == "GET":
 
+        # Usuário já autenticado: redireciona para home
+        if request.user.is_authenticated:
+            return redirect("/app/home/")
+
         request.sisvar_extra |= {"schema": schema} | {"form": formulario}  
         return render(request, "login.html")
 
@@ -75,7 +79,7 @@ def login_view(request):
     return response
 
 def logout_view(request):
-    response = redirect("/login/")
+    response = redirect("/app/usuario/login/")
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
     return response
@@ -410,4 +414,4 @@ def cadastro_cons_view(request):
             'id', 'first_name', 'username', 'email', 'is_active'
         )
 
-        return JsonResponse({"registros": list(usuarios)})
+        return JsonResponse({"registros": list(usuarios)});
