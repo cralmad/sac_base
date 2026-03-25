@@ -7,6 +7,31 @@
 {% block page_title %}Login{% endblock %}
 {% block content %}
 
+<!-- Modal de confirmação de logout (exibido se usuário já autenticado) -->
+<div class="modal fade" id="modalLogoutConfirm" tabindex="-1" aria-labelledby="modalLogoutLabel" aria-modal="true" role="dialog">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalLogoutLabel">
+          <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+          Você já está autenticado
+        </h5>
+      </div>
+      <div class="modal-body">
+        Você já possui uma sessão ativa. Deseja efetuar o <strong>logout</strong>?
+      </div>
+      <div class="modal-footer">
+        <a href="/app/usuario/logout/" class="btn btn-danger">
+          <i class="bi bi-box-arrow-right me-1"></i> Sim, fazer logout
+        </a>
+        <a href="/app/home/" class="btn btn-secondary">
+          <i class="bi bi-arrow-left me-1"></i> Não, voltar ao sistema
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <form id="loginForm">
   {% csrf_token %}
   <input
