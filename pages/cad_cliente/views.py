@@ -14,15 +14,17 @@ def cad_cliente_view(request):
         nomeForm: {
             "grupo":       {'type': 'integer', 'required': True},
             "nome":        {'type': 'string',  'maxlength': 100, 'minlength': 3, 'required': True,  'value': ''},
+            "rsocial":      {'type': 'string',  'maxlength': 100, 'minlength': 3, 'required': True,  'value': ''},
             "logradouro":  {'type': 'string',  'maxlength': 20,  'required': False, 'value': ''},
             "endereco":    {'type': 'string',  'maxlength': 150, 'required': False, 'value': ''},
             "numero":      {'type': 'string',  'maxlength': 10,  'required': False, 'value': ''},
             "complemento": {'type': 'string',  'maxlength': 50,  'required': False, 'value': ''},
             "bairro":      {'type': 'string',  'maxlength': 60,  'required': False, 'value': ''},
             "pais":        {'type': 'string',  'maxlength': 20,  'required': True,  'value': ''},
-            "uf":          {'type': 'string',  'maxlength': 10,  'required': True,  'value': ''},
+            "uf":          {'type': 'string',  'maxlength': 20,  'required': True,  'value': ''},
             "cidade":      {'type': 'string',  'maxlength': 50,  'required': True,  'value': ''},
-            "codpostal":   {'type': 'string',  'maxlength': 8,   'required': False, 'value': ''},
+            "codpostal":   {'type': 'string',  'maxlength': 10,   'required': False, 'value': ''},
+            "identificador": {'type': 'string', 'maxlength': 20, 'required': False, 'value': ''},
         },
         nomeFormCons: {
             "nome_cons":      {'type': 'string',  'maxlength': 100},
@@ -42,6 +44,7 @@ def cad_cliente_view(request):
                         "id":          None,
                         "grupo":       None,
                         "nome":        "",
+                        "rsocial":     "",
                         "logradouro":  "",
                         "endereco":    "",
                         "numero":      "",
@@ -51,6 +54,7 @@ def cad_cliente_view(request):
                         "uf":          "",
                         "cidade":      "",
                         "codpostal":   "",
+                        "identificador": "",
                     }
                 },
                 nomeFormCons: {
@@ -85,6 +89,7 @@ def cad_cliente_view(request):
     id_cliente  = campos.get("id")
     grupo_id    = campos.get("grupo")
     nome        = campos.get("nome")
+    rsocial     = campos.get("rsocial")
     logradouro  = campos.get("logradouro") or ""
     endereco    = campos.get("endereco") or ""
     numero      = campos.get("numero") or ""
@@ -94,6 +99,7 @@ def cad_cliente_view(request):
     uf          = campos.get("uf")
     cidade      = campos.get("cidade")
     codpostal   = campos.get("codpostal") or ""
+    identificador = campos.get("identificador") or ""
     cliente     = None
 
     # Carrega o registro existente quando há ID (editar) ######################
@@ -123,6 +129,7 @@ def cad_cliente_view(request):
             cliente = Cliente.objects.create(
                 grupo=grupo_obj,
                 nome=nome,
+                rsocial=rsocial,
                 logradouro=logradouro,
                 endereco=endereco,
                 numero=numero,
@@ -132,11 +139,13 @@ def cad_cliente_view(request):
                 uf=uf,
                 cidade=cidade,
                 codpostal=codpostal,
+                identificador=identificador,
             )
 
         case 'editar':
             cliente.grupo       = grupo_obj
             cliente.nome        = nome
+            cliente.rsocial     = rsocial
             cliente.logradouro  = logradouro
             cliente.endereco    = endereco
             cliente.numero      = numero
@@ -146,6 +155,7 @@ def cad_cliente_view(request):
             cliente.uf          = uf
             cliente.cidade      = cidade
             cliente.codpostal   = codpostal
+            cliente.identificador = identificador
             cliente.save()
 
         case _:
@@ -164,6 +174,7 @@ def cad_cliente_view(request):
                     "id":          cliente.id,
                     "grupo":       cliente.grupo_id,
                     "nome":        cliente.nome,
+                    "rsocial":     cliente.rsocial,
                     "logradouro":  cliente.logradouro,
                     "endereco":    cliente.endereco,
                     "numero":      cliente.numero,
@@ -173,6 +184,7 @@ def cad_cliente_view(request):
                     "uf":          cliente.uf,
                     "cidade":      cliente.cidade,
                     "codpostal":   cliente.codpostal,
+                    "identificador": cliente.identificador,
                 }
             }
         },
@@ -208,6 +220,7 @@ def cad_cliente_cons_view(request):
                                 "id":          cliente.id,
                                 "grupo":       cliente.grupo_id,
                                 "nome":        cliente.nome,
+                                "rsocial":     cliente.rsocial,
                                 "logradouro":  cliente.logradouro,
                                 "endereco":    cliente.endereco,
                                 "numero":      cliente.numero,
@@ -217,6 +230,7 @@ def cad_cliente_cons_view(request):
                                 "uf":          cliente.uf,
                                 "cidade":      cliente.cidade,
                                 "codpostal":   cliente.codpostal,
+                                "identificador": cliente.identificador,
                             }
                         }
                     }
@@ -232,7 +246,7 @@ def cad_cliente_cons_view(request):
             filtros['nome__icontains'] = nome_cons
 
         clientes = Cliente.objects.filter(**filtros).values(
-            'id', 'nome', 'pais', 'uf', 'cidade', 'grupo_id'
+            'id', 'nome', 'rsocial', 'pais', 'uf', 'cidade', 'grupo_id', 'identificador'
         )
 
         return JsonResponse({"registros": list(clientes)})

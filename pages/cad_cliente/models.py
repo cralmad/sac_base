@@ -9,12 +9,19 @@ class Cliente(models.Model):
     grupo = models.ForeignKey(
         GrupoCli,
         on_delete=models.PROTECT,
-        null=True,
-        blank=True,
+        null=False,
+        blank=False,
         db_column='grupo_id'
     )
 
     nome = models.CharField(
+        max_length=100,
+        null=False,
+        blank=False,
+        validators=[MinLengthValidator(3)]
+    )
+
+    rsocial = models.CharField(
         max_length=100,
         null=False,
         blank=False,
@@ -27,14 +34,32 @@ class Cliente(models.Model):
     complemento = models.CharField(max_length=50,  null=True, blank=True)
     bairro      = models.CharField(max_length=60,  null=True, blank=True)
     pais        = models.CharField(max_length=20,  null=False, blank=False)
-    uf          = models.CharField(max_length=10,  null=False, blank=False)
+    uf          = models.CharField(max_length=20,  null=False, blank=False)
     cidade      = models.CharField(max_length=50,  null=False, blank=False)
-    codpostal   = models.CharField(max_length=8,   null=True, blank=True)
+    codpostal   = models.CharField(max_length=10,   null=True, blank=True)
+    
+    '''O identificador é um campo opcional que pode ser usado para armazenar um número de identificação fiscal, 
+    como CPF ou CNPJ ou qualquer outro identificador único para o cliente.'''
+    identificador  = models.CharField(max_length=20,  null=True, blank=True)
 
     atualizacao = models.DateTimeField(auto_now=True)
 
+    def save(self, *args, **kwargs):
+        
+        self.nome = self.nome.upper()
+        self.rsocial = self.rsocial.upper()
+
+        super().save(*args, **kwargs)
+
     class Meta:
         db_table = 'cliente'
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=['identificador'],
+                name='unique_identificador'
+            )
+        ]
 
     def __str__(self):
         return self.nome
