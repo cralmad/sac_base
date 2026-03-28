@@ -452,3 +452,11 @@ export function setSchema(formId, schema) {
 export function __debugState() {
   return structuredClone(_rawState);
 }
+
+/**
+ * Retorna uma cópia segura de _state.others para leitura externa.
+ * Use para acessar chaves dinâmicas injetadas pelo backend (ex: opcoes).
+ */
+export function getOthers() {
+  return structuredClone(_state.others);
+}
