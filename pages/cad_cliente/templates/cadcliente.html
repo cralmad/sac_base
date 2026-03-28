@@ -1,12 +1,17 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Cadastro{% endblock %}
+{% block title %}SacBase - Cadastro de Cliente{% endblock %}
 
-{% block estilo %}<link rel="stylesheet" href="{% static 'cad_cliente/css/styles.css' %}">{% endblock %}
+{% block estilo %}
+<link rel="stylesheet" href="{% static 'cad_cliente/css/styles.css' %}">
+{% endblock %}
+
+{% block page_title %}Cadastro de Cliente{% endblock %}
 
 {% block content %}
 
+{# ── Abas de navegação ── #}
 <ul class="nav nav-tabs" id="cadastroTabs" role="tablist">
     <li class="nav-item" role="presentation">
         <button class="nav-link active"
@@ -18,7 +23,6 @@
             CADASTRO
         </button>
     </li>
-
     <li class="nav-item" role="presentation">
         <button class="nav-link"
                 id="observacao-tab"
@@ -31,194 +35,215 @@
     </li>
 </ul>
 
-<form id="cadCliente" data-form-lock="cadCliente" novalidate>
-    <div class="tab-content border border-top-0 p-1" id="cadastroTabsContent">
-        <div class="tab-pane fade show active" id="cadastro" role="tabpanel">
-            <div class="container my-4">
+{# ── Formulário principal ── #}
+<form id="cadCliente" data-form-lock="cadCliente" method="POST" novalidate>
+    {% csrf_token %}
+    <div class="tab-content border border-top-0 p-2" id="cadastroTabsContent">
 
+        {# ── Aba CADASTRO ── #}
+        <div class="tab-pane fade show active" id="cadastro" role="tabpanel">
+            <div class="container-md-3 my-3 mx-auto">
                 <div class="row g-3">
 
-                <!-- Grupo -->
-                <div class="col-md-4">
-                    <label for="grupo" class="form-label">Grupo *</label>
-                    <select
-                    id="grupo"
-                    name="grupo"
-                    class="form-select"
-                    required
-                    >
-                    <option value="">Selecione</option>
-                    <option value="A">Grupo A</option>
-                    <option value="B">Grupo B</option>
-                    <option value="C">Grupo C</option>
-                    </select>
-                </div>
-
-                <!-- Nome -->
-                <div class="col-md-8">
-                    <label for="nome" class="form-label">Nome *</label>
-                    <input
-                    type="text"
-                    id="nome"
-                    name="nome"
-                    class="form-control smart-input"
-                    data-textCase="upper"
-                    maxlength="100"
-                    required
-                    >
-                </div>
-
-                <!-- Logradouro -->
-                <div class="col-md-12">
-                    <label for="logradouro" class="form-label">Logradouro</label>
-                    <div class="input-group">
-                        <select
-                        id="logradouro"
-                        name="logradouro"
-                        class="form-select"
-                        style="max-width: 160px"
-                        >
-                        <option value="">Selecione</option>
-                        <option value="Rua">Rua</option>
-                        <option value="Avenida">Avenida</option>
-                        <option value="Travessa">Travessa</option>
-                        <option value="Alameda">Alameda</option>
+                    {# Grupo #}
+                    <div class="col-12 col-sm-4">
+                        <label for="grupo" class="form-label mb-0">Grupo *</label>
+                        <select id="grupo" name="grupo" class="form-select smart-input" required>
+                            <option value="">Selecione</option>
                         </select>
-
-                        <input
-                        type="text"
-                        id="endereco"
-                        name="endereco"
-                        class="form-control smart-input"
-                        maxlength="150"
-                        >
                     </div>
-                </div>
 
-                <!-- Número -->
-                <div class="col-md-3">
-                    <label for="numero" class="form-label">Número</label>
-                    <input
-                    type="text"
-                    id="numero"
-                    name="numero"
-                    class="form-control smart-input"
-                    maxlength="10"
-                    >
-                </div>
+                    {# Nome #}
+                    <div class="col-12 col-sm-8">
+                        <label for="nome" class="form-label mb-0">Nome *</label>
+                        <input type="text" id="nome" name="nome"
+                               class="form-control smart-input"
+                               data-textcase="upper" maxlength="100" minlength="3" required>
+                    </div>
 
-                <!-- Complemento -->
-                <div class="col-md-3">
-                    <label for="complemento" class="form-label">Complemento</label>
-                    <input
-                    type="text"
-                    id="complemento"
-                    name="complemento"
-                    class="form-control smart-input"
-                    maxlength="50"
-                    >
-                </div>
+                    {# Razão Social #}
+                    <div class="col-12">
+                        <label for="rsocial" class="form-label mb-0">Razão Social *</label>
+                        <input type="text" id="rsocial" name="rsocial"
+                               class="form-control smart-input"
+                               data-textcase="upper" maxlength="100" minlength="3" required>
+                    </div>
 
-                <!-- Bairro -->
-                <div class="col-md-6">
-                    <label for="bairro" class="form-label">Bairro</label>
-                    <input
-                    type="text"
-                    id="bairro"
-                    name="bairro"
-                    class="form-control smart-input"
-                    maxlength="60"
-                    >
-                </div>
+                    {# Logradouro + Endereço #}
+                    <div class="col-12">
+                        <label for="endereco" class="form-label mb-0">Logradouro / Endereço</label>
+                        <div class="input-group">
+                            <select id="logradouro" name="logradouro" class="form-select smart-input" style="max-width:160px">
+                                <option value="">Tipo</option>
+                                <option value="Rua">Rua</option>
+                                <option value="Avenida">Avenida</option>
+                                <option value="Travessa">Travessa</option>
+                                <option value="Alameda">Alameda</option>
+                            </select>
+                            <input type="text" id="endereco" name="endereco"
+                                   class="form-control smart-input"
+                                   data-textcase="upper" maxlength="150">
+                        </div>
+                    </div>
 
-                <!-- País -->
-                <div class="col-md-4">
-                    <label for="pais" class="form-label">País *</label>
-                    <select
-                    id="pais"
-                    name="pais"
-                    class="form-select"
-                    data-hierarchy="Paises"
-                    data-hierarchy-root
-                    required
-                    >
-                    <option value="">Selecione</option>
-                    </select>
-                </div>
+                    {# Número #}
+                    <div class="col-12 col-sm-3">
+                        <label for="numero" class="form-label mb-0">Número</label>
+                        <input type="text" id="numero" name="numero"
+                               class="form-control smart-input" maxlength="10">
+                    </div>
 
-                <!-- UF -->
-                <div class="col-md-3">
-                    <label for="uf" class="form-label">UF *</label>
-                    <select
-                    id="uf"
-                    name="uf"
-                    class="form-select"
-                    data-hierarchy="Paises"
-                    data-select-depends="pais"
-                    required
-                    disabled
-                    >
-                    <option value="">Selecione</option>
-                    </select>
-                </div>
+                    {# Complemento #}
+                    <div class="col-12 col-sm-3">
+                        <label for="complemento" class="form-label mb-0">Complemento</label>
+                        <input type="text" id="complemento" name="complemento"
+                               class="form-control smart-input"
+                               data-textcase="upper" maxlength="50">
+                    </div>
 
-                <!-- Cidade -->
-                <div class="col-md-5">
-                    <label for="cidade" class="form-label">Cidade *</label>
-                    <select
-                    id="cidade"
-                    name="cidade"
-                    class="form-select"
-                    data-hierarchy="Paises"
-                    data-select-depends="pais,uf"
-                    required
-                    disabled
-                    >
-                    <option value="">Selecione</option>
-                    </select>
-                </div>
+                    {# Bairro #}
+                    <div class="col-12 col-sm-6">
+                        <label for="bairro" class="form-label mb-0">Bairro</label>
+                        <input type="text" id="bairro" name="bairro"
+                               class="form-control smart-input"
+                               data-textcase="upper" maxlength="60">
+                    </div>
 
-                <!-- Código Postal -->
-                <div class="col-md-4">
-                    <label for="codpostal" class="form-label">Código Postal</label>
-                    <input
-                    type="text"
-                    id="codpostal"
-                    name="codpostal"
-                    class="form-control smart-input"
-                    data-mask="pt-postcode"
-                    data-allow="0-9"
-                    maxlength="10"
-                    >
-                </div>
+                    {# País #}
+                    <div class="col-12 col-sm-4">
+                        <label for="pais" class="form-label mb-0">País *</label>
+                        <select id="pais" name="pais" class="form-select smart-input" required>
+                            <option value="">Selecione</option>
+                        </select>
+                    </div>
 
-                <!-- Identificador -->
-                <div class="col-md-4">
-                    <label for="identificador" class="form-label">Identificador</label>
-                    <input
-                    type="text"
-                    id="identificador"
-                    name="identificador"
-                    class="form-control smart-input"
-                    maxlength="20"
-                    >
-                </div>
-                
-                <!-- Botão -->
-                <div class="col-12">
-                    <button type="submit" class="btn btn-primary">Salvar</button>
-                </div>
+                    {# UF / Região #}
+                    <div class="col-12 col-sm-3">
+                        <label for="regiao" class="form-label mb-0">UF</label>
+                        <select id="regiao" name="regiao" class="form-select smart-input" disabled>
+                            <option value="">Selecione</option>
+                        </select>
+                    </div>
+
+                    {# Cidade #}
+                    <div class="col-12 col-sm-5">
+                        <label for="cidade" class="form-label mb-0">Cidade</label>
+                        <select id="cidade" name="cidade" class="form-select smart-input" disabled>
+                            <option value="">Selecione</option>
+                        </select>
+                    </div>
+
+                    {# Código Postal #}
+                    <div class="col-12 col-sm-4">
+                        <label for="codpostal" class="form-label mb-0">Código Postal</label>
+                        <input type="text" id="codpostal" name="codpostal"
+                               class="form-control smart-input"
+                               data-mask="pt-postcode" data-allow="0-9" maxlength="10">
+                    </div>
+
+                    {# Identificador #}
+                    <div class="col-12 col-sm-4">
+                        <label for="identificador" class="form-label mb-0">Identificador</label>
+                        <input type="text" id="identificador" name="identificador"
+                               class="form-control smart-input" maxlength="20">
+                    </div>
 
                 </div>
             </div>
         </div>
 
+        {# ── Aba OBSERVAÇÃO ── #}
         <div class="tab-pane fade" id="observacao" role="tabpanel">
-            <p>Conteúdo da observação.</p>
+            <div class="container-md-3 my-3 mx-auto">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label for="observacao" class="form-label mb-0">Observação</label>
+                        <textarea id="observacao" name="observacao"
+                                  class="form-control smart-input" rows="5" maxlength="500"></textarea>
+                    </div>
+                </div>
+            </div>
         </div>
+
     </div>
+
+    {# ── Botões controlados pelo estado via data-show-on ── #}
+    <div class="d-grid gap-2 d-md-flex mt-3">
+        <button id="btn-salvar"   class="btn btn-primary"                  data-show-on="novo,editar"  type="submit">
+            <i class="bi bi-save"></i> Salvar
+        </button>
+        <button id="btn-editar"   class="btn btn-warning  d-none"          data-show-on="visualizar"   type="button">
+            <i class="bi bi-pencil"></i> Editar
+        </button>
+        <button id="btn-novo"     class="btn btn-success  d-none"          data-show-on="visualizar"   type="button">
+            <i class="bi bi-plus-circle"></i> Novo
+        </button>
+        <button id="btn-cancelar" class="btn btn-outline-secondary d-none" data-show-on="novo,editar"  type="button">
+            <i class="bi bi-x-circle"></i> Cancelar
+        </button>
+        <button id="btn-excluir"  class="btn btn-danger   d-none"          data-show-on="visualizar"   type="button">
+            <i class="bi bi-trash"></i> Excluir
+        </button>
+        <button id="btn-abrir-pesquisa" class="btn btn-secondary"          type="button">
+            <i class="bi bi-search"></i> Pesquisar
+        </button>
+    </div>
+
 </form>
 
-{% block scripts %}<script type="module" src="{% static 'cad_cliente/js/scripts.js' %}"></script>{% endblock %}
+{# ── Tela de pesquisa ── #}
+<div id="div-pesquisa" class="container-md-3 d-none mt-3">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <span>Consultar Clientes</span>
+            <button type="button" id="btn-fechar" class="btn-close btn-close-white"></button>
+        </div>
+        <div class="card-body">
+            <form id="consCliente" method="POST">
+                <div class="container-md-3 my-2 mx-auto">
+                    <div class="row g-3">
+                        <div class="col-12 col-sm-8">
+                            <label class="form-label mb-0">Nome</label>
+                            <input type="text" name="nome_cons"
+                                   class="form-control smart-input"
+                                   data-textcase="upper" maxlength="100">
+                        </div>
+                        <div class="col-12 col-sm-4 d-grid gap-2 d-sm-flex align-items-end">
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-search"></i> Filtrar
+                            </button>
+                            <button type="button" id="btn-voltar" class="btn btn-outline-danger">
+                                Voltar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
 
+            <div class="table-responsive mt-3">
+                <table class="table table-hover table-sm border">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Nome</th>
+                            <th>Razão Social</th>
+                            <th>Grupo</th>
+                            <th>País</th>
+                            <th>UF</th>
+                            <th>Cidade</th>
+                            <th>Identificador</th>
+                            <th class="text-center">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-corpo"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'cad_cliente/js/scripts.js' %}"></script>
 {% endblock %}
