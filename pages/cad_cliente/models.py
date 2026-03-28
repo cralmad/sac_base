@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.validators import MinLengthValidator
 from pages.cad_grupo_cli.models import GrupoCli
+from pages.core.models import Pais, Regiao, Cidade
 
 
 class Cliente(models.Model):
@@ -28,14 +29,32 @@ class Cliente(models.Model):
         validators=[MinLengthValidator(3)]
     )
 
+    pais = models.ForeignKey(
+        Pais,
+        on_delete=models.PROTECT,
+        null=False,
+        blank=False,
+        db_column='pais_id'
+    )
+    regiao = models.ForeignKey(
+        Regiao,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        db_column='regiao_id'
+    )
+    cidade = models.ForeignKey(
+        Cidade,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        db_column='cidade_id'
+    )
     logradouro  = models.CharField(max_length=20,  null=True, blank=True)
     endereco    = models.CharField(max_length=150, null=True, blank=True)
     numero      = models.CharField(max_length=10,  null=True, blank=True)
     complemento = models.CharField(max_length=50,  null=True, blank=True)
     bairro      = models.CharField(max_length=60,  null=True, blank=True)
-    pais        = models.CharField(max_length=20,  null=False, blank=False)
-    uf          = models.CharField(max_length=20,  null=False, blank=False)
-    cidade      = models.CharField(max_length=50,  null=False, blank=False)
     codpostal   = models.CharField(max_length=10,   null=True, blank=True)
     
     '''O identificador é um campo opcional que pode ser usado para armazenar um número de identificação fiscal, 

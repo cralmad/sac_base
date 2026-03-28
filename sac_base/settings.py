@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'pages.cad_grupo_cli',
     'pages.usuario',
     'pages.home',
+    'pages.core',
 ]
 
 MIDDLEWARE = [
