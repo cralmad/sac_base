@@ -1,3 +1,4 @@
+import json
 from django.shortcuts import render
 from django.http import JsonResponse
 from sac_base.form_validador import SchemaValidator
@@ -64,17 +65,20 @@ def cad_cliente_view(request):
                 },
                 nomeFormCons: {
                     "estado": "novo",
+                    "update": None,
                     "campos": {
                         "nome_cons":      "",
                         "id_selecionado": None,
                     }
                 }
             },
-            "opcoes": {
-                "grupos":  grupos,
-                "paises":  paises,
-                "regioes": regioes,
-                "cidades": cidades,
+            "others": {
+                "opcoes": {
+                    "grupos":  grupos,
+                    "paises":  paises,
+                    "regioes": regioes,
+                    "cidades": cidades,
+                }
             }
         }
         return render(request, template)
@@ -101,103 +105,68 @@ def cad_cliente_view(request):
     grupo_id      = campos.get("grupo")
     nome          = campos.get("nome")
     rsocial       = campos.get("rsocial")
-    logradouro    = campos.get("logradouro") or ""
-    endereco      = campos.get("endereco") or ""
-    numero        = campos.get("numero") or ""
-    complemento   = campos.get("complemento") or ""
-    bairro        = campos.get("bairro") or ""
+    logradouro    = campos.get("logradouro", "")
+    endereco      = campos.get("endereco", "")
+    numero        = campos.get("numero", "")
+    complemento   = campos.get("complemento", "")
+    bairro        = campos.get("bairro", "")
     pais_id       = campos.get("pais")
-    regiao_id     = campos.get("regiao") or None
-    cidade_id     = campos.get("cidade") or None
-    codpostal     = campos.get("codpostal") or ""
-    identificador = campos.get("identificador") or ""
-    cliente       = None
-
-    # Carrega o registro existente quando há ID (editar) ######################
-    if id_cliente:
-        try:
-            cliente = Cliente.objects.get(id=id_cliente)
-        except Cliente.DoesNotExist:
-            return JsonResponse({
-                "mensagens": {"erro": {"conteudo": ["Registro não encontrado"], "ignorar": False}}
-            }, status=404)
-    ###########################################################################
-
-    # Validações de negócio ###################################################
-    try:
-        grupo_obj = GrupoCli.objects.get(id=grupo_id)
-    except GrupoCli.DoesNotExist:
-        return JsonResponse({
-            "mensagens": {"erro": {"conteudo": ["Grupo não encontrado"], "ignorar": False}}
-        }, status=422)
-
-    try:
-        pais_obj = Pais.objects.get(id=pais_id)
-    except Pais.DoesNotExist:
-        return JsonResponse({
-            "mensagens": {"erro": {"conteudo": ["País não encontrado"], "ignorar": False}}
-        }, status=422)
-
-    regiao_obj = None
-    if regiao_id:
-        try:
-            regiao_obj = Regiao.objects.get(id=regiao_id, pais=pais_obj)
-        except Regiao.DoesNotExist:
-            return JsonResponse({
-                "mensagens": {"erro": {"conteudo": ["UF/Região não encontrada para o País informado"], "ignorar": False}}
-            }, status=422)
-
-    cidade_obj = None
-    if cidade_id:
-        try:
-            cidade_obj = Cidade.objects.get(id=cidade_id, regiao=regiao_obj)
-        except Cidade.DoesNotExist:
-            return JsonResponse({
-                "mensagens": {"erro": {"conteudo": ["Cidade não encontrada para a UF informada"], "ignorar": False}}
-            }, status=422)
-    ###########################################################################
+    regiao_id     = campos.get("regiao")
+    cidade_id     = campos.get("cidade")
+    codpostal     = campos.get("codpostal", "")
+    identificador = campos.get("identificador", "")
 
     match estado:
-
-        case 'novo':
-            cliente = Cliente.objects.create(
-                grupo=grupo_obj,
-                nome=nome,
-                rsocial=rsocial,
-                logradouro=logradouro,
-                endereco=endereco,
-                numero=numero,
-                complemento=complemento,
-                bairro=bairro,
-                pais=pais_obj,
-                regiao=regiao_obj,
-                cidade=cidade_obj,
-                codpostal=codpostal,
-                identificador=identificador,
+        case "novo":
+            cliente = Cliente(
+                grupo_id      = grupo_id,
+                nome          = nome,
+                rsocial       = rsocial,
+                logradouro    = logradouro,
+                endereco      = endereco,
+                numero        = numero,
+                complemento   = complemento,
+                bairro        = bairro,
+                pais_id       = pais_id,
+                regiao_id     = regiao_id,
+                cidade_id     = cidade_id,
+                codpostal     = codpostal,
+                identificador = identificador,
             )
+            cliente.save()
 
-        case 'editar':
-            cliente.grupo       = grupo_obj
-            cliente.nome        = nome
-            cliente.rsocial     = rsocial
-            cliente.logradouro  = logradouro
-            cliente.endereco    = endereco
-            cliente.numero      = numero
-            cliente.complemento = complemento
-            cliente.bairro      = bairro
-            cliente.pais        = pais_obj
-            cliente.regiao      = regiao_obj
-            cliente.cidade      = cidade_obj
-            cliente.codpostal   = codpostal
+        case "editar":
+            try:
+                cliente = Cliente.objects.get(pk=id_cliente)
+            except Cliente.DoesNotExist:
+                return JsonResponse({
+                    "mensagens": {"erro": {"conteudo": ["Registro não encontrado."], "ignorar": False}}
+                }, status=404)
+
+            cliente.grupo_id      = grupo_id
+            cliente.nome          = nome
+            cliente.rsocial       = rsocial
+            cliente.logradouro    = logradouro
+            cliente.endereco      = endereco
+            cliente.numero        = numero
+            cliente.complemento   = complemento
+            cliente.bairro        = bairro
+            cliente.pais_id       = pais_id
+            cliente.regiao_id     = regiao_id
+            cliente.cidade_id     = cidade_id
+            cliente.codpostal     = codpostal
             cliente.identificador = identificador
             cliente.save()
 
-        case 'excluir':
-            if not cliente:
+        case "excluir":
+            try:
+                cliente = Cliente.objects.get(pk=id_cliente)
+                cliente.delete()
+            except Cliente.DoesNotExist:
                 return JsonResponse({
-                    "mensagens": {"erro": {"conteudo": ["Registro não encontrado para exclusão"], "ignorar": False}}
+                    "mensagens": {"erro": {"conteudo": ["Registro não encontrado."], "ignorar": False}}
                 }, status=404)
-            cliente.delete()
+
             return JsonResponse({
                 "success": True,
                 "form": {
@@ -229,7 +198,7 @@ def cad_cliente_view(request):
         "form": {
             nomeForm: {
                 "estado": "visualizar",
-                "update": cliente.atualizacao,
+                "update": cliente.atualizacao if hasattr(cliente, 'atualizacao') else None,
                 "campos": {
                     "id":            cliente.id,
                     "grupo":         cliente.grupo_id,
@@ -249,69 +218,95 @@ def cad_cliente_view(request):
             }
         },
         "mensagens": {
-            "sucesso": {
-                "ignorar": True,
-                "conteudo": ["Operação realizada com sucesso!"]
-            }
+            "sucesso": {"ignorar": True, "conteudo": ["Registro salvo com sucesso!"]}
         }
     })
 
+
 def cad_cliente_cons_view(request):
-    nomeForm     = "cadCliente"
-    nomeFormCons = "consCliente"
+    """
+    View de consulta de clientes.
+    POST /app/cad/cliente/cons/
 
-    if request.method == "POST":
-        dataFront = request.sisvar_front
-        form      = dataFront.get("form", {}).get(nomeFormCons, {})
-        campos    = form.get("campos", {})
+    Comportamento:
+    - Se `id_selecionado` estiver preenchido: carrega o registro e retorna estado 'visualizar'.
+    - Caso contrário: filtra por nome e retorna lista de registros para a tabela.
+    """
+    nomeForm     = 'cadCliente'
+    nomeFormCons = 'consCliente'
 
-        id_selecionado = int(campos.get('id_selecionado') or 0)
+    if request.method != 'POST':
+        return JsonResponse({
+            "success": False,
+            "mensagens": {"erro": {"ignorar": False, "conteudo": ["Método não permitido."]}}
+        }, status=405)
 
-        if id_selecionado:
-            try:
-                cliente = Cliente.objects.get(id=id_selecionado)
-                return JsonResponse({
-                    "form": {
-                        nomeForm: {
-                            "estado": "visualizar",
-                            "update": cliente.atualizacao,
-                            "campos": {
-                                "id":            cliente.id,
-                                "grupo":         cliente.grupo_id,
-                                "nome":          cliente.nome,
-                                "rsocial":       cliente.rsocial,
-                                "logradouro":    cliente.logradouro,
-                                "endereco":      cliente.endereco,
-                                "numero":        cliente.numero,
-                                "complemento":   cliente.complemento,
-                                "bairro":        cliente.bairro,
-                                "pais":          cliente.pais_id,
-                                "regiao":        cliente.regiao_id,
-                                "cidade":        cliente.cidade_id,
-                                "codpostal":     cliente.codpostal,
-                                "identificador": cliente.identificador,
-                            }
-                        }
+    dataFront   = request.sisvar_front
+    form_cons   = dataFront.get("form", {}).get(nomeFormCons, {})
+    campos      = form_cons.get("campos", {})
+
+    id_selecionado = campos.get("id_selecionado")
+
+    # ── Carregar registro individual ──────────────────────────────────────────
+    if id_selecionado:
+        try:
+            cli = Cliente.objects.get(pk=id_selecionado)
+        except Cliente.DoesNotExist:
+            return JsonResponse({
+                "success": False,
+                "mensagens": {"erro": {"ignorar": False, "conteudo": ["Registro não encontrado."]}}
+            }, status=404)
+
+        return JsonResponse({
+            "success": True,
+            "form": {
+                nomeForm: {
+                    "estado": "visualizar",
+                    "update": cli.atualizacao if hasattr(cli, 'atualizacao') else None,
+                    "campos": {
+                        "id":            cli.id,
+                        "grupo":         cli.grupo_id,
+                        "nome":          cli.nome,
+                        "rsocial":       cli.rsocial,
+                        "logradouro":    cli.logradouro,
+                        "endereco":      cli.endereco,
+                        "numero":        cli.numero,
+                        "complemento":   cli.complemento,
+                        "bairro":        cli.bairro,
+                        "pais":          cli.pais_id,
+                        "regiao":        cli.regiao_id,
+                        "cidade":        cli.cidade_id,
+                        "codpostal":     cli.codpostal,
+                        "identificador": cli.identificador,
                     }
-                })
-            except Cliente.DoesNotExist:
-                return JsonResponse({
-                    "mensagens": {"erro": {"conteudo": ["Registro não encontrado"], "ignorar": False}}
-                }, status=404)
+                }
+            },
+            "mensagens": {}
+        })
 
-        nome_cons = campos.get('nome_cons', '').strip()
-        filtros = {}
-        if nome_cons:
-            filtros['nome__icontains'] = nome_cons
+    # ── Pesquisa por filtro ───────────────────────────────────────────────────
+    nome_cons = campos.get("nome_cons", "").strip()
+    qs = Cliente.objects.select_related('grupo', 'pais', 'regiao', 'cidade')
 
-        clientes = Cliente.objects.filter(**filtros).select_related('grupo', 'pais', 'regiao', 'cidade').values(
-            'id', 'nome', 'rsocial', 'grupo_id', 'grupo__descricao',
-            'pais_id', 'pais__nome', 'regiao_id', 'regiao__sigla',
-            'cidade_id', 'cidade__nome', 'identificador'
-        ).order_by('nome')
+    if nome_cons:
+        qs = qs.filter(nome__icontains=nome_cons)
 
-        return JsonResponse({"registros": list(clientes)})
+    registros = [
+        {
+            "id":          c.id,
+            "nome":        c.nome,
+            "rsocial":     c.rsocial,
+            "grupo":       c.grupo.descricao if c.grupo else "",
+            "pais":        c.pais.nome       if c.pais   else "",
+            "regiao":      c.regiao.sigla    if c.regiao else "",
+            "cidade":      c.cidade.nome     if c.cidade else "",
+            "identificador": c.identificador,
+        }
+        for c in qs.order_by('nome')[:200]
+    ]
 
     return JsonResponse({
-        "mensagens": {"erro": {"conteudo": ["Método não permitido"], "ignorar": False}}
-    }, status=405)
+        "success": True,
+        "registros": registros,
+        "mensagens": {}
+    })
