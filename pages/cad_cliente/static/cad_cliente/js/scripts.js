@@ -7,7 +7,7 @@ import {
   hidratarFormulario,
   setFormState,
   confirmar,
-  getSisVar,
+  getOthers,
 } from '/static/js/sisVar.js';
 import { fazerRequisicao } from '/static/js/base.js';
 import { initSmartInputs } from '/static/js/input_rules.js';
@@ -36,7 +36,7 @@ initSmartInputs((input, value) => {
 
 function preencherSelectGrupos() {
   const sel = document.getElementById('grupo');
-  const grupos = getSisVar()?.opcoes?.grupos ?? [];
+  const grupos = getOthers()?.opcoes?.grupos ?? [];
   sel.innerHTML = '<option value="">Selecione</option>';
   grupos.forEach(g => {
     const opt = document.createElement('option');
@@ -48,7 +48,7 @@ function preencherSelectGrupos() {
 
 function preencherSelectPaises() {
   const sel = document.getElementById('pais');
-  const paises = getSisVar()?.opcoes?.paises ?? [];
+  const paises = getOthers()?.opcoes?.paises ?? [];
   sel.innerHTML = '<option value="">Selecione</option>';
   paises.forEach(p => {
     const opt = document.createElement('option');
@@ -70,7 +70,7 @@ function preencherSelectRegioes(paisId) {
     return;
   }
 
-  const regioes = (getSisVar()?.opcoes?.regioes ?? []).filter(r => r.pais_id == paisId);
+  const regioes = (getOthers()?.opcoes?.regioes ?? []).filter(r => r.pais_id == paisId);
   regioes.forEach(r => {
     const opt = document.createElement('option');
     opt.value = r.id;
@@ -89,7 +89,7 @@ function preencherSelectCidades(regiaoId) {
     return;
   }
 
-  const cidades = (getSisVar()?.opcoes?.cidades ?? []).filter(c => c.regiao_id == regiaoId);
+  const cidades = (getOthers()?.opcoes?.cidades ?? []).filter(c => c.regiao_id == regiaoId);
   cidades.forEach(c => {
     const opt = document.createElement('option');
     opt.value = c.id;
@@ -190,7 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const formFiltro       = document.getElementById(nomeFormCons);
   const tabelaCorpo      = document.getElementById('tabela-corpo');
 
-  // Popula selects estáticos ao carregar
+  // Popula selects ao carregar
   preencherSelectGrupos();
   preencherSelectPaises();
 
