@@ -2,8 +2,8 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from sac_base.form_validador import SchemaValidator
 from pages.cad_grupo_cli.models import GrupoCli
+from pages.core.models import Pais, Regiao, Cidade
 from .models import Cliente
-
 
 def cad_cliente_view(request):
     template     = 'cadcliente.html'
@@ -12,19 +12,19 @@ def cad_cliente_view(request):
 
     schema = {
         nomeForm: {
-            "grupo":       {'type': 'integer', 'required': True},
-            "nome":        {'type': 'string',  'maxlength': 100, 'minlength': 3, 'required': True,  'value': ''},
-            "rsocial":      {'type': 'string',  'maxlength': 100, 'minlength': 3, 'required': True,  'value': ''},
-            "logradouro":  {'type': 'string',  'maxlength': 20,  'required': False, 'value': ''},
-            "endereco":    {'type': 'string',  'maxlength': 150, 'required': False, 'value': ''},
-            "numero":      {'type': 'string',  'maxlength': 10,  'required': False, 'value': ''},
-            "complemento": {'type': 'string',  'maxlength': 50,  'required': False, 'value': ''},
-            "bairro":      {'type': 'string',  'maxlength': 60,  'required': False, 'value': ''},
-            "pais":        {'type': 'string',  'maxlength': 20,  'required': True,  'value': ''},
-            "uf":          {'type': 'string',  'maxlength': 20,  'required': True,  'value': ''},
-            "cidade":      {'type': 'string',  'maxlength': 50,  'required': True,  'value': ''},
-            "codpostal":   {'type': 'string',  'maxlength': 10,   'required': False, 'value': ''},
-            "identificador": {'type': 'string', 'maxlength': 20, 'required': False, 'value': ''},
+            "grupo":         {'type': 'integer', 'required': True},
+            "nome":          {'type': 'string',  'maxlength': 100, 'minlength': 3, 'required': True,  'value': ''},
+            "rsocial":       {'type': 'string',  'maxlength': 100, 'minlength': 3, 'required': True,  'value': ''},
+            "logradouro":    {'type': 'string',  'maxlength': 20,  'required': False, 'value': ''},
+            "endereco":      {'type': 'string',  'maxlength': 150, 'required': False, 'value': ''},
+            "numero":        {'type': 'string',  'maxlength': 10,  'required': False, 'value': ''},
+            "complemento":   {'type': 'string',  'maxlength': 50,  'required': False, 'value': ''},
+            "bairro":        {'type': 'string',  'maxlength': 60,  'required': False, 'value': ''},
+            "pais":          {'type': 'integer', 'required': True},
+            "regiao":        {'type': 'integer', 'required': False},
+            "cidade":        {'type': 'integer', 'required': False},
+            "codpostal":     {'type': 'string',  'maxlength': 10,  'required': False, 'value': ''},
+            "identificador": {'type': 'string',  'maxlength': 20,  'required': False, 'value': ''},
         },
         nomeFormCons: {
             "nome_cons":      {'type': 'string',  'maxlength': 100},
@@ -34,6 +34,11 @@ def cad_cliente_view(request):
 
     # ---------- GET ----------
     if request.method == 'GET':
+        grupos  = list(GrupoCli.objects.values('id', 'descricao').order_by('descricao'))
+        paises  = list(Pais.objects.values('id', 'nome', 'sigla').order_by('nome'))
+        regioes = list(Regiao.objects.values('id', 'nome', 'sigla', 'pais_id').order_by('nome'))
+        cidades = list(Cidade.objects.values('id', 'nome', 'regiao_id').order_by('nome'))
+
         request.sisvar_extra = {
             "schema": schema,
             "form": {
@@ -41,19 +46,19 @@ def cad_cliente_view(request):
                     "estado": "novo",
                     "update": None,
                     "campos": {
-                        "id":          None,
-                        "grupo":       None,
-                        "nome":        "",
-                        "rsocial":     "",
-                        "logradouro":  "",
-                        "endereco":    "",
-                        "numero":      "",
-                        "complemento": "",
-                        "bairro":      "",
-                        "pais":        "",
-                        "uf":          "",
-                        "cidade":      "",
-                        "codpostal":   "",
+                        "id":            None,
+                        "grupo":         None,
+                        "nome":          "",
+                        "rsocial":       "",
+                        "logradouro":    "",
+                        "endereco":      "",
+                        "numero":        "",
+                        "complemento":   "",
+                        "bairro":        "",
+                        "pais":          None,
+                        "regiao":        None,
+                        "cidade":        None,
+                        "codpostal":     "",
                         "identificador": "",
                     }
                 },
@@ -64,6 +69,12 @@ def cad_cliente_view(request):
                         "id_selecionado": None,
                     }
                 }
+            },
+            "opcoes": {
+                "grupos":  grupos,
+                "paises":  paises,
+                "regioes": regioes,
+                "cidades": cidades,
             }
         }
         return render(request, template)
@@ -86,21 +97,21 @@ def cad_cliente_view(request):
         }, status=400)
     ###########################################################################
 
-    id_cliente  = campos.get("id")
-    grupo_id    = campos.get("grupo")
-    nome        = campos.get("nome")
-    rsocial     = campos.get("rsocial")
-    logradouro  = campos.get("logradouro") or ""
-    endereco    = campos.get("endereco") or ""
-    numero      = campos.get("numero") or ""
-    complemento = campos.get("complemento") or ""
-    bairro      = campos.get("bairro") or ""
-    pais        = campos.get("pais")
-    uf          = campos.get("uf")
-    cidade      = campos.get("cidade")
-    codpostal   = campos.get("codpostal") or ""
+    id_cliente    = campos.get("id")
+    grupo_id      = campos.get("grupo")
+    nome          = campos.get("nome")
+    rsocial       = campos.get("rsocial")
+    logradouro    = campos.get("logradouro") or ""
+    endereco      = campos.get("endereco") or ""
+    numero        = campos.get("numero") or ""
+    complemento   = campos.get("complemento") or ""
+    bairro        = campos.get("bairro") or ""
+    pais_id       = campos.get("pais")
+    regiao_id     = campos.get("regiao") or None
+    cidade_id     = campos.get("cidade") or None
+    codpostal     = campos.get("codpostal") or ""
     identificador = campos.get("identificador") or ""
-    cliente     = None
+    cliente       = None
 
     # Carrega o registro existente quando há ID (editar) ######################
     if id_cliente:
@@ -113,13 +124,36 @@ def cad_cliente_view(request):
     ###########################################################################
 
     # Validações de negócio ###################################################
-    grupo_obj = None
-    if grupo_id:
+    try:
+        grupo_obj = GrupoCli.objects.get(id=grupo_id)
+    except GrupoCli.DoesNotExist:
+        return JsonResponse({
+            "mensagens": {"erro": {"conteudo": ["Grupo não encontrado"], "ignorar": False}}
+        }, status=422)
+
+    try:
+        pais_obj = Pais.objects.get(id=pais_id)
+    except Pais.DoesNotExist:
+        return JsonResponse({
+            "mensagens": {"erro": {"conteudo": ["País não encontrado"], "ignorar": False}}
+        }, status=422)
+
+    regiao_obj = None
+    if regiao_id:
         try:
-            grupo_obj = GrupoCli.objects.get(id=grupo_id)
-        except GrupoCli.DoesNotExist:
+            regiao_obj = Regiao.objects.get(id=regiao_id, pais=pais_obj)
+        except Regiao.DoesNotExist:
             return JsonResponse({
-                "mensagens": {"erro": {"conteudo": ["Grupo não encontrado"], "ignorar": False}}
+                "mensagens": {"erro": {"conteudo": ["UF/Região não encontrada para o País informado"], "ignorar": False}}
+            }, status=422)
+
+    cidade_obj = None
+    if cidade_id:
+        try:
+            cidade_obj = Cidade.objects.get(id=cidade_id, regiao=regiao_obj)
+        except Cidade.DoesNotExist:
+            return JsonResponse({
+                "mensagens": {"erro": {"conteudo": ["Cidade não encontrada para a UF informada"], "ignorar": False}}
             }, status=422)
     ###########################################################################
 
@@ -135,9 +169,9 @@ def cad_cliente_view(request):
                 numero=numero,
                 complemento=complemento,
                 bairro=bairro,
-                pais=pais,
-                uf=uf,
-                cidade=cidade,
+                pais=pais_obj,
+                regiao=regiao_obj,
+                cidade=cidade_obj,
                 codpostal=codpostal,
                 identificador=identificador,
             )
@@ -151,12 +185,38 @@ def cad_cliente_view(request):
             cliente.numero      = numero
             cliente.complemento = complemento
             cliente.bairro      = bairro
-            cliente.pais        = pais
-            cliente.uf          = uf
-            cliente.cidade      = cidade
+            cliente.pais        = pais_obj
+            cliente.regiao      = regiao_obj
+            cliente.cidade      = cidade_obj
             cliente.codpostal   = codpostal
             cliente.identificador = identificador
             cliente.save()
+
+        case 'excluir':
+            if not cliente:
+                return JsonResponse({
+                    "mensagens": {"erro": {"conteudo": ["Registro não encontrado para exclusão"], "ignorar": False}}
+                }, status=404)
+            cliente.delete()
+            return JsonResponse({
+                "success": True,
+                "form": {
+                    nomeForm: {
+                        "estado": "novo",
+                        "update": None,
+                        "campos": {
+                            "id": None, "grupo": None, "nome": "", "rsocial": "",
+                            "logradouro": "", "endereco": "", "numero": "",
+                            "complemento": "", "bairro": "", "pais": None,
+                            "regiao": None, "cidade": None,
+                            "codpostal": "", "identificador": "",
+                        }
+                    }
+                },
+                "mensagens": {
+                    "sucesso": {"ignorar": True, "conteudo": ["Registro excluído com sucesso!"]}
+                }
+            })
 
         case _:
             return JsonResponse({
@@ -171,19 +231,19 @@ def cad_cliente_view(request):
                 "estado": "visualizar",
                 "update": cliente.atualizacao,
                 "campos": {
-                    "id":          cliente.id,
-                    "grupo":       cliente.grupo_id,
-                    "nome":        cliente.nome,
-                    "rsocial":     cliente.rsocial,
-                    "logradouro":  cliente.logradouro,
-                    "endereco":    cliente.endereco,
-                    "numero":      cliente.numero,
-                    "complemento": cliente.complemento,
-                    "bairro":      cliente.bairro,
-                    "pais":        cliente.pais,
-                    "uf":          cliente.uf,
-                    "cidade":      cliente.cidade,
-                    "codpostal":   cliente.codpostal,
+                    "id":            cliente.id,
+                    "grupo":         cliente.grupo_id,
+                    "nome":          cliente.nome,
+                    "rsocial":       cliente.rsocial,
+                    "logradouro":    cliente.logradouro,
+                    "endereco":      cliente.endereco,
+                    "numero":        cliente.numero,
+                    "complemento":   cliente.complemento,
+                    "bairro":        cliente.bairro,
+                    "pais":          cliente.pais_id,
+                    "regiao":        cliente.regiao_id,
+                    "cidade":        cliente.cidade_id,
+                    "codpostal":     cliente.codpostal,
                     "identificador": cliente.identificador,
                 }
             }
@@ -195,7 +255,6 @@ def cad_cliente_view(request):
             }
         }
     })
-
 
 def cad_cliente_cons_view(request):
     nomeForm     = "cadCliente"
@@ -217,19 +276,19 @@ def cad_cliente_cons_view(request):
                             "estado": "visualizar",
                             "update": cliente.atualizacao,
                             "campos": {
-                                "id":          cliente.id,
-                                "grupo":       cliente.grupo_id,
-                                "nome":        cliente.nome,
-                                "rsocial":     cliente.rsocial,
-                                "logradouro":  cliente.logradouro,
-                                "endereco":    cliente.endereco,
-                                "numero":      cliente.numero,
-                                "complemento": cliente.complemento,
-                                "bairro":      cliente.bairro,
-                                "pais":        cliente.pais,
-                                "uf":          cliente.uf,
-                                "cidade":      cliente.cidade,
-                                "codpostal":   cliente.codpostal,
+                                "id":            cliente.id,
+                                "grupo":         cliente.grupo_id,
+                                "nome":          cliente.nome,
+                                "rsocial":       cliente.rsocial,
+                                "logradouro":    cliente.logradouro,
+                                "endereco":      cliente.endereco,
+                                "numero":        cliente.numero,
+                                "complemento":   cliente.complemento,
+                                "bairro":        cliente.bairro,
+                                "pais":          cliente.pais_id,
+                                "regiao":        cliente.regiao_id,
+                                "cidade":        cliente.cidade_id,
+                                "codpostal":     cliente.codpostal,
                                 "identificador": cliente.identificador,
                             }
                         }
@@ -245,9 +304,11 @@ def cad_cliente_cons_view(request):
         if nome_cons:
             filtros['nome__icontains'] = nome_cons
 
-        clientes = Cliente.objects.filter(**filtros).values(
-            'id', 'nome', 'rsocial', 'pais', 'uf', 'cidade', 'grupo_id', 'identificador'
-        )
+        clientes = Cliente.objects.filter(**filtros).select_related('grupo', 'pais', 'regiao', 'cidade').values(
+            'id', 'nome', 'rsocial', 'grupo_id', 'grupo__descricao',
+            'pais_id', 'pais__nome', 'regiao_id', 'regiao__sigla',
+            'cidade_id', 'cidade__nome', 'identificador'
+        ).order_by('nome')
 
         return JsonResponse({"registros": list(clientes)})
 
