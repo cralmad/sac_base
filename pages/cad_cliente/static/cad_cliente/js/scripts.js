@@ -247,6 +247,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         updateState(resultado.data);
+        preencherSelectGrupos();
+        preencherSelectPaises();
+        document.getElementById('regiao').disabled = true;
+        document.getElementById('cidade').disabled = true;
         AppLoader.hide();
       }
     });
@@ -256,6 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
   formFiltro.addEventListener('submit', async e => {
     e.preventDefault();
     clearMessages();
+    AppLoader.show();
 
     const resultado = await fazerRequisicao('/app/cad/cliente/cons/', {
       form: { [nomeFormCons]: getForm(nomeFormCons) }
@@ -294,10 +299,10 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${r.id ?? ''}</td>
         <td>${r.nome ?? ''}</td>
         <td>${r.rsocial ?? ''}</td>
-        <td>${r.grupo__descricao ?? ''}</td>
-        <td>${r.pais__nome ?? ''}</td>
-        <td>${r.regiao__sigla ?? ''}</td>
-        <td>${r.cidade__nome ?? ''}</td>
+        <td>${r.grupo ?? ''}</td>
+        <td>${r.pais ?? ''}</td>
+        <td>${r.regiao ?? ''}</td>
+        <td>${r.cidade ?? ''}</td>
         <td>${r.identificador ?? ''}</td>
         <td class="text-center">
           <button class="btn btn-sm btn-primary btn-selecionar" data-id="${r.id}">
