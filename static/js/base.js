@@ -5,15 +5,23 @@ import {
   getCsrfToken 
 } from "/static/js/sisVar.js";
 
-import { AppLoader } from "/static/js/loader.js"; // ✅ ADICIONAR IMPORT
+import { AppLoader } from "/static/js/loader.js";
 
 /**
- * Função utilitária para fazer requisições POST com CSRF token
+ * Função utilitária para fazer requisições POST com CSRF token.
+ * Status tratados como resposta legível (não lançam exceção):
+ *   200 — sucesso
+ *   400 — erro de validação de schema
+ *   401 — não autenticado
+ *   422 — erro de regra de negócio (ex: duplicidade)
+ * Qualquer outro status de erro lança exceção.
  */
 export async function fazerRequisicao(url, payload) {
+  const STATUS_LEGIVEIS = [400, 401, 422];
+
   try {
     const csrfToken = getCsrfToken();
-    
+
     if (!csrfToken) {
       console.warn("CSRF token não encontrado! Tente recarregar a página.");
     }
@@ -27,17 +35,25 @@ export async function fazerRequisicao(url, payload) {
       body: JSON.stringify(payload)
     });
 
-    if (!response.ok && response.status !== 400 && response.status !== 401) {
+    if (!response.ok && !STATUS_LEGIVEIS.includes(response.status)) {
       throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
     }
 
     const data = await response.json();
-    return { success: true, data };
+
+    // Para status de erro legível, retorna success: false com data para
+    // que updateState() possa processar as mensagens do servidor
+    if (!response.ok) {
+      return { success: false, status: response.status, data, error: null };
+    }
+
+    return { success: true, status: response.status, data };
 
   } catch (err) {
     console.error("Erro na requisição:", err);
-    return { 
-      success: false, 
+    return {
+      success: false,
+      status: null,
       error: err.message,
       data: null
     };
@@ -97,12 +113,11 @@ export async function inicializarNavbarUsuario() {
     }
 }
 
-// ✅ Inicializa AppLoader E navbar quando DOM está pronto
-// AGUARDA a navbar terminar (async) antes de ocultar o loader
+// Inicializa AppLoader e navbar quando DOM está pronto
 document.addEventListener("DOMContentLoaded", async () => {
     AppLoader.init();
-    await inicializarNavbarUsuario(); // ← await garante esperar a chamada de rede
-    AppLoader.hide();                 // ← só oculta após tudo carregar
+    await inicializarNavbarUsuario();
+    AppLoader.hide();
 });
 
 /*****************DEBUG**********************/
