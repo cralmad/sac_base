@@ -1,59 +1,113 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Cadastro de Grupo de Clientes{% endblock %}
+{% block title %}SacBase - Grupo de Clientes{% endblock %}
 
-{% block estilo %}<link rel="stylesheet" href="{% static 'cad_grupo_cli/css/styles.css' %}">{% endblock %}
+{% block estilo %}
+  <link rel="stylesheet" href="{% static 'cad_grupo_cli/css/styles.css' %}">
+{% endblock %}
+
+{% block page_title %}Cadastro de Grupo de Clientes{% endblock %}
 
 {% block content %}
 
-<ul class="nav nav-tabs" id="cadastroTabs" role="tablist">
-    <li class="nav-item" role="presentation">
-        <button class="nav-link active"
-                id="cadastro-tab"
-                data-bs-toggle="tab"
-                data-bs-target="#cadastro"
-                type="button"
-                role="tab">
-            CADASTRO
-        </button>
-    </li>
-</ul>
-
-<form id="cadForm" novalidate>
+  {# ── Formulário principal ── #}
+  <form id="cadGrupoCli" data-form-lock="cadGrupoCli" method="POST">
     {% csrf_token %}
-    <div class="tab-content border border-top-0 p-1" id="cadastroTabsContent">
-        <div class="tab-pane fade show active" id="cadastro" role="tabpanel">
-            <div class="container my-4">
 
-                <div class="row g-3">
+    <div class="container-md-3 my-3 mx-auto">
+      <div class="row g-3">
 
-                <!-- Grupo -->
-                <div class="col-md-6">
-                    <label for="descricao" class="form-label">Descrição do Grupo *</label>
-                    <input
-                    type="text"
-                    id="descricao"
-                    name="descricao"
-                    class="form-control smart-input"
-                    data-textCase="upper"
-                    maxlength="30"
-                    required
-                    >
-                </div>
-
-                <!-- Botão -->
-                <div class="col-12">
-                    <button type="submit" class="btn btn-primary">Salvar</button>
-                </div>
-
-                </div>
-                
-                <button id="teste" type="button" class="btn btn-primary">TESTE</button>
-            </div>
+        <div class="col-12 col-sm-6">
+          <label for="descricao" class="form-label mb-0">Descrição do Grupo *</label>
+          <input
+            type="text"
+            id="descricao"
+            name="descricao"
+            class="form-control smart-input"
+            data-textcase="upper"
+            maxlength="30"
+            minlength="3"
+            required
+          />
         </div>
-    </div>
-</form>
 
-{% block scripts %}<script type="module" src="{% static 'cad_grupo_cli/js/scripts.js' %}"></script>{% endblock %}
+      </div>
+    </div>
+
+    <div class="container-md-3 mx-auto mt-3">
+      <div class="d-grid gap-2 d-md-flex">
+        <button id="btn-salvar"         class="btn btn-primary"            data-show-on="novo,editar" type="submit">
+          <i class="bi bi-save"></i> Salvar
+        </button>
+        <button id="btn-editar"         class="btn btn-warning d-none"     data-show-on="visualizar"  type="button">
+          <i class="bi bi-pencil"></i> Editar
+        </button>
+        <button id="btn-novo"           class="btn btn-success d-none"     data-show-on="visualizar"  type="button">
+          <i class="bi bi-plus-circle"></i> Novo
+        </button>
+        <button id="btn-cancelar"       class="btn btn-outline-secondary d-none" data-show-on="novo,editar" type="button">
+          <i class="bi bi-x-circle"></i> Cancelar
+        </button>
+        <button id="btn-abrir-pesquisa" class="btn btn-secondary"          type="button">
+          <i class="bi bi-search"></i> Pesquisar
+        </button>
+      </div>
+    </div>
+  </form>
+
+  {# ── Tela de pesquisa ── #}
+  <div id="div-pesquisa" class="d-none">
+    <form id="consGrupoCli">
+      {% csrf_token %}
+      <div class="container-md-3 my-3 mx-auto">
+        <div class="row g-3">
+
+          <div class="col-12 col-sm-6">
+            <label for="cons-descricao" class="form-label mb-0">Descrição</label>
+            <input
+              type="text"
+              id="cons-descricao"
+              name="descricao"
+              class="form-control smart-input"
+              data-textcase="upper"
+              maxlength="30"
+            />
+          </div>
+
+          <div class="col-12 d-grid gap-2 d-md-flex">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-search"></i> Pesquisar
+            </button>
+            <button id="btn-fechar" type="button" class="btn btn-outline-secondary">
+              <i class="bi bi-x-circle"></i> Fechar
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </form>
+
+    <div class="container-md-3 mx-auto mt-3">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover table-striped">
+          <thead class="table-dark">
+            <tr>
+              <th>Código</th>
+              <th>Descrição</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tabela-corpo">
+            {# preenchido via JS #}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="{% static 'cad_grupo_cli/js/scripts.js' %}"></script>
 {% endblock %}
