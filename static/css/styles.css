@@ -1,4 +1,6 @@
-﻿/* Loader Global */
+/* ============================================================
+   LOADER GLOBAL
+   ============================================================ */
 #global-loader {
     position: fixed;
     top: 0;
@@ -10,15 +12,12 @@
     justify-content: center;
     align-items: center;
     z-index: 99999;
-
-    /* NÃO bloquear ponteiros por padrão (quando oculto) */
     pointer-events: none;
     transition: opacity 0.3s ease, visibility 0.3s ease;
     opacity: 0;
     visibility: hidden;
 }
 
-/* Quando está oculto - CRÍTICO */
 #global-loader.d-none {
     display: none !important;
     visibility: hidden !important;
@@ -26,15 +25,13 @@
     opacity: 0 !important;
 }
 
-/* Quando está visível (d-none removido) */
 #global-loader:not(.d-none) {
     display: flex;
     opacity: 1;
     visibility: visible;
-    pointer-events: auto; /* passa a bloquear somente quando realmente visível */
+    pointer-events: auto;
 }
 
-/* Spinner */
 #global-loader .spinner-border {
     width: 4rem;
     height: 4rem;
@@ -43,6 +40,199 @@
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
+    0%   { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+
+/* ============================================================
+   BOTÕES PADRONIZADOS — Estilos globais
+   Controle de visibilidade via data-show-on (sisVar.js)
+   ============================================================ */
+
+/* Base comum a todos os botões de ação do sistema */
+button[data-show-on],
+button[id^="btn-"] {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    border-radius: 0.375rem;
+    padding: 0.45rem 1rem;
+    font-size: 0.9rem;
+    transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+    white-space: nowrap;
+    min-height: 2.25rem;
+}
+
+button[data-show-on]:hover:not(:disabled),
+button[id^="btn-"]:hover:not(:disabled) {
+    filter: brightness(1.08);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+    transform: translateY(-1px);
+}
+
+button[data-show-on]:active:not(:disabled),
+button[id^="btn-"]:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+button[data-show-on]:focus-visible,
+button[id^="btn-"]:focus-visible {
+    outline: 3px solid #86b7fe;
+    outline-offset: 2px;
+}
+
+/* ── SALVAR ── */
+#btn-salvar {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+}
+#btn-salvar:hover:not(:disabled) {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+}
+
+/* ── EDITAR ── */
+#btn-editar {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #000;
+}
+#btn-editar:hover:not(:disabled) {
+    background-color: #e0a800;
+    border-color: #d39e00;
+}
+
+/* ── NOVO ── */
+#btn-novo {
+    background-color: #198754;
+    border-color: #198754;
+    color: #fff;
+}
+#btn-novo:hover:not(:disabled) {
+    background-color: #157347;
+    border-color: #146c43;
+}
+
+/* ── CANCELAR ── */
+#btn-cancelar {
+    background-color: transparent;
+    border-color: #6c757d;
+    color: #6c757d;
+}
+#btn-cancelar:hover:not(:disabled) {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    color: #fff;
+}
+
+/* ── EXCLUIR ── */
+#btn-excluir {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: #fff;
+}
+#btn-excluir:hover:not(:disabled) {
+    background-color: #bb2d3b;
+    border-color: #b02a37;
+}
+
+/* ── PESQUISAR / ABRIR PESQUISA ── */
+#btn-abrir-pesquisa,
+#btn-pesquisar {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    color: #fff;
+}
+#btn-abrir-pesquisa:hover:not(:disabled),
+#btn-pesquisar:hover:not(:disabled) {
+    background-color: #5c636a;
+    border-color: #565e64;
+}
+
+/* ── FILTRAR ── */
+#btn-filtrar,
+button[type="submit"].btn-success {
+    background-color: #198754;
+    border-color: #198754;
+    color: #fff;
+}
+
+/* ── VOLTAR ── */
+#btn-voltar {
+    background-color: transparent;
+    border-color: #dc3545;
+    color: #dc3545;
+}
+#btn-voltar:hover:not(:disabled) {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: #fff;
+}
+
+/* ── GERAR (relatórios) ── */
+#btn-gerar {
+    background-color: #0dcaf0;
+    border-color: #0dcaf0;
+    color: #000;
+}
+#btn-gerar:hover:not(:disabled) {
+    background-color: #0bb2d4;
+    border-color: #0aa2c0;
+}
+
+/* ── Estado desabilitado ── */
+button[data-show-on]:disabled,
+button[id^="btn-"]:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    filter: none;
+    transform: none;
+    box-shadow: none;
+}
+
+
+/* ============================================================
+   LAYOUT DO GRUPO DE BOTÕES — Responsivo
+   Wrapper recomendado: <div class="btn-actions">
+   Fallback: .d-grid.gap-2.d-md-flex (Bootstrap)
+   ============================================================ */
+
+/* Wrapper semântico para barra de ações */
+.btn-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+/* Mobile: botões empilhados em coluna, largura total */
+@media (max-width: 575.98px) {
+    .btn-actions {
+        flex-direction: column;
+    }
+    .btn-actions button,
+    .btn-actions a.btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Fallback Bootstrap d-grid também cobre mobile */
+    .d-grid button[data-show-on],
+    .d-grid button[id^="btn-"] {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Tablet e acima: botões em linha */
+@media (min-width: 576px) {
+    .btn-actions {
+        flex-direction: row;
+        align-items: center;
+    }
 }
