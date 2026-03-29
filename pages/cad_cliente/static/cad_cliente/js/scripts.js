@@ -14,6 +14,10 @@ import { initSmartInputs } from '/static/js/input_rules.js';
 import { criarAtualizadorForm } from '/static/js/refresh_varSis.js';
 import { AppLoader } from '/static/js/loader.js';
 
+// ── Bloqueio de cliques precoces no carregamento da página ────────────────────
+AppLoader.show();
+document.addEventListener('DOMContentLoaded', () => AppLoader.hide());
+
 const nomeForm     = 'cadCliente';
 const nomeFormCons = 'consCliente';
 const form  = document.getElementById(nomeForm);
@@ -143,7 +147,7 @@ function hidratarSelects(campos) {
   if (campos.cidade) selCidade.value = campos.cidade;
 }
 
-// ── Validação JS (substitui minlength/required nativos bloqueados por input_rules) ──
+// ── Validação JS ──────────────────────────────────────────────────────────────
 function validarFormulario(campos) {
   const erros = [];
 
@@ -178,7 +182,6 @@ form.addEventListener('submit', async e => {
     return;
   }
 
-  // FIX: validação JS antes de abrir o modal de confirmação
   const erros = validarFormulario(formData.campos);
   if (erros.length > 0) {
     erros.forEach(msg => definirMensagem('erro', msg, false));
@@ -195,8 +198,6 @@ form.addEventListener('submit', async e => {
         form: { [nomeForm]: formData }
       });
 
-      // FIX: quando success=false mas há data (status 400/422), usa updateState
-      // para que o Proxy exiba as mensagens de erro vindas do servidor
       if (!resultado.success) {
         if (resultado.data) {
           updateState(resultado.data);
@@ -277,7 +278,6 @@ document.addEventListener('DOMContentLoaded', () => {
           form: { [nomeForm]: formData }
         });
 
-        // FIX: mesma lógica de tratamento de erro
         if (!resultado.success) {
           if (resultado.data) {
             updateState(resultado.data);
@@ -303,7 +303,6 @@ document.addEventListener('DOMContentLoaded', () => {
       form: { [nomeFormCons]: getForm(nomeFormCons) }
     });
 
-    // FIX: mesma lógica de tratamento de erro
     if (!resultado.success) {
       if (resultado.data) {
         updateState(resultado.data);
@@ -326,32 +325,41 @@ document.addEventListener('DOMContentLoaded', () => {
     AppLoader.hide();
   });
 
-  // ── Renderização da tabela ──
+  // ── Renderização da tabela (textContent previne XSS) ─────────────────────
   function renderizarTabela(registros) {
     tabelaCorpo.innerHTML = '';
 
     if (!Array.isArray(registros) || registros.length === 0) {
-      tabelaCorpo.innerHTML = '<tr><td colspan="9" class="text-center">Nenhum registro encontrado</td></tr>';
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 9;
+      td.className = 'text-center';
+      td.textContent = 'Nenhum registro encontrado';
+      tr.appendChild(td);
+      tabelaCorpo.appendChild(tr);
       return;
     }
 
     registros.forEach(r => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${r.id ?? ''}</td>
-        <td>${r.nome ?? ''}</td>
-        <td>${r.rsocial ?? ''}</td>
-        <td>${r.grupo ?? ''}</td>
-        <td>${r.pais ?? ''}</td>
-        <td>${r.regiao ?? ''}</td>
-        <td>${r.cidade ?? ''}</td>
-        <td>${r.identificador ?? ''}</td>
-        <td class="text-center">
-          <button class="btn btn-sm btn-primary btn-selecionar" data-id="${r.id}">
-            Selecionar
-          </button>
-        </td>
-      `;
+
+      // Colunas de texto — textContent garante segurança contra XSS
+      [r.id, r.nome, r.rsocial, r.grupo, r.pais, r.regiao, r.cidade, r.identificador].forEach(valor => {
+        const td = document.createElement('td');
+        td.textContent = valor ?? '';
+        tr.appendChild(td);
+      });
+
+      // Coluna de ação — botão com data-id seguro
+      const tdAcao = document.createElement('td');
+      tdAcao.className = 'text-center';
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-sm btn-primary btn-selecionar';
+      btn.dataset.id = r.id;
+      btn.textContent = 'Selecionar';
+      tdAcao.appendChild(btn);
+      tr.appendChild(tdAcao);
+
       tabelaCorpo.appendChild(tr);
     });
   }
