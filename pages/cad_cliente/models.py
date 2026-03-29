@@ -55,19 +55,20 @@ class Cliente(models.Model):
     numero      = models.CharField(max_length=10,  null=True, blank=True)
     complemento = models.CharField(max_length=50,  null=True, blank=True)
     bairro      = models.CharField(max_length=60,  null=True, blank=True)
-    codpostal   = models.CharField(max_length=10,   null=True, blank=True)
-    
-    '''O identificador é um campo opcional que pode ser usado para armazenar um número de identificação fiscal, 
-    como CPF ou CNPJ ou qualquer outro identificador único para o cliente.'''
-    identificador  = models.CharField(max_length=20,  null=True, blank=True)
+    codpostal   = models.CharField(max_length=10,  null=True, blank=True)
+
+    # O identificador é um campo opcional que pode ser usado para armazenar um
+    # número de identificação fiscal, como CPF ou CNPJ ou qualquer outro
+    # identificador único para o cliente.
+    identificador = models.CharField(max_length=20, null=True, blank=True)
+
+    observacao = models.CharField(max_length=500, null=True, blank=True)
 
     atualizacao = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-        
-        self.nome = self.nome.upper()
+        self.nome    = self.nome.upper()
         self.rsocial = self.rsocial.upper()
-
         super().save(*args, **kwargs)
 
     class Meta:
