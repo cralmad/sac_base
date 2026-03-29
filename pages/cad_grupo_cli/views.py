@@ -35,7 +35,7 @@ def cad_grupo_cli_view(request):
                 nomeFormCons: {
                     'estado': 'novo',
                     'campos': {
-                        'descricao':    '',
+                        'descricao':      '',
                         'id_selecionado': None,
                     }
                 }
@@ -110,11 +110,6 @@ def cad_grupo_cli_cons_view(request):
     nomeFormCons = 'consGrupoCli'
     nomeForm     = 'cadGrupoCli'
 
-    schema_cons = {
-        'descricao':      {'type': 'string', 'maxlength': 30, 'value': ''},
-        'id_selecionado': {'type': 'integer', 'required': False, 'value': None},
-    }
-
     dataFront = request.sisvar_front
     form      = dataFront.get('form', {}).get(nomeFormCons, {})
     campos    = form.get('campos', {})
@@ -157,4 +152,38 @@ def cad_grupo_cli_cons_view(request):
     return JsonResponse({
         'success':   True,
         'registros': registros,
+    })
+
+
+def cad_grupo_cli_del_view(request):
+    """
+    Exclui um grupo de cliente pelo ID recebido no payload.
+    Rota: POST /app/cad/grupocli/del
+    """
+    nomeForm = 'cadGrupoCli'
+
+    dataFront = request.sisvar_front
+    form      = dataFront.get('form', {}).get(nomeForm, {})
+    campos    = form.get('campos', {})
+    id_registro = campos.get('id')
+
+    if not id_registro:
+        return JsonResponse({
+            'mensagens': {'erro': {'conteudo': ['ID não informado.'], 'ignorar': False}}
+        }, status=400)
+
+    try:
+        grupo = GrupoCli.objects.get(id=id_registro)
+    except GrupoCli.DoesNotExist:
+        return JsonResponse({
+            'mensagens': {'erro': {'conteudo': ['Registro não encontrado.'], 'ignorar': False}}
+        }, status=404)
+
+    grupo.delete()
+
+    return JsonResponse({
+        'success': True,
+        'mensagens': {
+            'sucesso': {'ignorar': True, 'conteudo': ['Grupo de cliente excluído com sucesso!']}
+        }
     })

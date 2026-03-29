@@ -36,7 +36,7 @@ function marcarCampoErro(formEl, nomeCampo, ativo) {
   }
 }
 
-// 5. SUBMIT DO FORMULÁRIO PRINCIPAL
+// 5. SUBMIT DO FORMULÁRIO PRINCIPAL (Salvar)
 form.addEventListener('submit', async e => {
   e.preventDefault();
   clearMessages();
@@ -57,16 +57,9 @@ form.addEventListener('submit', async e => {
       AppLoader.hide();
 
       if (!resultado.success) {
-        // data contém as mensagens do servidor (400 e 422) — updateState exibe no #container-mensagens
-        if (resultado.data) {
-          updateState(resultado.data);
-        } else {
-          definirMensagem('erro', `Erro: ${resultado.error}`, false);
-        }
-        // Destaca o campo visualmente se for duplicidade (422)
-        if (resultado.status === 422) {
-          marcarCampoErro(form, 'descricao', true);
-        }
+        if (resultado.data) updateState(resultado.data);
+        else definirMensagem('erro', `Erro: ${resultado.error}`, false);
+        if (resultado.status === 422) marcarCampoErro(form, 'descricao', true);
         return;
       }
 
@@ -78,16 +71,18 @@ form.addEventListener('submit', async e => {
 
 // 6. LÓGICA DE UI — dentro do DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {
-  const divPrincipal      = document.getElementById(nomeForm);
-  const divPesquisa       = document.getElementById('div-pesquisa');
-  const btnAbrirPesquisa  = document.getElementById('btn-abrir-pesquisa');
-  const btnVoltar         = document.getElementById('btn-voltar');
-  const btnFechar         = document.getElementById('btn-fechar');
-  const btnEditar         = document.getElementById('btn-editar');
-  const btnNovo           = document.getElementById('btn-novo');
-  const btnCancelar       = document.getElementById('btn-cancelar');
-  const tabelaCorpo       = document.getElementById('tabela-corpo');
+  const divPrincipal     = document.getElementById(nomeForm);
+  const divPesquisa      = document.getElementById('div-pesquisa');
+  const btnAbrirPesquisa = document.getElementById('btn-abrir-pesquisa');
+  const btnVoltar        = document.getElementById('btn-voltar');
+  const btnFechar        = document.getElementById('btn-fechar');
+  const btnEditar        = document.getElementById('btn-editar');
+  const btnNovo          = document.getElementById('btn-novo');
+  const btnExcluir       = document.getElementById('btn-excluir');
+  const btnCancelar      = document.getElementById('btn-cancelar');
+  const tabelaCorpo      = document.getElementById('tabela-corpo');
 
+  // Alternância cadastro ↔ pesquisa
   const alternarTelas = () => {
     divPrincipal.classList.toggle('d-none');
     divPesquisa.classList.toggle('d-none');
@@ -97,6 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
   btnVoltar.addEventListener('click', alternarTelas);
   btnFechar.addEventListener('click', alternarTelas);
 
+  // Botões de estado
   btnEditar.addEventListener('click', () => setFormState(nomeForm, 'editar'));
   btnNovo.addEventListener('click',   () => setFormState(nomeForm, 'novo'));
   btnCancelar.addEventListener('click', () => {
@@ -104,6 +100,35 @@ document.addEventListener('DOMContentLoaded', () => {
       titulo: 'Confirmar Cancelamento',
       mensagem: 'Deseja cancelar? Os dados não salvos serão perdidos.',
       onConfirmar: () => setFormState(nomeForm, 'novo')
+    });
+  });
+
+  // Botão Excluir
+  btnExcluir.addEventListener('click', () => {
+    const formData = getForm(nomeForm);
+    const descricao = formData?.campos?.descricao || '';
+
+    confirmar({
+      titulo: 'Confirmar Exclusão',
+      mensagem: `Deseja excluir o grupo "${descricao}"? Esta ação não pode ser desfeita.`,
+      onConfirmar: async () => {
+        AppLoader.show();
+
+        const resultado = await fazerRequisicao('/app/cad/grupocli/del', {
+          form: { [nomeForm]: formData }
+        });
+
+        AppLoader.hide();
+
+        if (!resultado.success) {
+          if (resultado.data) updateState(resultado.data);
+          else definirMensagem('erro', `Erro: ${resultado.error}`, false);
+          return;
+        }
+
+        updateState(resultado.data);
+        setFormState(nomeForm, 'novo');
+      }
     });
   });
 
