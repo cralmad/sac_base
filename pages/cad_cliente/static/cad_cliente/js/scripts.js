@@ -216,7 +216,7 @@ form.addEventListener('submit', async e => {
 
 // ── Inicialização ao carregar o DOM ──────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  const divPrincipal     = document.getElementById(nomeForm);
+  const areaCadastro     = document.getElementById('area-cadastro');
   const divPesquisa      = document.getElementById('div-pesquisa');
   const btnAbrirPesquisa = document.getElementById('btn-abrir-pesquisa');
   const btnVoltar        = document.getElementById('btn-voltar');
@@ -234,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── Alternância entre formulário e tela de pesquisa ──
   const alternarTelas = () => {
-    divPrincipal.classList.toggle('d-none');
+    areaCadastro.classList.toggle('d-none');
     divPesquisa.classList.toggle('d-none');
   };
 
@@ -298,6 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
   formFiltro.addEventListener('submit', async e => {
     e.preventDefault();
     clearMessages();
+    AppLoader.show();
 
     const resultado = await fazerRequisicao('/app/cad/cliente/cons/', {
       form: { [nomeFormCons]: getForm(nomeFormCons) }
@@ -380,6 +381,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Carregar registro selecionado ──
   async function carregarRegistro(id) {
     clearMessages();
+    AppLoader.show();
 
     updateFormField(nomeFormCons, 'id_selecionado', id);
 
