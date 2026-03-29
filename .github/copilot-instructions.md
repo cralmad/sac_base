@@ -64,7 +64,8 @@ O layout deve seguir rigorosamente a abordagem Mobile-First:
     * `PESQUISAR`: Direciona para o formulário de consulta/pesquisa.
     * `FILTRAR`: Executa busca com base nos filtros.
     * `GERAR`: Exclusivo para processamento de relatórios.
-    * `VOLTAR`: Retorna à tela anterior ou cancela edição.
+    * `VOLTAR`: Retorna à tela anterior.
+    * `CANCELAR`: Limpa o formulário ou cancela a ação em andamento.
 
 ---
 
