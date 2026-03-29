@@ -1,4 +1,3 @@
-import json
 from django.shortcuts import render
 from django.http import JsonResponse
 from sac_base.form_validador import SchemaValidator
@@ -26,6 +25,7 @@ def cad_cliente_view(request):
             "cidade":        {'type': 'integer', 'required': False},
             "codpostal":     {'type': 'string',  'maxlength': 10,  'required': False, 'value': ''},
             "identificador": {'type': 'string',  'maxlength': 20,  'required': False, 'value': ''},
+            "observacao":    {'type': 'string',  'maxlength': 500, 'required': False, 'value': ''},
         },
         nomeFormCons: {
             "nome_cons":      {'type': 'string',  'maxlength': 100},
@@ -61,6 +61,7 @@ def cad_cliente_view(request):
                         "cidade":        None,
                         "codpostal":     "",
                         "identificador": "",
+                        "observacao":    "",
                     }
                 },
                 nomeFormCons: {
@@ -115,6 +116,7 @@ def cad_cliente_view(request):
     cidade_id     = campos.get("cidade")
     codpostal     = campos.get("codpostal", "")
     identificador = campos.get("identificador", "")
+    observacao    = campos.get("observacao", "")
 
     match estado:
         case "novo":
@@ -132,6 +134,7 @@ def cad_cliente_view(request):
                 cidade_id     = cidade_id,
                 codpostal     = codpostal,
                 identificador = identificador,
+                observacao    = observacao,
             )
             cliente.save()
 
@@ -156,6 +159,7 @@ def cad_cliente_view(request):
             cliente.cidade_id     = cidade_id
             cliente.codpostal     = codpostal
             cliente.identificador = identificador
+            cliente.observacao    = observacao
             cliente.save()
 
         case "excluir":
@@ -178,7 +182,7 @@ def cad_cliente_view(request):
                             "logradouro": "", "endereco": "", "numero": "",
                             "complemento": "", "bairro": "", "pais": None,
                             "regiao": None, "cidade": None,
-                            "codpostal": "", "identificador": "",
+                            "codpostal": "", "identificador": "", "observacao": "",
                         }
                     }
                 },
@@ -198,7 +202,7 @@ def cad_cliente_view(request):
         "form": {
             nomeForm: {
                 "estado": "visualizar",
-                "update": cliente.atualizacao if hasattr(cliente, 'atualizacao') else None,
+                "update": cliente.atualizacao,
                 "campos": {
                     "id":            cliente.id,
                     "grupo":         cliente.grupo_id,
@@ -214,6 +218,7 @@ def cad_cliente_view(request):
                     "cidade":        cliente.cidade_id,
                     "codpostal":     cliente.codpostal,
                     "identificador": cliente.identificador,
+                    "observacao":    cliente.observacao,
                 }
             }
         },
@@ -262,7 +267,7 @@ def cad_cliente_cons_view(request):
             "form": {
                 nomeForm: {
                     "estado": "visualizar",
-                    "update": cli.atualizacao if hasattr(cli, 'atualizacao') else None,
+                    "update": cli.atualizacao,
                     "campos": {
                         "id":            cli.id,
                         "grupo":         cli.grupo_id,
@@ -278,6 +283,7 @@ def cad_cliente_cons_view(request):
                         "cidade":        cli.cidade_id,
                         "codpostal":     cli.codpostal,
                         "identificador": cli.identificador,
+                        "observacao":    cli.observacao,
                     }
                 }
             },
