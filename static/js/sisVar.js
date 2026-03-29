@@ -133,17 +133,18 @@ export function renderMensagens() {
     info: { classe: 'info' }
   };
 
+  let temMensagemVisivel = false; // ← NOVO
+
   const renderizar = (tipo, dados) => {
     if (dados.conteudo && dados.conteudo.length > 0) {
       const podeIgnorar = dados.ignorar !== false;
+      temMensagemVisivel = true; // ← NOVO
 
       dados.conteudo.forEach(msg => {
         const alerta = document.createElement('div');
         alerta.className = `alert alert-${config[tipo]?.classe || 'secondary'} alert-dismissible fade show`;
-        
-        // FIX #6: Usar textContent em vez de innerHTML para evitar XSS
         alerta.textContent = msg;
-        
+
         if (podeIgnorar) {
           const btnClose = document.createElement('button');
           btnClose.type = "button";
@@ -151,13 +152,18 @@ export function renderMensagens() {
           btnClose.setAttribute("data-bs-dismiss", "alert");
           alerta.appendChild(btnClose);
         }
-        
+
         container.appendChild(alerta);
       });
     }
   };
 
   Object.entries(mensagens).forEach(([tipo, dados]) => renderizar(tipo, dados));
+
+  // ← NOVO: rola para o topo sempre que houver mensagens visíveis
+  if (temMensagemVisivel) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 }
 
 /**

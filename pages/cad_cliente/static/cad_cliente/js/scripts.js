@@ -143,6 +143,30 @@ function hidratarSelects(campos) {
   if (campos.cidade) selCidade.value = campos.cidade;
 }
 
+// ── Validação JS (substitui minlength/required nativos bloqueados por input_rules) ──
+function validarFormulario(campos) {
+  const erros = [];
+
+  if (!campos.grupo) {
+    erros.push('Grupo é obrigatório.');
+  }
+  if (!campos.nome || campos.nome.trim().length === 0) {
+    erros.push('Nome é obrigatório.');
+  } else if (campos.nome.trim().length < 3) {
+    erros.push('Nome deve ter pelo menos 3 caracteres.');
+  }
+  if (!campos.rsocial || campos.rsocial.trim().length === 0) {
+    erros.push('Razão Social é obrigatória.');
+  } else if (campos.rsocial.trim().length < 3) {
+    erros.push('Razão Social deve ter pelo menos 3 caracteres.');
+  }
+  if (!campos.pais) {
+    erros.push('País é obrigatório.');
+  }
+
+  return erros;
+}
+
 // ── Submissão do formulário principal ────────────────────────────────────────
 form.addEventListener('submit', async e => {
   e.preventDefault();
@@ -150,7 +174,14 @@ form.addEventListener('submit', async e => {
 
   const formData = getForm(nomeForm);
   if (!formData?.campos || Object.keys(formData.campos).length === 0) {
-    definirMensagem('aviso', 'Preencha o formulário antes de enviar');
+    definirMensagem('aviso', 'Preencha o formulário antes de enviar.');
+    return;
+  }
+
+  // FIX: validação JS antes de abrir o modal de confirmação
+  const erros = validarFormulario(formData.campos);
+  if (erros.length > 0) {
+    erros.forEach(msg => definirMensagem('erro', msg, false));
     return;
   }
 
@@ -164,8 +195,14 @@ form.addEventListener('submit', async e => {
         form: { [nomeForm]: formData }
       });
 
+      // FIX: quando success=false mas há data (status 400/422), usa updateState
+      // para que o Proxy exiba as mensagens de erro vindas do servidor
       if (!resultado.success) {
-        definirMensagem('erro', `Erro ao salvar: ${resultado.error}`, false);
+        if (resultado.data) {
+          updateState(resultado.data);
+        } else {
+          definirMensagem('erro', `Erro ao salvar: ${resultado.error}`, false);
+        }
         AppLoader.hide();
         return;
       }
@@ -240,17 +277,18 @@ document.addEventListener('DOMContentLoaded', () => {
           form: { [nomeForm]: formData }
         });
 
+        // FIX: mesma lógica de tratamento de erro
         if (!resultado.success) {
-          definirMensagem('erro', `Erro ao excluir: ${resultado.error}`, false);
+          if (resultado.data) {
+            updateState(resultado.data);
+          } else {
+            definirMensagem('erro', `Erro ao excluir: ${resultado.error}`, false);
+          }
           AppLoader.hide();
           return;
         }
 
         updateState(resultado.data);
-        preencherSelectGrupos();
-        preencherSelectPaises();
-        document.getElementById('regiao').disabled = true;
-        document.getElementById('cidade').disabled = true;
         AppLoader.hide();
       }
     });
@@ -260,14 +298,18 @@ document.addEventListener('DOMContentLoaded', () => {
   formFiltro.addEventListener('submit', async e => {
     e.preventDefault();
     clearMessages();
-    AppLoader.show();
 
     const resultado = await fazerRequisicao('/app/cad/cliente/cons/', {
       form: { [nomeFormCons]: getForm(nomeFormCons) }
     });
 
+    // FIX: mesma lógica de tratamento de erro
     if (!resultado.success) {
-      definirMensagem('erro', `Erro ao buscar clientes: ${resultado.error}`, false);
+      if (resultado.data) {
+        updateState(resultado.data);
+      } else {
+        definirMensagem('erro', `Erro ao buscar clientes: ${resultado.error}`, false);
+      }
       AppLoader.hide();
       return;
     }
@@ -278,7 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
       renderizarTabela(resultado.data.registros);
     } else {
       tabelaCorpo.innerHTML = '';
-      definirMensagem('info', 'Nenhum cliente encontrado');
+      definirMensagem('info', 'Nenhum cliente encontrado.');
     }
 
     AppLoader.hide();
@@ -320,7 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const id = e.target.dataset.id;
     if (!id) {
-      definirMensagem('aviso', 'Erro ao selecionar o registro');
+      definirMensagem('aviso', 'Erro ao selecionar o registro.');
       return;
     }
 
@@ -342,7 +384,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultado = await fazerRequisicao('/app/cad/cliente/cons/', sisVarPayload);
 
     if (!resultado.success) {
-      definirMensagem('erro', `Erro ao carregar registro: ${resultado.error}`, false);
+      if (resultado.data) {
+        updateState(resultado.data);
+      } else {
+        definirMensagem('erro', `Erro ao carregar registro: ${resultado.error}`, false);
+      }
       AppLoader.hide();
       return;
     }
