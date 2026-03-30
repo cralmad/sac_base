@@ -17,7 +17,7 @@ import { AppLoader } from "/static/js/loader.js";
  * Qualquer outro status de erro lança exceção.
  */
 export async function fazerRequisicao(url, payload) {
-  const STATUS_LEGIVEIS = [400, 401, 422];
+  const STATUS_LEGIVEIS = [400, 401, 409, 422];
 
   try {
     const csrfToken = getCsrfToken();
