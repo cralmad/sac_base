@@ -1,3 +1,4 @@
+from django.db import models as db_models
 from django.http import JsonResponse
 from django.shortcuts import render
 
@@ -19,7 +20,7 @@ def cad_grupo_cli_view(request):
         }
     }
 
-    # ── GET ──────────────────────────────────────────────────────────────────
+    # GET
     if request.method == 'GET':
         request.sisvar_extra = {
             'schema': schema,
@@ -34,6 +35,7 @@ def cad_grupo_cli_view(request):
                 },
                 nomeFormCons: {
                     'estado': 'novo',
+                    'update': None,
                     'campos': {
                         'descricao':      '',
                         'id_selecionado': None,
@@ -43,13 +45,12 @@ def cad_grupo_cli_view(request):
         }
         return render(request, template)
 
-    # ── POST ─────────────────────────────────────────────────────────────────
+    # POST
     dataFront = request.sisvar_front
     form      = dataFront.get('form', {}).get(nomeForm, {})
     campos    = form.get('campos', {})
     estado    = form.get('estado', '')
 
-    # 1ª camada — validação de schema
     validator = SchemaValidator(schema[nomeForm])
     if not validator.validate(campos):
         erros = [f"{c} - {', '.join(e)}" for c, e in validator.get_errors().items()]
@@ -59,7 +60,6 @@ def cad_grupo_cli_view(request):
 
     descricao = campos.get('descricao', '').strip().upper()
 
-    # 2ª camada — validações de negócio
     match estado:
         case 'novo':
             if GrupoCli.objects.filter(descricao=descricao).exists():
@@ -116,7 +116,6 @@ def cad_grupo_cli_cons_view(request):
 
     id_selecionado = campos.get('id_selecionado')
 
-    # Seleção de um registro específico
     if id_selecionado:
         try:
             grupo = GrupoCli.objects.get(id=id_selecionado)
@@ -138,7 +137,6 @@ def cad_grupo_cli_cons_view(request):
             }
         })
 
-    # Pesquisa com filtro
     descricao_filtro = campos.get('descricao', '').strip().upper()
     qs = GrupoCli.objects.all().order_by('descricao')
     if descricao_filtro:
@@ -179,7 +177,12 @@ def cad_grupo_cli_del_view(request):
             'mensagens': {'erro': {'conteudo': ['Registro não encontrado.'], 'ignorar': False}}
         }, status=404)
 
-    grupo.delete()
+    try:
+        grupo.delete()
+    except db_models.ProtectedError:
+        return JsonResponse({
+            'mensagens': {'erro': {'conteudo': ['Este grupo não pode ser excluído pois está vinculado a um ou mais clientes.'], 'ignorar': False}}
+        }, status=409)
 
     return JsonResponse({
         'success': True,
