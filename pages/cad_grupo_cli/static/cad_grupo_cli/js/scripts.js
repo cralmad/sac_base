@@ -24,6 +24,16 @@ initSmartInputs((input, value) => { updateFormField(nomeForm, input.name, value)
 const updater2 = criarAtualizadorForm({ formId: nomeFormCons, setter: updateFormField, form: form2 });
 form2.addEventListener('input', updater2);
 
+// Utilitário: escapa strings para inserção segura no DOM (evita XSS)
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Utilitário: marca/desmarca campo com erro visual Bootstrap
 function marcarCampoErro(formEl, nomeCampo, ativo) {
   const input = formEl.querySelector(`[name="${nomeCampo}"]`);
@@ -71,6 +81,8 @@ form.addEventListener('submit', async e => {
 
 // 6. LÓGICA DE UI — dentro do DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {
+  AppLoader.show();
+
   const divPrincipal     = document.getElementById(nomeForm);
   const divPesquisa      = document.getElementById('div-pesquisa');
   const btnAbrirPesquisa = document.getElementById('btn-abrir-pesquisa');
@@ -110,108 +122,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
     confirmar({
       titulo: 'Confirmar Exclusão',
-      mensagem: `Deseja excluir o grupo "${descricao}"? Esta ação não pode ser desfeita.`,
-      onConfirmar: async () => {
-        AppLoader.show();
-
-        const resultado = await fazerRequisicao('/app/cad/grupocli/del', {
-          form: { [nomeForm]: formData }
-        });
-
-        AppLoader.hide();
-
-        if (!resultado.success) {
-          if (resultado.data) updateState(resultado.data);
-          else definirMensagem('erro', `Erro: ${resultado.error}`, false);
-          return;
-        }
-
-        updateState(resultado.data);
-        setFormState(nomeForm, 'novo');
-      }
-    });
-  });
-
-  // Submit da consulta (Filtrar)
-  form2.addEventListener('submit', async e => {
-    e.preventDefault();
-    clearMessages();
-    AppLoader.show();
-
-    const resultado = await fazerRequisicao('/app/cad/grupocli/cons', {
-      form: { [nomeFormCons]: getForm(nomeFormCons) }
-    });
-
-    AppLoader.hide();
-
-    if (!resultado.success) {
-      if (resultado.data) updateState(resultado.data);
-      else definirMensagem('erro', `Erro: ${resultado.error}`, false);
-      return;
-    }
-
-    updateState(resultado.data);
-
-    if (resultado.data?.registros && resultado.data.registros.length > 0) {
-      renderizarTabela(resultado.data.registros);
-    } else {
-      tabelaCorpo.innerHTML = '';
-      definirMensagem('info', 'Nenhum grupo de cliente encontrado.');
-    }
-  });
-
-  // Event delegation — selecionar da tabela
-  tabelaCorpo.addEventListener('click', async e => {
-    if (!e.target.classList.contains('btn-selecionar')) return;
-
-    const id = e.target.dataset.id;
-    if (!id) { definirMensagem('aviso', 'Erro ao selecionar o registro.', true); return; }
-
-    clearMessages();
-    AppLoader.show();
-
-    updateFormField(nomeFormCons, 'id_selecionado', id);
-    const payload = { form: { [nomeFormCons]: structuredClone(getForm(nomeFormCons)) } };
-    updateFormField(nomeFormCons, 'id_selecionado', null);
-
-    const resultado = await fazerRequisicao('/app/cad/grupocli/cons', payload);
-
-    AppLoader.hide();
-
-    if (!resultado.success) {
-      if (resultado.data) updateState(resultado.data);
-      else definirMensagem('erro', `Erro: ${resultado.error}`, false);
-      return;
-    }
-
-    updateState(resultado.data);
-    hidratarFormulario(nomeForm);
-    setFormState(nomeForm, 'visualizar');
-    alternarTelas();
-  });
-
-  // Renderização da tabela
-  function renderizarTabela(registros) {
-    tabelaCorpo.innerHTML = '';
-
-    if (!Array.isArray(registros) || registros.length === 0) {
-      tabelaCorpo.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Nenhum registro encontrado.</td></tr>';
-      return;
-    }
-
-    registros.forEach(reg => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${reg.id}</td>
-        <td>${reg.descricao}</td>
-        <td class="text-center">
-          <button type="button" class="btn btn-sm btn-primary btn-selecionar" data-id="${reg.id}">
-            Selecionar
-          </button>
-        </td>
-      `;
-      tabelaCorpo.appendChild(tr);
-    });
-  }
-
-});
+      mensagem: `Deseja excluir o grupo \
