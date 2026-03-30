@@ -122,4 +122,120 @@ document.addEventListener('DOMContentLoaded', () => {
 
     confirmar({
       titulo: 'Confirmar Exclusão',
-      mensagem: `Deseja excluir o grupo \
+      mensagem: `Deseja excluir o grupo "${escHtml(descricao)}"? Esta ação não pode ser desfeita.`,
+      onConfirmar: async () => {
+        AppLoader.show();
+
+        const resultado = await fazerRequisicao('/app/cad/grupocli/del', {
+          form: { [nomeForm]: formData }
+        });
+
+        AppLoader.hide();
+
+        if (!resultado.success) {
+          if (resultado.data) updateState(resultado.data);
+          else definirMensagem('erro', `Erro: ${resultado.error}`, false);
+          return;
+        }
+
+        updateState(resultado.data);
+        setFormState(nomeForm, 'novo');
+      }
+    });
+  });
+
+  // Submit da consulta (Filtrar)
+  form2.addEventListener('submit', async e => {
+    e.preventDefault();
+    clearMessages();
+    AppLoader.show();
+
+    const resultado = await fazerRequisicao('/app/cad/grupocli/cons', {
+      form: { [nomeFormCons]: getForm(nomeFormCons) }
+    });
+
+    AppLoader.hide();
+
+    if (!resultado.success) {
+      if (resultado.data) updateState(resultado.data);
+      else definirMensagem('erro', `Erro: ${resultado.error}`, false);
+      return;
+    }
+
+    updateState(resultado.data);
+
+    if (resultado.data?.registros && resultado.data.registros.length > 0) {
+      renderizarTabela(resultado.data.registros);
+    } else {
+      tabelaCorpo.innerHTML = '';
+      definirMensagem('info', 'Nenhum grupo de cliente encontrado.');
+    }
+  });
+
+  // Event delegation — selecionar da tabela
+tabelaCorpo.addEventListener('click', async e => {
+    if (!e.target.classList.contains('btn-selecionar')) return;
+
+    const id = e.target.dataset.id;
+    if (!id) { definirMensagem('aviso', 'Erro ao selecionar o registro.', true); return; }
+
+    clearMessages();
+    AppLoader.show();
+
+    updateFormField(nomeFormCons, 'id_selecionado', id);
+    const payload = { form: { [nomeFormCons]: structuredClone(getForm(nomeFormCons)) } };
+    updateFormField(nomeFormCons, 'id_selecionado', null);
+
+    const resultado = await fazerRequisicao('/app/cad/grupocli/cons', payload);
+
+    AppLoader.hide();
+
+    if (!resultado.success) {
+      if (resultado.data) updateState(resultado.data);
+      else definirMensagem('erro', `Erro: ${resultado.error}`, false);
+      return;
+    }
+
+    updateState(resultado.data);
+    hidratarFormulario(nomeForm);
+    setFormState(nomeForm, 'visualizar');
+    alternarTelas();
+  });
+
+  // Renderização da tabela
+  function renderizarTabela(registros) {
+    tabelaCorpo.innerHTML = '';
+
+    if (!Array.isArray(registros) || registros.length === 0) {
+      tabelaCorpo.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Nenhum registro encontrado.</td></tr>';
+      return;
+    }
+
+    registros.forEach(reg => {
+      const tr = document.createElement('tr');
+
+      const tdId = document.createElement('td');
+      tdId.textContent = reg.id;
+
+      const tdDesc = document.createElement('td');
+      tdDesc.textContent = reg.descricao;
+
+      const tdAcao = document.createElement('td');
+      tdAcao.className = 'text-center';
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-sm btn-primary btn-selecionar';
+      btn.dataset.id = reg.id;
+      btn.textContent = 'Selecionar';
+
+      tdAcao.appendChild(btn);
+      tr.appendChild(tdId);
+      tr.appendChild(tdDesc);
+      tr.appendChild(tdAcao);
+      tabelaCorpo.appendChild(tr);
+    });
+  }
+
+  AppLoader.hide();
+});
