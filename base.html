@@ -10,59 +10,271 @@
         <title>{% block title %}{% endblock %}</title>
 
         <link rel="shortcut icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
-        
+
         <!-- Bootstrap CSS -->
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
+        <!-- Bootstrap Icons -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
         <!-- CSS global -->
         <link rel="stylesheet" href="{% static '/css/styles.css' %}">
-        
+
         {{ sisVar|json_script:"sisDados" }}
     </head>
 
     <body class="bg-light">
-        <nav id="navbase" class="navbar navbar-expand-lg navbar-dark bg-dark">
+
+        <!-- ============================================================
+             NAVBAR
+             ============================================================ -->
+        <nav id="navbase" class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
             <div class="container-fluid">
+
+                <!-- Botão hamburguer (mobile): abre o offcanvas da sidebar -->
+                <button class="navbar-toggler border-0 me-2"
+                        type="button"
+                        data-bs-toggle="offcanvas"
+                        data-bs-target="#sidebarOffcanvas"
+                        aria-controls="sidebarOffcanvas"
+                        aria-label="Abrir menu">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
                 <a class="navbar-brand" href="/">SacBase</a>
+
+                <!-- Dropdown do usuário é injetado aqui pelo base.js -->
             </div>
         </nav>
 
+        <!-- ============================================================
+             LAYOUT PRINCIPAL
+             ============================================================ -->
         <div class="container-fluid">
-            <div class="row">
+            <div class="row flex-nowrap">
 
-                <!-- Sidebar -->
-                <aside class="col-md-2 d-none d-md-block bg-white border-end min-vh-100">
-                    <div class="p-3">
-                        <h6 class="text-muted">Menu</h6>
-                        <ul class="nav flex-column">
-                            <li class="nav-item"><a class="nav-link" href="/">Dashboard</a></li>
-                            <li class="nav-item"><a class="nav-link" href="/rel/">Relatórios</a></li>
-                        </ul>
+                <!-- ── SIDEBAR (offcanvas no mobile, estática no desktop) ── -->
+                <div class="offcanvas-lg offcanvas-start bg-white border-end sidebar-wrapper"
+                     id="sidebarOffcanvas"
+                     tabindex="-1"
+                     aria-labelledby="sidebarOffcanvasLabel">
+
+                    <!-- Cabeçalho do offcanvas (visível só no mobile) -->
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h6 class="offcanvas-title fw-bold" id="sidebarOffcanvasLabel">Menu</h6>
+                        <button type="button"
+                                class="btn-close"
+                                data-bs-dismiss="offcanvas"
+                                data-bs-target="#sidebarOffcanvas"
+                                aria-label="Fechar"></button>
                     </div>
-                </aside>
 
-                <!-- Conteúdo -->
-                <main class="col-md-10 ms-sm-auto px-4 py-4">
+                    <!-- Corpo da sidebar -->
+                    <div class="offcanvas-body p-0 d-flex flex-column">
+                        <nav id="sidebar-nav" class="flex-grow-1 py-3">
 
-                    <!-- Mensagens ao Usuário -->
-                    <div id="container-mensagens" class="mt-3"></div>
-                    
-                    <!-- O span#page-title-suffix é preenchido por JS quando necessário (ex: modo edição) -->
-                    <h1 class="mb-4">{% block page_title %}{% endblock %}<span id="page-title-suffix"></span></h1>
-                    {% block content %}{% endblock %}
+                            <!-- ── COMERCIAL ── -->
+                            <div class="sidebar-group-label">COMERCIAL</div>
+                            <ul class="nav flex-column mb-1">
+                                <li class="nav-item">
+                                    <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                       href="#"
+                                       data-bs-toggle="collapse"
+                                       data-bs-target="#submenu-comercial"
+                                       aria-expanded="false">
+                                        <span><i class="bi bi-bag me-2"></i>Comercial</span>
+                                        <i class="bi bi-chevron-down sidebar-arrow"></i>
+                                    </a>
+                                    <div class="collapse" id="submenu-comercial">
+                                        <ul class="nav flex-column ms-3">
+                                            <li class="nav-item">
+                                                <a class="nav-link sidebar-sublink" href="/comercial/cadastro/">
+                                                    <i class="bi bi-person-plus me-2"></i>Cadastro
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link sidebar-sublink" href="/comercial/movimentacao/">
+                                                    <i class="bi bi-arrow-left-right me-2"></i>Movimentação
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link sidebar-sublink" href="/comercial/relatorio/">
+                                                    <i class="bi bi-file-earmark-bar-graph me-2"></i>Relatório
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </li>
+                            </ul>
 
-                    <button id="teste" type="button" class="btn btn-primary">TESTE</button>
-                    
-                </main>
-            </div>
-        </div>
+                            <!-- ── FINANCEIRO ── -->
+                            <div class="sidebar-group-label">FINANCEIRO</div>
+                            <ul class="nav flex-column mb-1">
+                                <li class="nav-item">
+                                    <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                       href="#"
+                                       data-bs-toggle="collapse"
+                                       data-bs-target="#submenu-financeiro"
+                                       aria-expanded="false">
+                                        <span><i class="bi bi-currency-dollar me-2"></i>Financeiro</span>
+                                        <i class="bi bi-chevron-down sidebar-arrow"></i>
+                                    </a>
+                                    <div class="collapse" id="submenu-financeiro">
+                                        <ul class="nav flex-column ms-3">
+                                            <li class="nav-item">
+                                                <a class="nav-link sidebar-sublink" href="/financeiro/cadastro/">
+                                                    <i class="bi bi-person-plus me-2"></i>Cadastro
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link sidebar-sublink" href="/financeiro/movimentacao/">
+                                                    <i class="bi bi-arrow-left-right me-2"></i>Movimentação
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link sidebar-sublink" href="/financeiro/relatorio/">
+                                                    <i class="bi bi-file-earmark-bar-graph me-2"></i>Relatório
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </li>
+                            </ul>
 
-        <footer class="text-center py-3 bg-white border-top">
-            <small>&copy; {% now "Y" %} - SaBase</small>
-        </footer>
+                            <!-- ── LOGÍSTICA ── -->
+                            <div class="sidebar-group-label">LOGÍSTICA</div>
+                            <ul class="nav flex-column mb-1">
+                                <li class="nav-item">
+                                    <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                       href="#"
+                                       data-bs-toggle="collapse"
+                                       data-bs-target="#submenu-logistica"
+                                       aria-expanded="false">
+                                        <span><i class="bi bi-truck me-2"></i>Logística</span>
+                                        <i class="bi bi-chevron-down sidebar-arrow"></i>
+                                    </a>
+                                    <div class="collapse" id="submenu-logistica">
+                                        <ul class="nav flex-column ms-3">
+                                            <li class="nav-item">
+                                                <a class="nav-link sidebar-sublink" href="/logistica/cadastro/">
+                                                    <i class="bi bi-person-plus me-2"></i>Cadastro
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link sidebar-sublink" href="/logistica/movimentacao/">
+                                                    <i class="bi bi-arrow-left-right me-2"></i>Movimentação
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link sidebar-sublink" href="/logistica/relatorio/">
+                                                    <i class="bi bi-file-earmark-bar-graph me-2"></i>Relatório
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </li>
+                            </ul>
 
-        <!-- Modal de Confirmação Global -->
-        <!-- Controlado por sisVar.confirmar() — reutilizável em qualquer página -->
+                            <!-- ── RH ── -->
+                            <div class="sidebar-group-label">RH</div>
+                            <ul class="nav flex-column mb-1">
+                                <li class="nav-item">
+                                    <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                       href="#"
+                                       data-bs-toggle="collapse"
+                                       data-bs-target="#submenu-rh"
+                                       aria-expanded="false">
+                                        <span><i class="bi bi-people me-2"></i>RH</span>
+                                        <i class="bi bi-chevron-down sidebar-arrow"></i>
+                                    </a>
+                                    <div class="collapse" id="submenu-rh">
+                                        <ul class="nav flex-column ms-3">
+                                            <li class="nav-item">
+                                                <a class="nav-link sidebar-sublink" href="/rh/cadastro/">
+                                                    <i class="bi bi-person-plus me-2"></i>Cadastro
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link sidebar-sublink" href="/rh/movimentacao/">
+                                                    <i class="bi bi-arrow-left-right me-2"></i>Movimentação
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link sidebar-sublink" href="/rh/relatorio/">
+                                                    <i class="bi bi-file-earmark-bar-graph me-2"></i>Relatório
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </li>
+                            </ul>
+
+                            <!-- ── ADMIN ── -->
+                            <div class="sidebar-group-label">ADMIN</div>
+                            <ul class="nav flex-column mb-1">
+                                <li class="nav-item">
+                                    <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                       href="#"
+                                       data-bs-toggle="collapse"
+                                       data-bs-target="#submenu-admin"
+                                       aria-expanded="false">
+                                        <span><i class="bi bi-gear me-2"></i>Admin</span>
+                                        <i class="bi bi-chevron-down sidebar-arrow"></i>
+                                    </a>
+                                    <div class="collapse" id="submenu-admin">
+                                        <ul class="nav flex-column ms-3">
+                                            <li class="nav-item">
+                                                <a class="nav-link sidebar-sublink" href="/admin/cadastro/">
+                                                    <i class="bi bi-person-plus me-2"></i>Cadastro
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link sidebar-sublink" href="/admin/movimentacao/">
+                                                    <i class="bi bi-arrow-left-right me-2"></i>Movimentação
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link sidebar-sublink" href="/admin/relatorio/">
+                                                    <i class="bi bi-file-earmark-bar-graph me-2"></i>Relatório
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </li>
+                            </ul>
+
+                        </nav><!-- /#sidebar-nav -->
+                    </div><!-- /.offcanvas-body -->
+                </div><!-- /#sidebarOffcanvas -->
+
+                <!-- ── ÁREA PRINCIPAL ── -->
+                <div class="col flex-grow-1 px-0">
+                    <main class="px-3 px-md-4 py-4">
+
+                        <!-- Mensagens ao Usuário -->
+                        <div id="container-mensagens" class="mt-2"></div>
+
+                        <!-- O span#page-title-suffix é preenchido por JS quando necessário (ex: modo edição) -->
+                        <h1 class="mb-4">{% block page_title %}{% endblock %}<span id="page-title-suffix"></span></h1>
+
+                        {% block content %}{% endblock %}
+
+                        <button id="teste" type="button" class="btn btn-primary">TESTE</button>
+
+                    </main>
+
+                    <footer class="text-center py-3 bg-white border-top">
+                        <small>&copy; {% now "Y" %} - SacBase</small>
+                    </footer>
+                </div><!-- /.col -->
+
+            </div><!-- /.row -->
+        </div><!-- /.container-fluid -->
+
+        <!-- ============================================================
+             MODAL DE CONFIRMAÇÃO GLOBAL
+             Controlado por sisVar.confirmar() — reutilizável em qualquer página
+             ============================================================ -->
         <div class="modal fade" id="modal-confirmacao" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
@@ -83,16 +295,18 @@
             </div>
         </div>
 
+        <!-- Loader Global -->
         <div id="global-loader">
             <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
                 <span class="visually-hidden">Carregando...</span>
             </div>
         </div>
+
         <!-- Bootstrap JS -->
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
         <!-- JS global -->
         <script type="module" src="{% static 'js/base.js' %}"></script>
-       {% block scripts %}{% endblock %}
+        {% block scripts %}{% endblock %}
     </body>
 </html>

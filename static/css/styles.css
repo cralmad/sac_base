@@ -236,3 +236,77 @@ button[id^="btn-"]:disabled {
         align-items: center;
     }
 }
+
+/* ============================================================
+   SIDEBAR — Layout, visual e responsividade
+   O comportamento mobile (offcanvas) é 100% Bootstrap.
+   ============================================================ */
+
+/* Largura fixa no desktop (≥992px) */
+@media (min-width: 992px) {
+    .sidebar-wrapper {
+        width: 240px;
+        flex-shrink: 0;
+        position: sticky;
+        top: 56px;           /* altura da navbar sticky */
+        height: calc(100vh - 56px);
+        overflow-y: auto;
+    }
+}
+
+/* Rótulos de grupo (COMERCIAL, FINANCEIRO…) */
+.sidebar-group-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #6c757d;
+    padding: 0.75rem 1rem 0.25rem;
+    text-transform: uppercase;
+}
+
+/* Links de primeiro nível (toggle dos submenus) */
+.sidebar-toggle {
+    padding: 0.45rem 1rem;
+    color: #212529;
+    font-weight: 500;
+    font-size: 0.9rem;
+    border-radius: 0.375rem;
+    text-decoration: none;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+.sidebar-toggle:hover {
+    background-color: #f0f0f0;
+    color: #0d6efd;
+}
+
+/* Rotação da seta ao expandir */
+.sidebar-arrow {
+    transition: transform 0.2s ease;
+    font-size: 0.75rem;
+}
+.sidebar-toggle[aria-expanded="true"] .sidebar-arrow {
+    transform: rotate(-180deg);
+}
+
+/* Links de submenu */
+.sidebar-sublink {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.85rem;
+    color: #495057;
+    border-radius: 0.375rem;
+    text-decoration: none;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+.sidebar-sublink:hover {
+    background-color: #e9f0ff;
+    color: #0d6efd;
+}
+.sidebar-sublink.active {
+    background-color: #0d6efd;
+    color: #fff;
+    font-weight: 600;
+}
+.sidebar-sublink.active:hover {
+    background-color: #0b5ed7;
+    color: #fff;
+}
