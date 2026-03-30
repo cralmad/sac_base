@@ -25,9 +25,7 @@
 
     <body class="bg-light">
 
-        <!-- ============================================================
-             NAVBAR
-             ============================================================ -->
+        <!-- NAVBAR -->
         <nav id="navbase" class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
             <div class="container-fluid">
 
@@ -47,13 +45,11 @@
             </div>
         </nav>
 
-        <!-- ============================================================
-             LAYOUT PRINCIPAL
-             ============================================================ -->
+        <!-- LAYOUT PRINCIPAL -->
         <div class="container-fluid">
             <div class="row flex-nowrap">
 
-                <!-- ── SIDEBAR (offcanvas no mobile, estática no desktop) ── -->
+                <!-- SIDEBAR (offcanvas no mobile, estática no desktop) -->
                 <div class="offcanvas-lg offcanvas-start bg-white border-end sidebar-wrapper"
                      id="sidebarOffcanvas"
                      tabindex="-1"
@@ -74,7 +70,6 @@
                         <nav id="sidebar-nav" class="flex-grow-1 py-3">
 
                             <!-- ── COMERCIAL ── -->
-                            <div class="sidebar-group-label">COMERCIAL</div>
                             <ul class="nav flex-column mb-1">
                                 <li class="nav-item">
                                     <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
@@ -82,33 +77,96 @@
                                        data-bs-toggle="collapse"
                                        data-bs-target="#submenu-comercial"
                                        aria-expanded="false">
-                                        <span><i class="bi bi-bag me-2"></i>Comercial</span>
+                                        <span><i class="bi bi-bag me-2"></i>COMERCIAL</span>
                                         <i class="bi bi-chevron-down sidebar-arrow"></i>
                                     </a>
                                     <div class="collapse" id="submenu-comercial">
                                         <ul class="nav flex-column ms-3">
+
+                                            <!-- Cadastro -->
                                             <li class="nav-item">
-                                                <a class="nav-link sidebar-sublink" href="/comercial/cadastro/">
-                                                    <i class="bi bi-person-plus me-2"></i>Cadastro
+                                                <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                                   href="#"
+                                                   data-bs-toggle="collapse"
+                                                   data-bs-target="#submenu-comercial-cadastro"
+                                                   aria-expanded="false">
+                                                    <span><i class="bi bi-person-plus me-2"></i>Cadastro</span>
+                                                    <i class="bi bi-chevron-down sidebar-arrow"></i>
                                                 </a>
+                                                <div class="collapse" id="submenu-comercial-cadastro">
+                                                    <ul class="nav flex-column ms-3">
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/app/cad/cliente/">
+                                                                <i class="bi bi-dot me-1"></i>Clientes
+                                                            </a>
+                                                        </li>
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/app/cad/grupocli/">
+                                                                <i class="bi bi-dot me-1"></i>Grupos de Clientes
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
                                             </li>
+
+                                            <!-- Movimentação -->
                                             <li class="nav-item">
-                                                <a class="nav-link sidebar-sublink" href="/comercial/movimentacao/">
-                                                    <i class="bi bi-arrow-left-right me-2"></i>Movimentação
+                                                <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                                   href="#"
+                                                   data-bs-toggle="collapse"
+                                                   data-bs-target="#submenu-comercial-movimentacao"
+                                                   aria-expanded="false">
+                                                    <span><i class="bi bi-arrow-left-right me-2"></i>Movimentação</span>
+                                                    <i class="bi bi-chevron-down sidebar-arrow"></i>
                                                 </a>
+                                                <div class="collapse" id="submenu-comercial-movimentacao">
+                                                    <ul class="nav flex-column ms-3">
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/comercial/movimentacao/pedidos/">
+                                                                <i class="bi bi-dot me-1"></i>Pedidos
+                                                            </a>
+                                                        </li>
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/comercial/movimentacao/orcamentos/">
+                                                                <i class="bi bi-dot me-1"></i>Orçamentos
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
                                             </li>
+
+                                            <!-- Relatório -->
                                             <li class="nav-item">
-                                                <a class="nav-link sidebar-sublink" href="/comercial/relatorio/">
-                                                    <i class="bi bi-file-earmark-bar-graph me-2"></i>Relatório
+                                                <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                                   href="#"
+                                                   data-bs-toggle="collapse"
+                                                   data-bs-target="#submenu-comercial-relatorio"
+                                                   aria-expanded="false">
+                                                    <span><i class="bi bi-file-earmark-bar-graph me-2"></i>Relatório</span>
+                                                    <i class="bi bi-chevron-down sidebar-arrow"></i>
                                                 </a>
+                                                <div class="collapse" id="submenu-comercial-relatorio">
+                                                    <ul class="nav flex-column ms-3">
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/comercial/relatorio/vendas/">
+                                                                <i class="bi bi-dot me-1"></i>Vendas
+                                                            </a>
+                                                        </li>
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/comercial/relatorio/desempenho/">
+                                                                <i class="bi bi-dot me-1"></i>Desempenho
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
                                             </li>
+
                                         </ul>
                                     </div>
                                 </li>
                             </ul>
 
                             <!-- ── FINANCEIRO ── -->
-                            <div class="sidebar-group-label">FINANCEIRO</div>
                             <ul class="nav flex-column mb-1">
                                 <li class="nav-item">
                                     <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
@@ -116,33 +174,96 @@
                                        data-bs-toggle="collapse"
                                        data-bs-target="#submenu-financeiro"
                                        aria-expanded="false">
-                                        <span><i class="bi bi-currency-dollar me-2"></i>Financeiro</span>
+                                        <span><i class="bi bi-currency-dollar me-2"></i>FINANCEIRO</span>
                                         <i class="bi bi-chevron-down sidebar-arrow"></i>
                                     </a>
                                     <div class="collapse" id="submenu-financeiro">
                                         <ul class="nav flex-column ms-3">
+
+                                            <!-- Cadastro -->
                                             <li class="nav-item">
-                                                <a class="nav-link sidebar-sublink" href="/financeiro/cadastro/">
-                                                    <i class="bi bi-person-plus me-2"></i>Cadastro
+                                                <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                                   href="#"
+                                                   data-bs-toggle="collapse"
+                                                   data-bs-target="#submenu-financeiro-cadastro"
+                                                   aria-expanded="false">
+                                                    <span><i class="bi bi-person-plus me-2"></i>Cadastro</span>
+                                                    <i class="bi bi-chevron-down sidebar-arrow"></i>
                                                 </a>
+                                                <div class="collapse" id="submenu-financeiro-cadastro">
+                                                    <ul class="nav flex-column ms-3">
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/financeiro/cadastro/contas/">
+                                                                <i class="bi bi-dot me-1"></i>Contas
+                                                            </a>
+                                                        </li>
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/financeiro/cadastro/fornecedores/">
+                                                                <i class="bi bi-dot me-1"></i>Fornecedores
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
                                             </li>
+
+                                            <!-- Movimentação -->
                                             <li class="nav-item">
-                                                <a class="nav-link sidebar-sublink" href="/financeiro/movimentacao/">
-                                                    <i class="bi bi-arrow-left-right me-2"></i>Movimentação
+                                                <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                                   href="#"
+                                                   data-bs-toggle="collapse"
+                                                   data-bs-target="#submenu-financeiro-movimentacao"
+                                                   aria-expanded="false">
+                                                    <span><i class="bi bi-arrow-left-right me-2"></i>Movimentação</span>
+                                                    <i class="bi bi-chevron-down sidebar-arrow"></i>
                                                 </a>
+                                                <div class="collapse" id="submenu-financeiro-movimentacao">
+                                                    <ul class="nav flex-column ms-3">
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/financeiro/movimentacao/pagamentos/">
+                                                                <i class="bi bi-dot me-1"></i>Pagamentos
+                                                            </a>
+                                                        </li>
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/financeiro/movimentacao/recebimentos/">
+                                                                <i class="bi bi-dot me-1"></i>Recebimentos
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
                                             </li>
+
+                                            <!-- Relatório -->
                                             <li class="nav-item">
-                                                <a class="nav-link sidebar-sublink" href="/financeiro/relatorio/">
-                                                    <i class="bi bi-file-earmark-bar-graph me-2"></i>Relatório
+                                                <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                                   href="#"
+                                                   data-bs-toggle="collapse"
+                                                   data-bs-target="#submenu-financeiro-relatorio"
+                                                   aria-expanded="false">
+                                                    <span><i class="bi bi-file-earmark-bar-graph me-2"></i>Relatório</span>
+                                                    <i class="bi bi-chevron-down sidebar-arrow"></i>
                                                 </a>
+                                                <div class="collapse" id="submenu-financeiro-relatorio">
+                                                    <ul class="nav flex-column ms-3">
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/financeiro/relatorio/fluxo-caixa/">
+                                                                <i class="bi bi-dot me-1"></i>Fluxo de Caixa
+                                                            </a>
+                                                        </li>
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/financeiro/relatorio/dre/">
+                                                                <i class="bi bi-dot me-1"></i>DRE
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
                                             </li>
+
                                         </ul>
                                     </div>
                                 </li>
                             </ul>
 
                             <!-- ── LOGÍSTICA ── -->
-                            <div class="sidebar-group-label">LOGÍSTICA</div>
                             <ul class="nav flex-column mb-1">
                                 <li class="nav-item">
                                     <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
@@ -150,33 +271,96 @@
                                        data-bs-toggle="collapse"
                                        data-bs-target="#submenu-logistica"
                                        aria-expanded="false">
-                                        <span><i class="bi bi-truck me-2"></i>Logística</span>
+                                        <span><i class="bi bi-truck me-2"></i>LOGÍSTICA</span>
                                         <i class="bi bi-chevron-down sidebar-arrow"></i>
                                     </a>
                                     <div class="collapse" id="submenu-logistica">
                                         <ul class="nav flex-column ms-3">
+
+                                            <!-- Cadastro -->
                                             <li class="nav-item">
-                                                <a class="nav-link sidebar-sublink" href="/logistica/cadastro/">
-                                                    <i class="bi bi-person-plus me-2"></i>Cadastro
+                                                <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                                   href="#"
+                                                   data-bs-toggle="collapse"
+                                                   data-bs-target="#submenu-logistica-cadastro"
+                                                   aria-expanded="false">
+                                                    <span><i class="bi bi-person-plus me-2"></i>Cadastro</span>
+                                                    <i class="bi bi-chevron-down sidebar-arrow"></i>
                                                 </a>
+                                                <div class="collapse" id="submenu-logistica-cadastro">
+                                                    <ul class="nav flex-column ms-3">
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/logistica/cadastro/transportadoras/">
+                                                                <i class="bi bi-dot me-1"></i>Transportadoras
+                                                            </a>
+                                                        </li>
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/logistica/cadastro/depositos/">
+                                                                <i class="bi bi-dot me-1"></i>Depósitos
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
                                             </li>
+
+                                            <!-- Movimentação -->
                                             <li class="nav-item">
-                                                <a class="nav-link sidebar-sublink" href="/logistica/movimentacao/">
-                                                    <i class="bi bi-arrow-left-right me-2"></i>Movimentação
+                                                <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                                   href="#"
+                                                   data-bs-toggle="collapse"
+                                                   data-bs-target="#submenu-logistica-movimentacao"
+                                                   aria-expanded="false">
+                                                    <span><i class="bi bi-arrow-left-right me-2"></i>Movimentação</span>
+                                                    <i class="bi bi-chevron-down sidebar-arrow"></i>
                                                 </a>
+                                                <div class="collapse" id="submenu-logistica-movimentacao">
+                                                    <ul class="nav flex-column ms-3">
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/logistica/movimentacao/entregas/">
+                                                                <i class="bi bi-dot me-1"></i>Entregas
+                                                            </a>
+                                                        </li>
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/logistica/movimentacao/transferencias/">
+                                                                <i class="bi bi-dot me-1"></i>Transferências
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
                                             </li>
+
+                                            <!-- Relatório -->
                                             <li class="nav-item">
-                                                <a class="nav-link sidebar-sublink" href="/logistica/relatorio/">
-                                                    <i class="bi bi-file-earmark-bar-graph me-2"></i>Relatório
+                                                <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                                   href="#"
+                                                   data-bs-toggle="collapse"
+                                                   data-bs-target="#submenu-logistica-relatorio"
+                                                   aria-expanded="false">
+                                                    <span><i class="bi bi-file-earmark-bar-graph me-2"></i>Relatório</span>
+                                                    <i class="bi bi-chevron-down sidebar-arrow"></i>
                                                 </a>
+                                                <div class="collapse" id="submenu-logistica-relatorio">
+                                                    <ul class="nav flex-column ms-3">
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/logistica/relatorio/rastreamento/">
+                                                                <i class="bi bi-dot me-1"></i>Rastreamento
+                                                            </a>
+                                                        </li>
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/logistica/relatorio/estoque/">
+                                                                <i class="bi bi-dot me-1"></i>Estoque
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
                                             </li>
+
                                         </ul>
                                     </div>
                                 </li>
                             </ul>
 
                             <!-- ── RH ── -->
-                            <div class="sidebar-group-label">RH</div>
                             <ul class="nav flex-column mb-1">
                                 <li class="nav-item">
                                     <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
@@ -189,28 +373,91 @@
                                     </a>
                                     <div class="collapse" id="submenu-rh">
                                         <ul class="nav flex-column ms-3">
+
+                                            <!-- Cadastro -->
                                             <li class="nav-item">
-                                                <a class="nav-link sidebar-sublink" href="/rh/cadastro/">
-                                                    <i class="bi bi-person-plus me-2"></i>Cadastro
+                                                <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                                   href="#"
+                                                   data-bs-toggle="collapse"
+                                                   data-bs-target="#submenu-rh-cadastro"
+                                                   aria-expanded="false">
+                                                    <span><i class="bi bi-person-plus me-2"></i>Cadastro</span>
+                                                    <i class="bi bi-chevron-down sidebar-arrow"></i>
                                                 </a>
+                                                <div class="collapse" id="submenu-rh-cadastro">
+                                                    <ul class="nav flex-column ms-3">
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/rh/cadastro/funcionarios/">
+                                                                <i class="bi bi-dot me-1"></i>Funcionários
+                                                            </a>
+                                                        </li>
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/rh/cadastro/cargos/">
+                                                                <i class="bi bi-dot me-1"></i>Cargos
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
                                             </li>
+
+                                            <!-- Movimentação -->
                                             <li class="nav-item">
-                                                <a class="nav-link sidebar-sublink" href="/rh/movimentacao/">
-                                                    <i class="bi bi-arrow-left-right me-2"></i>Movimentação
+                                                <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                                   href="#"
+                                                   data-bs-toggle="collapse"
+                                                   data-bs-target="#submenu-rh-movimentacao"
+                                                   aria-expanded="false">
+                                                    <span><i class="bi bi-arrow-left-right me-2"></i>Movimentação</span>
+                                                    <i class="bi bi-chevron-down sidebar-arrow"></i>
                                                 </a>
+                                                <div class="collapse" id="submenu-rh-movimentacao">
+                                                    <ul class="nav flex-column ms-3">
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/rh/movimentacao/admissoes/">
+                                                                <i class="bi bi-dot me-1"></i>Admissões
+                                                            </a>
+                                                        </li>
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/rh/movimentacao/demissoes/">
+                                                                <i class="bi bi-dot me-1"></i>Demissões
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
                                             </li>
+
+                                            <!-- Relatório -->
                                             <li class="nav-item">
-                                                <a class="nav-link sidebar-sublink" href="/rh/relatorio/">
-                                                    <i class="bi bi-file-earmark-bar-graph me-2"></i>Relatório
+                                                <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                                   href="#"
+                                                   data-bs-toggle="collapse"
+                                                   data-bs-target="#submenu-rh-relatorio"
+                                                   aria-expanded="false">
+                                                    <span><i class="bi bi-file-earmark-bar-graph me-2"></i>Relatório</span>
+                                                    <i class="bi bi-chevron-down sidebar-arrow"></i>
                                                 </a>
+                                                <div class="collapse" id="submenu-rh-relatorio">
+                                                    <ul class="nav flex-column ms-3">
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/rh/relatorio/folha-pagamento/">
+                                                                <i class="bi bi-dot me-1"></i>Folha de Pagamento
+                                                            </a>
+                                                        </li>
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/rh/relatorio/ponto/">
+                                                                <i class="bi bi-dot me-1"></i>Ponto
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
                                             </li>
+
                                         </ul>
                                     </div>
                                 </li>
                             </ul>
 
                             <!-- ── ADMIN ── -->
-                            <div class="sidebar-group-label">ADMIN</div>
                             <ul class="nav flex-column mb-1">
                                 <li class="nav-item">
                                     <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
@@ -218,36 +465,100 @@
                                        data-bs-toggle="collapse"
                                        data-bs-target="#submenu-admin"
                                        aria-expanded="false">
-                                        <span><i class="bi bi-gear me-2"></i>Admin</span>
+                                        <span><i class="bi bi-gear me-2"></i>ADMIN</span>
                                         <i class="bi bi-chevron-down sidebar-arrow"></i>
                                     </a>
                                     <div class="collapse" id="submenu-admin">
                                         <ul class="nav flex-column ms-3">
+
+                                            <!-- Cadastro -->
                                             <li class="nav-item">
-                                                <a class="nav-link sidebar-sublink" href="/admin/cadastro/">
-                                                    <i class="bi bi-person-plus me-2"></i>Cadastro
+                                                <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                                   href="#"
+                                                   data-bs-toggle="collapse"
+                                                   data-bs-target="#submenu-admin-cadastro"
+                                                   aria-expanded="false">
+                                                    <span><i class="bi bi-person-plus me-2"></i>Cadastro</span>
+                                                    <i class="bi bi-chevron-down sidebar-arrow"></i>
                                                 </a>
+                                                <div class="collapse" id="submenu-admin-cadastro">
+                                                    <ul class="nav flex-column ms-3">
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/app/usuario/cadastro/">
+                                                                <i class="bi bi-dot me-1"></i>Usuários
+                                                            </a>
+                                                        </li>
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/admin/cadastro/perfis/">
+                                                                <i class="bi bi-dot me-1"></i>Perfis de Acesso
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
                                             </li>
+
+                                            <!-- Movimentação -->
                                             <li class="nav-item">
-                                                <a class="nav-link sidebar-sublink" href="/admin/movimentacao/">
-                                                    <i class="bi bi-arrow-left-right me-2"></i>Movimentação
+                                                <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                                   href="#"
+                                                   data-bs-toggle="collapse"
+                                                   data-bs-target="#submenu-admin-movimentacao"
+                                                   aria-expanded="false">
+                                                    <span><i class="bi bi-arrow-left-right me-2"></i>Movimentação</span>
+                                                    <i class="bi bi-chevron-down sidebar-arrow"></i>
                                                 </a>
+                                                <div class="collapse" id="submenu-admin-movimentacao">
+                                                    <ul class="nav flex-column ms-3">
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/admin/movimentacao/logs/">
+                                                                <i class="bi bi-dot me-1"></i>Logs do Sistema
+                                                            </a>
+                                                        </li>
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/admin/movimentacao/auditoria/">
+                                                                <i class="bi bi-dot me-1"></i>Auditoria
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
                                             </li>
+
+                                            <!-- Relatório -->
                                             <li class="nav-item">
-                                                <a class="nav-link sidebar-sublink" href="/admin/relatorio/">
-                                                    <i class="bi bi-file-earmark-bar-graph me-2"></i>Relatório
+                                                <a class="nav-link sidebar-toggle collapsed d-flex justify-content-between align-items-center"
+                                                   href="#"
+                                                   data-bs-toggle="collapse"
+                                                   data-bs-target="#submenu-admin-relatorio"
+                                                   aria-expanded="false">
+                                                    <span><i class="bi bi-file-earmark-bar-graph me-2"></i>Relatório</span>
+                                                    <i class="bi bi-chevron-down sidebar-arrow"></i>
                                                 </a>
+                                                <div class="collapse" id="submenu-admin-relatorio">
+                                                    <ul class="nav flex-column ms-3">
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/admin/relatorio/acessos/">
+                                                                <i class="bi bi-dot me-1"></i>Acessos
+                                                            </a>
+                                                        </li>
+                                                        <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/admin/relatorio/erros/">
+                                                                <i class="bi bi-dot me-1"></i>Erros
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
                                             </li>
+
                                         </ul>
                                     </div>
                                 </li>
                             </ul>
 
-                        </nav><!-- /#sidebar-nav -->
-                    </div><!-- /.offcanvas-body -->
+                        </nav>
+                    </div>
                 </div><!-- /#sidebarOffcanvas -->
 
-                <!-- ── ÁREA PRINCIPAL ── -->
+                <!-- ÁREA PRINCIPAL -->
                 <div class="col flex-grow-1 px-0">
                     <main class="px-3 px-md-4 py-4">
 
@@ -266,15 +577,12 @@
                     <footer class="text-center py-3 bg-white border-top">
                         <small>&copy; {% now "Y" %} - SacBase</small>
                     </footer>
-                </div><!-- /.col -->
+                </div>
 
-            </div><!-- /.row -->
-        </div><!-- /.container-fluid -->
+            </div>
+        </div>
 
-        <!-- ============================================================
-             MODAL DE CONFIRMAÇÃO GLOBAL
-             Controlado por sisVar.confirmar() — reutilizável em qualquer página
-             ============================================================ -->
+        <!-- MODAL DE CONFIRMAÇÃO GLOBAL -->
         <div class="modal fade" id="modal-confirmacao" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
