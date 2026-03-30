@@ -61,7 +61,9 @@ export async function fazerRequisicao(url, payload) {
 }
 
 /**
- * Inicializa a navbar com informações do usuário autenticado
+ * Inicializa a navbar com as informações do usuário autenticado.
+ * Exibe: ícone + nome do usuário + seta de dropdown.
+ * O menu offcanvas da sidebar é 100% Bootstrap — sem JS necessário aqui.
  */
 export async function inicializarNavbarUsuario() {
     try {
@@ -78,39 +80,48 @@ export async function inicializarNavbarUsuario() {
         const navbarContainer = document.getElementById("navbase");
 
         const dropdownHtml = `
-            <div class="dropdown ms-auto">
-                <a class="nav-link dropdown-toggle text-light d-flex align-items-center"
-                   href="#"
-                   role="button"
-                   data-bs-toggle="dropdown"
-                   aria-expanded="false">
-                    <i class="bi bi-person-circle me-2"></i>
-                </a>
+            <div class=\"dropdown ms-auto\">\n                <a class=\"nav-link dropdown-toggle text-light d-flex align-items-center gap-2\"
+                   href=\"#\"
+                   role=\"button\"
+                   data-bs-toggle=\"dropdown\"
+                   aria-expanded=\"false\">
+                    <i class=\"bi bi-person-circle\"></i>
+                    <span class=\"d-none d-sm-inline\">${usuario.nome}</span>
+                </a>\n
+                <ul class=\"dropdown-menu dropdown-menu-end\">\n                    <li class=\"dropdown-item-text fw-bold d-sm-none\">\n                        ${usuario.nome}\n                    </li>\n                    <li class=\"d-sm-none\"><hr class=\"dropdown-divider\"></li>\n                    <li>\n                        <a class=\"dropdown-item d-flex align-items-center gap-2\" href=\"/app/usuario/alterarsenha/\">
+                            <i class=\"bi bi-key\"></i> Alterar senha
+                        </a>\n                    </li>\n                    <li>\n                        <a class=\"dropdown-item d-flex align-items-center gap-2 text-danger\" href=\"/app/usuario/logout/\">
+                            <i class=\"bi bi-box-arrow-right\"></i> Logout
+                        </a>\n                    </li>\n                </ul>\n            </div>\n        `;
 
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li class="dropdown-item-text fw-bold">
-                        ${usuario.nome}
-                    </li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li>
-                        <a class="dropdown-item" href="/app/usuario/alterarsenha/">
-                            Alterar senha
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item" href="/app/usuario/logout/">
-                            Logout
-                        </a>
-                    </li>
-                </ul>
-            </div>
-        `;
+        navbarContainer.querySelector(".container-fluid").insertAdjacentHTML("beforeend", dropdownHtml);
 
-        navbarContainer.insertAdjacentHTML("beforeend", dropdownHtml);
+        // Marca o link ativo na sidebar com base na URL atual
+        marcarLinkAtivo();
 
     } catch (erro) {
         console.error("Erro ao inicializar navbar de usuário:", erro);
     }
+}
+
+/**
+ * Marca o link ativo na sidebar comparando o href com a URL atual,
+ * e expande automaticamente o collapse pai do link ativo.
+ */
+function marcarLinkAtivo() {
+    const path = window.location.pathname;
+    document.querySelectorAll("#sidebar-nav .sidebar-sublink").forEach(link => {
+        if (link.getAttribute("href") === path) {
+            link.classList.add("active");
+            // Expande o collapse pai
+            const collapse = link.closest(".collapse");
+            if (collapse) {
+                collapse.classList.add("show");
+                const trigger = document.querySelector(`[data-bs-target=\"#${collapse.id}\"]`);
+                if (trigger) trigger.setAttribute("aria-expanded", "true");
+            }
+        }
+    });
 }
 
 // Inicializa AppLoader e navbar quando DOM está pronto
