@@ -1,4 +1,3 @@
-
 # 📘 Guia de Padrões de Desenvolvimento — SAC Base (Instruções para Copilot)
 
 Este guia define a arquitetura, o fluxo de dados e os padrões de interface do projeto. Use-o como fonte de verdade absoluta.
@@ -49,6 +48,7 @@ O layout deve seguir rigorosamente a abordagem Mobile-First:
 ---
 
 ## 5. PADRÕES DE FORMULÁRIO E UI
+* **Estilização:** A estilização deve ser realizada, sempre que possível, pelo Bootstrap.
 * **Hierarquia de Validação:**
     1. Regras nativas do HTML (required, maxlength, etc.).
     2. Validação JavaScript (via scripts de página).
