@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}SacBase - Grupos de Permissão{% endblock %}
+
+{% block page_title %}Grupos de Permissão{% endblock %}
+{% block content %}
+
+<form id="cadGrupo" data-form-lock="cadGrupo" method="POST">
+    {% csrf_token %}
+    <div class="container-md-3 my-3 mx-auto">
+        <div class="row g-3">
+
+            <div class="col-12 col-sm-8">
+                <label class="form-label mb-0">Nome do Grupo</label>
+                <input type="text" name="nome" class="form-control smart-input"
+                    data-deny="&quot;&apos;" data-textcase="upper" maxlength="80" minlength="3" required/>
+            </div>
+
+            <div class="col-12 form-check form-switch ms-3 mt-3">
+                <input class="form-check-input smart-input" type="checkbox" name="ativo" id="chkAtivo">
+                <label class="form-check-label mb-0" for="chkAtivo">Grupo Ativo</label>
+            </div>
+        </div>
+
+        <!-- Abas de Permissões -->
+        <div class="mt-4">
+            <label class="form-label fw-semibold">Permissões do Grupo</label>
+            <ul class="nav nav-tabs" id="tabsPermissao" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="tab-comercial" data-bs-toggle="tab"
+                        data-bs-target="#pane-comercial" type="button" role="tab">COMERCIAL</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tab-logistica" data-bs-toggle="tab"
+                        data-bs-target="#pane-logistica" type="button" role="tab">LOGÍSTICA</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tab-financeiro" data-bs-toggle="tab"
+                        data-bs-target="#pane-financeiro" type="button" role="tab">FINANCEIRO</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tab-rh" data-bs-toggle="tab"
+                        data-bs-target="#pane-rh" type="button" role="tab">RH</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tab-admin" data-bs-toggle="tab"
+                        data-bs-target="#pane-admin" type="button" role="tab">ADMIN</button>
+                </li>
+            </ul>
+
+            <div class="tab-content border border-top-0 rounded-bottom p-3" id="tabsPermissaoContent">
+
+                <!-- COMERCIAL -->
+                <div class="tab-pane fade show active" id="pane-comercial" role="tabpanel">
+                    <div id="perms-COMERCIAL" class="row g-2"></div>
+                </div>
+
+                <!-- LOGÍSTICA -->
+                <div class="tab-pane fade" id="pane-logistica" role="tabpanel">
+                    <div id="perms-LOGISTICA" class="row g-2"></div>
+                </div>
+
+                <!-- FINANCEIRO -->
+                <div class="tab-pane fade" id="pane-financeiro" role="tabpanel">
+                    <div id="perms-FINANCEIRO" class="row g-2"></div>
+                </div>
+
+                <!-- RH -->
+                <div class="tab-pane fade" id="pane-rh" role="tabpanel">
+                    <div id="perms-RH" class="row g-2">
+                        <p class="text-muted fst-italic">Nenhuma permissão cadastrada para este módulo.</p>
+                    </div>
+                </div>
+
+                <!-- ADMIN -->
+                <div class="tab-pane fade" id="pane-admin" role="tabpanel">
+                    <div id="perms-ADMIN" class="row g-2"></div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Botões padrão -->
+    <div class="mt-3">
+        <button id="btn-salvar" class="btn btn-primary" data-show-on="novo,editar" type="submit">
+            <i class="bi bi-save"></i> Salvar
+        </button>
+        <button id="btn-editar" type="button" data-show-on="visualizar" class="btn btn-warning d-none">
+            <i class="bi bi-pencil"></i> Editar
+        </button>
+        <button id="btn-novo" type="button" data-show-on="visualizar" class="btn btn-success d-none">
+            <i class="bi bi-plus-circle"></i> Novo
+        </button>
+        <button id="btn-excluir" type="button" data-show-on="visualizar" class="btn btn-danger d-none">
+            <i class="bi bi-trash"></i> Excluir
+        </button>
+        <button id="btn-cancelar" type="button" data-show-on="novo,editar" class="btn btn-outline-secondary d-none">
+            <i class="bi bi-x-circle"></i> Cancelar
+        </button>
+        <button type="button" id="btn-abrir-pesquisa" class="btn btn-secondary">
+            <i class="bi bi-search"></i> Pesquisar
+        </button>
+    </div>
+</form>
+
+<!-- Painel de Pesquisa -->
+<div id="div-pesquisa" class="container d-none mt-3">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <span>Consultar Grupos de Permissão</span>
+            <button type="button" id="btn-fechar" class="btn-close btn-close-white"></button>
+        </div>
+        <div class="card-body">
+            <form id="consGrupo" method="POST">
+                <div class="row g-3">
+                    <div class="col-12 col-sm-6">
+                        <label class="form-label mb-0">Nome do Grupo</label>
+                        <input type="text" name="nome_cons" class="form-control smart-input"
+                            data-deny="&quot;&apos;" maxlength="80"/>
+                    </div>
+                    <div class="col-12 col-sm-4 d-flex align-items-end gap-2">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-funnel"></i> Filtrar
+                        </button>
+                        <button type="button" class="btn btn-outline-danger" id="btn-voltar">
+                            <i class="bi bi-arrow-left"></i> Voltar
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="table-responsive mt-4">
+                <table class="table table-hover table-sm border">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Nome do Grupo</th>
+                            <th class="text-center">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-corpo"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="{% static 'permissao/js/scriptspermissao.js' %}"></script>
+{% endblock %}

@@ -8,6 +8,7 @@ urlpatterns = [
     path('app/cad/cliente/', include('pages.cad_cliente.urls')),
     path('app/cad/grupocli/', include('pages.cad_grupo_cli.urls')),
     path('app/', include('pages.usuario.urls')),
+    path('app/', include('pages.permissao.urls')),
     path('', include('pages.home.urls')),
 ]
 
