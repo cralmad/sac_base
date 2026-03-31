@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'pages.usuario',
     'pages.home',
     'pages.core',
+    'pages.permissao',
 ]
 
 MIDDLEWARE = [
