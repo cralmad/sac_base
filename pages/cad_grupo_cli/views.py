@@ -1,3 +1,4 @@
+from django.contrib.auth.decorators import permission_required
 from django.db import models as db_models
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -6,10 +7,38 @@ from sac_base.form_validador import SchemaValidator
 from .models import GrupoCli
 
 
+PERMISSOES_GRUPO_CLI = {
+    'acessar': 'cad_grupo_cli.view_grupocli',
+    'consultar': 'cad_grupo_cli.view_grupocli',
+    'incluir': 'cad_grupo_cli.add_grupocli',
+    'editar': 'cad_grupo_cli.change_grupocli',
+    'excluir': 'cad_grupo_cli.delete_grupocli',
+}
+
+
+def obter_acoes_permitidas_grupo_cli(usuario):
+    if not usuario or not getattr(usuario, 'is_authenticated', False):
+        return {acao: False for acao in PERMISSOES_GRUPO_CLI}
+
+    return {
+        acao: usuario.has_perm(codename)
+        for acao, codename in PERMISSOES_GRUPO_CLI.items()
+    }
+
+
+def resposta_sem_permissao(mensagem, status=403):
+    return JsonResponse({
+        'success': False,
+        'mensagens': {'erro': {'conteudo': [mensagem], 'ignorar': False}}
+    }, status=status)
+
+
+@permission_required(PERMISSOES_GRUPO_CLI['acessar'], raise_exception=True)
 def cad_grupo_cli_view(request):
     template     = 'cadgrupocli.html'
     nomeForm     = 'cadGrupoCli'
     nomeFormCons = 'consGrupoCli'
+    acoes_permitidas = obter_acoes_permitidas_grupo_cli(getattr(request, 'user', None))
 
     schema = {
         nomeForm: {
@@ -26,7 +55,7 @@ def cad_grupo_cli_view(request):
             'schema': schema,
             'form': {
                 nomeForm: {
-                    'estado': 'novo',
+                    'estado': 'novo' if acoes_permitidas['incluir'] else 'visualizar',
                     'update': None,
                     'campos': {
                         'id':        None,
@@ -41,6 +70,11 @@ def cad_grupo_cli_view(request):
                         'id_selecionado': None,
                     }
                 }
+            },
+            'others': {
+                'permissoes': {
+                    'cad_grupo_cli': acoes_permitidas,
+                }
             }
         }
         return render(request, template)
@@ -50,6 +84,12 @@ def cad_grupo_cli_view(request):
     form      = dataFront.get('form', {}).get(nomeForm, {})
     campos    = form.get('campos', {})
     estado    = form.get('estado', '')
+
+    if estado == 'novo' and not acoes_permitidas['incluir']:
+        return resposta_sem_permissao('Você não possui permissão para incluir grupos de cliente.')
+
+    if estado == 'editar' and not acoes_permitidas['editar']:
+        return resposta_sem_permissao('Você não possui permissão para editar grupos de cliente.')
 
     validator = SchemaValidator(schema[nomeForm])
     if not validator.validate(campos):
@@ -106,9 +146,16 @@ def cad_grupo_cli_view(request):
     })
 
 
+@permission_required(PERMISSOES_GRUPO_CLI['consultar'], raise_exception=True)
 def cad_grupo_cli_cons_view(request):
     nomeFormCons = 'consGrupoCli'
     nomeForm     = 'cadGrupoCli'
+
+    if request.method != 'POST':
+        return JsonResponse({
+            'success': False,
+            'mensagens': {'erro': {'conteudo': ['Método não permitido.'], 'ignorar': False}}
+        }, status=405)
 
     dataFront = request.sisvar_front
     form      = dataFront.get('form', {}).get(nomeFormCons, {})
@@ -153,12 +200,17 @@ def cad_grupo_cli_cons_view(request):
     })
 
 
+@permission_required(PERMISSOES_GRUPO_CLI['acessar'], raise_exception=True)
 def cad_grupo_cli_del_view(request):
     """
     Exclui um grupo de cliente pelo ID recebido no payload.
     Rota: POST /app/cad/grupocli/del
     """
     nomeForm = 'cadGrupoCli'
+    usuario = getattr(request, 'user', None)
+
+    if not usuario or not usuario.has_perm(PERMISSOES_GRUPO_CLI['excluir']):
+        return resposta_sem_permissao('Você não possui permissão para excluir grupos de cliente.')
 
     dataFront = request.sisvar_front
     form      = dataFront.get('form', {}).get(nomeForm, {})

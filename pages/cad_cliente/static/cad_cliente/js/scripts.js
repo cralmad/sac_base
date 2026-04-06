@@ -23,6 +23,20 @@ const nomeFormCons = 'consCliente';
 const form  = document.getElementById(nomeForm);
 const form2 = document.getElementById(nomeFormCons);
 
+function obterPermissoesCliente() {
+  return getOthers()?.permissoes?.cad_cliente ?? {
+    acessar: false,
+    consultar: false,
+    incluir: false,
+    editar: false,
+    excluir: false,
+  };
+}
+
+function podeExecutarAcao(acao) {
+  return Boolean(obterPermissoesCliente()?.[acao]);
+}
+
 // ── Atualizadores de sisVar ───────────────────────────────────────────────────
 const updater = criarAtualizadorForm({ formId: nomeForm, setter: updateFormField, form });
 form.addEventListener('input',  updater);
@@ -171,12 +185,35 @@ function validarFormulario(campos) {
   return erros;
 }
 
+function validarPermissaoPorEstado(estado) {
+  if (estado === 'novo' && !podeExecutarAcao('incluir')) {
+    definirMensagem('erro', 'Você não possui permissão para incluir clientes.', false);
+    return false;
+  }
+
+  if (estado === 'editar' && !podeExecutarAcao('editar')) {
+    definirMensagem('erro', 'Você não possui permissão para editar clientes.', false);
+    return false;
+  }
+
+  if (estado === 'excluir' && !podeExecutarAcao('excluir')) {
+    definirMensagem('erro', 'Você não possui permissão para excluir clientes.', false);
+    return false;
+  }
+
+  return true;
+}
+
 // ── Submissão do formulário principal ────────────────────────────────────────
 form.addEventListener('submit', async e => {
   e.preventDefault();
   clearMessages();
 
   const formData = getForm(nomeForm);
+  if (!validarPermissaoPorEstado(formData?.estado)) {
+    return;
+  }
+
   if (!formData?.campos || Object.keys(formData.campos).length === 0) {
     definirMensagem('aviso', 'Preencha o formulário antes de enviar.');
     return;
@@ -228,6 +265,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const formFiltro       = document.getElementById(nomeFormCons);
   const tabelaCorpo      = document.getElementById('tabela-corpo');
 
+  function aplicarPermissoesNaInterface() {
+    const permissoes = obterPermissoesCliente();
+
+    btnAbrirPesquisa.classList.toggle('d-none', !permissoes.consultar);
+    btnNovo.classList.toggle('d-none', !permissoes.incluir);
+    btnEditar.classList.toggle('d-none', !permissoes.editar);
+    btnExcluir.classList.toggle('d-none', !permissoes.excluir);
+
+    if (!permissoes.consultar && !divPesquisa.classList.contains('d-none')) {
+      alternarTelas();
+    }
+  }
+
   // Popula selects ao carregar
   preencherSelectGrupos();
   preencherSelectPaises();
@@ -243,15 +293,31 @@ document.addEventListener('DOMContentLoaded', () => {
   btnFechar.addEventListener('click', alternarTelas);
 
   // ── Botão Editar ──
-  btnEditar.addEventListener('click', () => setFormState(nomeForm, 'editar'));
+  btnEditar.addEventListener('click', () => {
+    clearMessages();
+    if (!podeExecutarAcao('editar')) {
+      definirMensagem('erro', 'Você não possui permissão para editar clientes.', false);
+      return;
+    }
+
+    setFormState(nomeForm, 'editar');
+    aplicarPermissoesNaInterface();
+  });
 
   // ── Botão Novo ──
   btnNovo.addEventListener('click', () => {
+    clearMessages();
+    if (!podeExecutarAcao('incluir')) {
+      definirMensagem('erro', 'Você não possui permissão para incluir clientes.', false);
+      return;
+    }
+
     setFormState(nomeForm, 'novo');
     preencherSelectGrupos();
     preencherSelectPaises();
     document.getElementById('regiao').disabled = true;
     document.getElementById('cidade').disabled = true;
+    aplicarPermissoesNaInterface();
   });
 
   // ── Botão Cancelar ──
@@ -259,7 +325,10 @@ document.addEventListener('DOMContentLoaded', () => {
     confirmar({
       titulo: 'Confirmar Cancelamento',
       mensagem: 'Deseja cancelar? Os dados não salvos serão perdidos.',
-      onConfirmar: () => setFormState(nomeForm, 'novo')
+      onConfirmar: () => {
+        setFormState(nomeForm, podeExecutarAcao('incluir') ? 'novo' : 'visualizar');
+        aplicarPermissoesNaInterface();
+      }
     });
   });
 
@@ -269,10 +338,21 @@ document.addEventListener('DOMContentLoaded', () => {
       titulo: 'Confirmar Exclusão',
       mensagem: 'Deseja excluir este registro? Esta ação não pode ser desfeita.',
       onConfirmar: async () => {
+        clearMessages();
+        if (!podeExecutarAcao('excluir')) {
+          definirMensagem('erro', 'Você não possui permissão para excluir clientes.', false);
+          return;
+        }
+
         AppLoader.show();
 
         const formData = getForm(nomeForm);
         formData.estado = 'excluir';
+
+        if (!validarPermissaoPorEstado(formData.estado)) {
+          AppLoader.hide();
+          return;
+        }
 
         const resultado = await fazerRequisicao('/app/cad/cliente/', {
           form: { [nomeForm]: formData }
@@ -289,6 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         updateState(resultado.data);
+        aplicarPermissoesNaInterface();
         AppLoader.hide();
       }
     });
@@ -298,6 +379,12 @@ document.addEventListener('DOMContentLoaded', () => {
   formFiltro.addEventListener('submit', async e => {
     e.preventDefault();
     clearMessages();
+
+    if (!podeExecutarAcao('consultar')) {
+      definirMensagem('erro', 'Você não possui permissão para consultar clientes.', false);
+      return;
+    }
+
     AppLoader.show();
 
     const resultado = await fazerRequisicao('/app/cad/cliente/cons/', {
@@ -315,6 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     updateState(resultado.data);
+    aplicarPermissoesNaInterface();
 
     if (resultado.data?.registros?.length > 0) {
       renderizarTabela(resultado.data.registros);
@@ -381,6 +469,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Carregar registro selecionado ──
   async function carregarRegistro(id) {
     clearMessages();
+
+    if (!podeExecutarAcao('consultar')) {
+      definirMensagem('erro', 'Você não possui permissão para consultar clientes.', false);
+      return;
+    }
+
     AppLoader.show();
 
     updateFormField(nomeFormCons, 'id_selecionado', id);
@@ -411,7 +505,10 @@ document.addEventListener('DOMContentLoaded', () => {
     hidratarSelects(campos);
 
     setFormState(nomeForm, 'visualizar');
+    aplicarPermissoesNaInterface();
     alternarTelas();
     AppLoader.hide();
   }
+
+  aplicarPermissoesNaInterface();
 });

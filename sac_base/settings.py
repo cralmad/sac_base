@@ -19,6 +19,8 @@ from datetime import timedelta
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 URL_BD = os.environ.get('BANCO_DE_DADOS')
+SETTINGS_MODULE = os.environ.get('DJANGO_SETTINGS_MODULE', '')
+USANDO_SETTINGS_TESTE_LOCAL = SETTINGS_MODULE == 'sac_base.settings_test'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -129,16 +131,23 @@ AUTH_USER_MODEL = "usuario.Usuarios" # Necessário para o app de usuário/autent
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-if not URL_BD:
+if URL_BD:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=URL_BD,
+            conn_max_age=60,
+            ssl_require=True
+        )
+    }
+elif USANDO_SETTINGS_TESTE_LOCAL:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / '.django_test.sqlite3',
+        }
+    }
+else:
     raise RuntimeError('Variável de ambiente BANCO_DE_DADOS não definida')
-
-DATABASES = {
-    'default': dj_database_url.config(
-        default=URL_BD,
-        conn_max_age=60,
-        ssl_require=True
-    )
-}
 
 
 # Password validation

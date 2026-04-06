@@ -145,7 +145,11 @@ form.addEventListener("submit", async e => {
       });
 
       if (!resultado.success) {
-        definirMensagem("erro", `Erro ao enviar dados: ${resultado.error}`, false);
+        if (resultado.data) {
+          updateState(resultado.data);
+        } else {
+          definirMensagem("erro", `Erro ao enviar dados: ${resultado.error}`, false);
+        }
         AppLoader.hide();
         return;
       }
@@ -234,7 +238,11 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         if (!resultado.success) {
-          definirMensagem("erro", `Erro ao excluir: ${resultado.error}`, false);
+          if (resultado.data) {
+            updateState(resultado.data);
+          } else {
+            definirMensagem("erro", `Erro ao excluir: ${resultado.error}`, false);
+          }
           AppLoader.hide();
           return;
         }
@@ -258,7 +266,11 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     if (!resultado.success) {
-      definirMensagem("erro", `Erro ao buscar grupos: ${resultado.error}`, false);
+      if (resultado.data) {
+        updateState(resultado.data);
+      } else {
+        definirMensagem("erro", `Erro ao buscar grupos: ${resultado.error}`, false);
+      }
       AppLoader.hide();
       return;
     }
@@ -318,7 +330,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const resultado = await fazerRequisicao("/app/permissao/grupos/cons", sisVarPayload);
 
     if (!resultado.success) {
-      definirMensagem("erro", `Erro ao carregar registro: ${resultado.error}`, false);
+      if (resultado.data) {
+        updateState(resultado.data);
+      } else {
+        definirMensagem("erro", `Erro ao carregar registro: ${resultado.error}`, false);
+      }
       AppLoader.hide();
       return;
     }

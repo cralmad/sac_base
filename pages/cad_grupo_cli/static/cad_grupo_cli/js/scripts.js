@@ -2,7 +2,7 @@
 import {
   updateFormField, getForm, updateState,
   clearMessages, definirMensagem,
-  hidratarFormulario, setFormState, confirmar
+  hidratarFormulario, setFormState, confirmar, getOthers
 } from '/static/js/sisVar.js';
 import { fazerRequisicao }      from '/static/js/base.js';
 import { initSmartInputs }      from '/static/js/input_rules.js';
@@ -14,6 +14,20 @@ const nomeForm     = 'cadGrupoCli';
 const nomeFormCons = 'consGrupoCli';
 const form  = document.getElementById(nomeForm);
 const form2 = document.getElementById(nomeFormCons);
+
+function obterPermissoesGrupoCli() {
+  return getOthers()?.permissoes?.cad_grupo_cli ?? {
+    acessar: false,
+    consultar: false,
+    incluir: false,
+    editar: false,
+    excluir: false,
+  };
+}
+
+function podeExecutarAcao(acao) {
+  return Boolean(obterPermissoesGrupoCli()?.[acao]);
+}
 
 // 3. VÍNCULO sisVar ↔ inputs do formulário principal
 const updater = criarAtualizadorForm({ formId: nomeForm, setter: updateFormField, form });
@@ -46,6 +60,20 @@ function marcarCampoErro(formEl, nomeCampo, ativo) {
   }
 }
 
+function validarPermissaoPorEstado(estado) {
+  if (estado === 'novo' && !podeExecutarAcao('incluir')) {
+    definirMensagem('erro', 'Você não possui permissão para incluir grupos de cliente.', false);
+    return false;
+  }
+
+  if (estado === 'editar' && !podeExecutarAcao('editar')) {
+    definirMensagem('erro', 'Você não possui permissão para editar grupos de cliente.', false);
+    return false;
+  }
+
+  return true;
+}
+
 // 5. SUBMIT DO FORMULÁRIO PRINCIPAL (Salvar)
 form.addEventListener('submit', async e => {
   e.preventDefault();
@@ -53,6 +81,9 @@ form.addEventListener('submit', async e => {
   marcarCampoErro(form, 'descricao', false);
 
   const formData = getForm(nomeForm);
+  if (!validarPermissaoPorEstado(formData?.estado)) {
+    return;
+  }
 
   confirmar({
     titulo: 'Confirmar Salvamento',
@@ -94,6 +125,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnCancelar      = document.getElementById('btn-cancelar');
   const tabelaCorpo      = document.getElementById('tabela-corpo');
 
+  function aplicarPermissoesNaInterface() {
+    const permissoes = obterPermissoesGrupoCli();
+
+    btnAbrirPesquisa.classList.toggle('d-none', !permissoes.consultar);
+    btnNovo.classList.toggle('d-none', !permissoes.incluir);
+    btnEditar.classList.toggle('d-none', !permissoes.editar);
+    btnExcluir.classList.toggle('d-none', !permissoes.excluir);
+
+    if (!permissoes.consultar && !divPesquisa.classList.contains('d-none')) {
+      alternarTelas();
+    }
+  }
+
   // Alternância cadastro ↔ pesquisa
   const alternarTelas = () => {
     divPrincipal.classList.toggle('d-none');
@@ -105,13 +149,34 @@ document.addEventListener('DOMContentLoaded', () => {
   btnFechar.addEventListener('click', alternarTelas);
 
   // Botões de estado
-  btnEditar.addEventListener('click', () => setFormState(nomeForm, 'editar'));
-  btnNovo.addEventListener('click',   () => setFormState(nomeForm, 'novo'));
+  btnEditar.addEventListener('click', () => {
+    clearMessages();
+    if (!podeExecutarAcao('editar')) {
+      definirMensagem('erro', 'Você não possui permissão para editar grupos de cliente.', false);
+      return;
+    }
+
+    setFormState(nomeForm, 'editar');
+    aplicarPermissoesNaInterface();
+  });
+  btnNovo.addEventListener('click', () => {
+    clearMessages();
+    if (!podeExecutarAcao('incluir')) {
+      definirMensagem('erro', 'Você não possui permissão para incluir grupos de cliente.', false);
+      return;
+    }
+
+    setFormState(nomeForm, 'novo');
+    aplicarPermissoesNaInterface();
+  });
   btnCancelar.addEventListener('click', () => {
     confirmar({
       titulo: 'Confirmar Cancelamento',
       mensagem: 'Deseja cancelar? Os dados não salvos serão perdidos.',
-      onConfirmar: () => setFormState(nomeForm, 'novo')
+      onConfirmar: () => {
+        setFormState(nomeForm, podeExecutarAcao('incluir') ? 'novo' : 'visualizar');
+        aplicarPermissoesNaInterface();
+      }
     });
   });
 
@@ -124,6 +189,12 @@ document.addEventListener('DOMContentLoaded', () => {
       titulo: 'Confirmar Exclusão',
       mensagem: `Deseja excluir o grupo "${escHtml(descricao)}"? Esta ação não pode ser desfeita.`,
       onConfirmar: async () => {
+        clearMessages();
+        if (!podeExecutarAcao('excluir')) {
+          definirMensagem('erro', 'Você não possui permissão para excluir grupos de cliente.', false);
+          return;
+        }
+
         AppLoader.show();
 
         const resultado = await fazerRequisicao('/app/cad/grupocli/del', {
@@ -139,7 +210,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         updateState(resultado.data);
-        setFormState(nomeForm, 'novo');
+        setFormState(nomeForm, podeExecutarAcao('incluir') ? 'novo' : 'visualizar');
+        aplicarPermissoesNaInterface();
       }
     });
   });
@@ -148,6 +220,12 @@ document.addEventListener('DOMContentLoaded', () => {
   form2.addEventListener('submit', async e => {
     e.preventDefault();
     clearMessages();
+
+    if (!podeExecutarAcao('consultar')) {
+      definirMensagem('erro', 'Você não possui permissão para consultar grupos de cliente.', false);
+      return;
+    }
+
     AppLoader.show();
 
     const resultado = await fazerRequisicao('/app/cad/grupocli/cons', {
@@ -163,6 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     updateState(resultado.data);
+  aplicarPermissoesNaInterface();
 
     if (resultado.data?.registros && resultado.data.registros.length > 0) {
       renderizarTabela(resultado.data.registros);
@@ -178,6 +257,11 @@ tabelaCorpo.addEventListener('click', async e => {
 
     const id = e.target.dataset.id;
     if (!id) { definirMensagem('aviso', 'Erro ao selecionar o registro.', true); return; }
+
+    if (!podeExecutarAcao('consultar')) {
+      definirMensagem('erro', 'Você não possui permissão para consultar grupos de cliente.', false);
+      return;
+    }
 
     clearMessages();
     AppLoader.show();
@@ -199,6 +283,7 @@ tabelaCorpo.addEventListener('click', async e => {
     updateState(resultado.data);
     hidratarFormulario(nomeForm);
     setFormState(nomeForm, 'visualizar');
+    aplicarPermissoesNaInterface();
     alternarTelas();
   });
 
@@ -237,5 +322,6 @@ tabelaCorpo.addEventListener('click', async e => {
     });
   }
 
+  aplicarPermissoesNaInterface();
   AppLoader.hide();
 });

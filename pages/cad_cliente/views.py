@@ -1,3 +1,4 @@
+from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render
 from django.http import JsonResponse
 from sac_base.form_validador import SchemaValidator
@@ -5,10 +6,39 @@ from pages.cad_grupo_cli.models import GrupoCli
 from pages.core.models import Pais, Regiao, Cidade
 from .models import Cliente
 
+
+PERMISSOES_CLIENTE = {
+    "acessar": "cad_cliente.view_cliente",
+    "consultar": "cad_cliente.view_cliente",
+    "incluir": "cad_cliente.add_cliente",
+    "editar": "cad_cliente.change_cliente",
+    "excluir": "cad_cliente.delete_cliente",
+}
+
+
+def obter_acoes_permitidas_cliente(usuario):
+    if not usuario or not getattr(usuario, "is_authenticated", False):
+        return {acao: False for acao in PERMISSOES_CLIENTE}
+
+    return {
+        acao: usuario.has_perm(codename)
+        for acao, codename in PERMISSOES_CLIENTE.items()
+    }
+
+
+def resposta_sem_permissao(mensagem, status=403):
+    return JsonResponse({
+        "success": False,
+        "mensagens": {"erro": {"conteudo": [mensagem], "ignorar": False}}
+    }, status=status)
+
+
+@permission_required(PERMISSOES_CLIENTE["acessar"], raise_exception=True)
 def cad_cliente_view(request):
     template     = 'cadcliente.html'
     nomeForm     = 'cadCliente'
     nomeFormCons = 'consCliente'
+    acoes_permitidas = obter_acoes_permitidas_cliente(getattr(request, 'user', None))
 
     schema = {
         nomeForm: {
@@ -39,12 +69,13 @@ def cad_cliente_view(request):
         paises  = list(Pais.objects.values('id', 'nome', 'sigla').order_by('nome'))
         regioes = list(Regiao.objects.values('id', 'nome', 'sigla', 'pais_id').order_by('nome'))
         cidades = list(Cidade.objects.values('id', 'nome', 'regiao_id').order_by('nome'))
+        estado_inicial = 'novo' if acoes_permitidas['incluir'] else 'visualizar'
 
         request.sisvar_extra = {
             "schema": schema,
             "form": {
                 nomeForm: {
-                    "estado": "novo",
+                    "estado": estado_inicial,
                     "update": None,
                     "campos": {
                         "id":            None,
@@ -74,6 +105,9 @@ def cad_cliente_view(request):
                 }
             },
             "others": {
+                "permissoes": {
+                    "cad_cliente": acoes_permitidas,
+                },
                 "opcoes": {
                     "grupos":  grupos,
                     "paises":  paises,
@@ -89,6 +123,15 @@ def cad_cliente_view(request):
     form      = dataFront.get("form", {}).get(nomeForm, {})
     campos    = form.get("campos", {})
     estado    = form.get("estado", "")
+
+    if estado == 'novo' and not acoes_permitidas['incluir']:
+        return resposta_sem_permissao('Você não possui permissão para incluir clientes.')
+
+    if estado == 'editar' and not acoes_permitidas['editar']:
+        return resposta_sem_permissao('Você não possui permissão para editar clientes.')
+
+    if estado == 'excluir' and not acoes_permitidas['excluir']:
+        return resposta_sem_permissao('Você não possui permissão para excluir clientes.')
 
     # Validação de schema #####################################################
     validator = SchemaValidator(schema[nomeForm])
@@ -228,6 +271,7 @@ def cad_cliente_view(request):
     })
 
 
+@permission_required(PERMISSOES_CLIENTE["consultar"], raise_exception=True)
 def cad_cliente_cons_view(request):
     """
     View de consulta de clientes.
