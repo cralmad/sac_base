@@ -34,19 +34,29 @@ export const PERMISSOES_SCHEMA = {
   ],
 
   LOGISTICA: [
-    // --- Cadastro de Clientes (compartilhado) ---
+    // --- Cadastro de Clientes ---
     { codename: "cad_cliente.view_cliente",   label: "Visualizar Cliente" },
     { codename: "cad_cliente.add_cliente",    label: "Incluir Cliente" },
     { codename: "cad_cliente.change_cliente", label: "Editar Cliente" },
     { codename: "cad_cliente.delete_cliente", label: "Excluir Cliente" },
+    // --- Grupo de Clientes ---
+    { codename: "cad_grupo_cli.view_grupocli",   label: "Visualizar Grupo de Cliente" },
+    { codename: "cad_grupo_cli.add_grupocli",    label: "Incluir Grupo de Cliente" },
+    { codename: "cad_grupo_cli.change_grupocli", label: "Editar Grupo de Cliente" },
+    { codename: "cad_grupo_cli.delete_grupocli", label: "Excluir Grupo de Cliente" },
   ],
 
   FINANCEIRO: [
-    // --- Cadastro de Clientes (compartilhado) ---
+    // --- Cadastro de Clientes ---
     { codename: "cad_cliente.view_cliente",   label: "Visualizar Cliente" },
     { codename: "cad_cliente.add_cliente",    label: "Incluir Cliente" },
     { codename: "cad_cliente.change_cliente", label: "Editar Cliente" },
     { codename: "cad_cliente.delete_cliente", label: "Excluir Cliente" },
+    // --- Grupo de Clientes ---
+    { codename: "cad_grupo_cli.view_grupocli",   label: "Visualizar Grupo de Cliente" },
+    { codename: "cad_grupo_cli.add_grupocli",    label: "Incluir Grupo de Cliente" },
+    { codename: "cad_grupo_cli.change_grupocli", label: "Editar Grupo de Cliente" },
+    { codename: "cad_grupo_cli.delete_grupocli", label: "Excluir Grupo de Cliente" },
   ],
 
   RH: [
@@ -64,16 +74,6 @@ export const PERMISSOES_SCHEMA = {
     { codename: "auth.add_group",    label: "Incluir Grupo de Permissão" },
     { codename: "auth.change_group", label: "Editar Grupo de Permissão" },
     { codename: "auth.delete_group", label: "Excluir Grupo de Permissão" },
-    // --- Cadastro de Clientes (compartilhado) ---
-    { codename: "cad_cliente.view_cliente",   label: "Visualizar Cliente" },
-    { codename: "cad_cliente.add_cliente",    label: "Incluir Cliente" },
-    { codename: "cad_cliente.change_cliente", label: "Editar Cliente" },
-    { codename: "cad_cliente.delete_cliente", label: "Excluir Cliente" },
-    // --- Grupo de Clientes (compartilhado) ---
-    { codename: "cad_grupo_cli.view_grupocli",   label: "Visualizar Grupo de Cliente" },
-    { codename: "cad_grupo_cli.add_grupocli",    label: "Incluir Grupo de Cliente" },
-    { codename: "cad_grupo_cli.change_grupocli", label: "Editar Grupo de Cliente" },
-    { codename: "cad_grupo_cli.delete_grupocli", label: "Excluir Grupo de Cliente" },
   ],
 };
 
