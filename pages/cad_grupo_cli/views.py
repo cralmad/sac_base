@@ -3,7 +3,10 @@ from django.db import models as db_models
 from django.http import JsonResponse
 from django.shortcuts import render
 
+from pages.auditoria.models import AuditEvent
+from pages.auditoria.utils import diff_snapshots, registrar_auditoria, snapshot_instance
 from sac_base.form_validador import SchemaValidator
+from sac_base.sisvar_builders import build_error_payload, build_form_response, build_form_state, build_records_response, build_sisvar_payload, build_success_payload
 from .models import GrupoCli
 
 
@@ -27,10 +30,7 @@ def obter_acoes_permitidas_grupo_cli(usuario):
 
 
 def resposta_sem_permissao(mensagem, status=403):
-    return JsonResponse({
-        'success': False,
-        'mensagens': {'erro': {'conteudo': [mensagem], 'ignorar': False}}
-    }, status=status)
+    return JsonResponse(build_error_payload(mensagem), status=status)
 
 
 @permission_required(PERMISSOES_GRUPO_CLI['acessar'], raise_exception=True)
@@ -51,32 +51,27 @@ def cad_grupo_cli_view(request):
 
     # GET
     if request.method == 'GET':
-        request.sisvar_extra = {
-            'schema': schema,
-            'form': {
-                nomeForm: {
-                    'estado': 'novo' if acoes_permitidas['incluir'] else 'visualizar',
-                    'update': None,
-                    'campos': {
-                        'id':        None,
+        request.sisvar_extra = build_sisvar_payload(
+            schema=schema,
+            forms={
+                nomeForm: build_form_state(
+                    estado='novo' if acoes_permitidas['incluir'] else 'visualizar',
+                    campos={
+                        'id': None,
                         'descricao': '',
-                    }
-                },
-                nomeFormCons: {
-                    'estado': 'novo',
-                    'update': None,
-                    'campos': {
-                        'descricao':      '',
+                    },
+                ),
+                nomeFormCons: build_form_state(
+                    campos={
+                        'descricao': '',
                         'id_selecionado': None,
-                    }
-                }
+                    },
+                ),
             },
-            'others': {
-                'permissoes': {
-                    'cad_grupo_cli': acoes_permitidas,
-                }
-            }
-        }
+            permissions={
+                'cad_grupo_cli': acoes_permitidas,
+            },
+        )
         return render(request, template)
 
     # POST
@@ -94,56 +89,60 @@ def cad_grupo_cli_view(request):
     validator = SchemaValidator(schema[nomeForm])
     if not validator.validate(campos):
         erros = [f"{c} - {', '.join(e)}" for c, e in validator.get_errors().items()]
-        return JsonResponse({
-            'mensagens': {'erro': {'conteudo': erros, 'ignorar': False}}
-        }, status=400)
+        return JsonResponse(build_error_payload(erros), status=400)
 
     descricao = campos.get('descricao', '').strip().upper()
 
     match estado:
         case 'novo':
             if GrupoCli.objects.filter(descricao=descricao).exists():
-                return JsonResponse({
-                    'mensagens': {'erro': {'conteudo': ['Descrição já cadastrada.'], 'ignorar': False}}
-                }, status=422)
-            grupo = GrupoCli.objects.create(descricao=descricao)
+                return JsonResponse(build_error_payload('Descrição já cadastrada.'), status=422)
+            grupo = GrupoCli.objects.create(
+                descricao=descricao,
+                created_by=request.user,
+                updated_by=request.user,
+            )
+            registrar_auditoria(
+                actor=request.user,
+                action=AuditEvent.ACTION_CREATE,
+                instance=grupo,
+                changed_fields=diff_snapshots({}, snapshot_instance(grupo)),
+            )
 
         case 'editar':
             id_registro = campos.get('id')
             try:
                 grupo = GrupoCli.objects.get(id=id_registro)
             except GrupoCli.DoesNotExist:
-                return JsonResponse({
-                    'mensagens': {'erro': {'conteudo': ['Registro não encontrado.'], 'ignorar': False}}
-                }, status=404)
+                return JsonResponse(build_error_payload('Registro não encontrado.'), status=404)
+            before = snapshot_instance(grupo)
             if GrupoCli.objects.filter(descricao=descricao).exclude(id=id_registro).exists():
-                return JsonResponse({
-                    'mensagens': {'erro': {'conteudo': ['Descrição já cadastrada.'], 'ignorar': False}}
-                }, status=422)
+                return JsonResponse(build_error_payload('Descrição já cadastrada.'), status=422)
             grupo.descricao = descricao
+            grupo.updated_by = request.user
             grupo.save()
+            changed_fields = diff_snapshots(before, snapshot_instance(grupo))
+            if changed_fields:
+                registrar_auditoria(
+                    actor=request.user,
+                    action=AuditEvent.ACTION_UPDATE,
+                    instance=grupo,
+                    changed_fields=changed_fields,
+                )
 
         case _:
-            return JsonResponse({
-                'mensagens': {'erro': {'conteudo': [f"Estado inválido: '{estado}'"], 'ignorar': False}}
-            }, status=400)
+            return JsonResponse(build_error_payload(f"Estado inválido: '{estado}'"), status=400)
 
-    return JsonResponse({
-        'success': True,
-        'form': {
-            nomeForm: {
-                'estado': 'visualizar',
-                'update': grupo.atualizacao.isoformat(),
-                'campos': {
-                    'id':        grupo.id,
-                    'descricao': grupo.descricao,
-                }
-            }
+    return JsonResponse(build_form_response(
+        form_id=nomeForm,
+        estado='visualizar',
+        update=grupo.atualizacao.isoformat(),
+        campos={
+            'id': grupo.id,
+            'descricao': grupo.descricao,
         },
-        'mensagens': {
-            'sucesso': {'ignorar': True, 'conteudo': ['Grupo de cliente salvo com sucesso!']}
-        }
-    })
+        mensagem_sucesso='Grupo de cliente salvo com sucesso!',
+    ))
 
 
 @permission_required(PERMISSOES_GRUPO_CLI['consultar'], raise_exception=True)
@@ -152,10 +151,7 @@ def cad_grupo_cli_cons_view(request):
     nomeForm     = 'cadGrupoCli'
 
     if request.method != 'POST':
-        return JsonResponse({
-            'success': False,
-            'mensagens': {'erro': {'conteudo': ['Método não permitido.'], 'ignorar': False}}
-        }, status=405)
+        return JsonResponse(build_error_payload('Método não permitido.'), status=405)
 
     dataFront = request.sisvar_front
     form      = dataFront.get('form', {}).get(nomeFormCons, {})
@@ -167,22 +163,16 @@ def cad_grupo_cli_cons_view(request):
         try:
             grupo = GrupoCli.objects.get(id=id_selecionado)
         except GrupoCli.DoesNotExist:
-            return JsonResponse({
-                'mensagens': {'erro': {'conteudo': ['Registro não encontrado.'], 'ignorar': False}}
-            }, status=404)
-        return JsonResponse({
-            'success': True,
-            'form': {
-                nomeForm: {
-                    'estado': 'visualizar',
-                    'update': grupo.atualizacao.isoformat(),
-                    'campos': {
-                        'id':        grupo.id,
-                        'descricao': grupo.descricao,
-                    }
-                }
-            }
-        })
+            return JsonResponse(build_error_payload('Registro não encontrado.'), status=404)
+        return JsonResponse(build_form_response(
+            form_id=nomeForm,
+            estado='visualizar',
+            update=grupo.atualizacao.isoformat(),
+            campos={
+                'id': grupo.id,
+                'descricao': grupo.descricao,
+            },
+        ))
 
     descricao_filtro = campos.get('descricao', '').strip().upper()
     qs = GrupoCli.objects.all().order_by('descricao')
@@ -194,10 +184,7 @@ def cad_grupo_cli_cons_view(request):
         for g in qs
     ]
 
-    return JsonResponse({
-        'success':   True,
-        'registros': registros,
-    })
+    return JsonResponse(build_records_response(registros))
 
 
 @permission_required(PERMISSOES_GRUPO_CLI['acessar'], raise_exception=True)
@@ -218,27 +205,25 @@ def cad_grupo_cli_del_view(request):
     id_registro = campos.get('id')
 
     if not id_registro:
-        return JsonResponse({
-            'mensagens': {'erro': {'conteudo': ['ID não informado.'], 'ignorar': False}}
-        }, status=400)
+        return JsonResponse(build_error_payload('ID não informado.'), status=400)
 
     try:
         grupo = GrupoCli.objects.get(id=id_registro)
     except GrupoCli.DoesNotExist:
-        return JsonResponse({
-            'mensagens': {'erro': {'conteudo': ['Registro não encontrado.'], 'ignorar': False}}
-        }, status=404)
+        return JsonResponse(build_error_payload('Registro não encontrado.'), status=404)
 
-    try:
-        grupo.delete()
-    except db_models.ProtectedError:
-        return JsonResponse({
-            'mensagens': {'erro': {'conteudo': ['Este grupo não pode ser excluído pois está vinculado a um ou mais clientes.'], 'ignorar': False}}
-        }, status=409)
+    if grupo.cliente_set.exists():
+        return JsonResponse(build_error_payload('Este grupo não pode ser excluído pois está vinculado a um ou mais clientes.'), status=409)
 
-    return JsonResponse({
-        'success': True,
-        'mensagens': {
-            'sucesso': {'ignorar': True, 'conteudo': ['Grupo de cliente excluído com sucesso!']}
-        }
-    })
+    before = snapshot_instance(grupo)
+    grupo.soft_delete(request.user, 'Exclusão via cadastro de grupo de cliente')
+    grupo.save()
+    registrar_auditoria(
+        actor=request.user,
+        action=AuditEvent.ACTION_SOFT_DELETE,
+        instance=grupo,
+        changed_fields=diff_snapshots(before, snapshot_instance(grupo)),
+        extra_data={'reason': grupo.delete_reason},
+    )
+
+    return JsonResponse(build_success_payload('Grupo de cliente excluído com sucesso!'))

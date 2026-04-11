@@ -7,7 +7,9 @@ import {
   hidratarFormulario,
   setFormState,
   confirmar,
-  getOthers,
+  getOptions,
+  getScreenPermissions,
+  getDataBackEnd,
 } from '/static/js/sisVar.js';
 import { fazerRequisicao } from '/static/js/base.js';
 import { initSmartInputs } from '/static/js/input_rules.js';
@@ -23,18 +25,55 @@ const nomeFormCons = 'consCliente';
 const form  = document.getElementById(nomeForm);
 const form2 = document.getElementById(nomeFormCons);
 
+getDataBackEnd();
+
 function obterPermissoesCliente() {
-  return getOthers()?.permissoes?.cad_cliente ?? {
+  return getScreenPermissions('cad_cliente', {
     acessar: false,
     consultar: false,
     incluir: false,
     editar: false,
     excluir: false,
-  };
+  });
 }
 
 function podeExecutarAcao(acao) {
   return Boolean(obterPermissoesCliente()?.[acao]);
+}
+
+function botaoDeveFicarVisivel(botao, estado) {
+  const estadosPermitidos = (botao.dataset.showOn || '')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
+
+  return estadosPermitidos.includes(estado);
+}
+
+function podeExibirBotaoPorPermissao(botaoId, estado) {
+  if (botaoId === 'btn-novo') {
+    return podeExecutarAcao('incluir');
+  }
+
+  if (botaoId === 'btn-editar') {
+    return podeExecutarAcao('editar');
+  }
+
+  if (botaoId === 'btn-excluir') {
+    return podeExecutarAcao('excluir');
+  }
+
+  if (botaoId === 'btn-salvar' || botaoId === 'btn-cancelar') {
+    if (estado === 'novo') {
+      return podeExecutarAcao('incluir');
+    }
+
+    if (estado === 'editar') {
+      return podeExecutarAcao('editar');
+    }
+  }
+
+  return true;
 }
 
 // ── Atualizadores de sisVar ───────────────────────────────────────────────────
@@ -54,7 +93,7 @@ initSmartInputs((input, value) => {
 
 function preencherSelectGrupos() {
   const sel = document.getElementById('grupo');
-  const grupos = getOthers()?.opcoes?.grupos ?? [];
+  const grupos = getOptions('grupos', []);
   sel.innerHTML = '<option value="">Selecione</option>';
   grupos.forEach(g => {
     const opt = document.createElement('option');
@@ -66,7 +105,7 @@ function preencherSelectGrupos() {
 
 function preencherSelectPaises() {
   const sel = document.getElementById('pais');
-  const paises = getOthers()?.opcoes?.paises ?? [];
+  const paises = getOptions('paises', []);
   sel.innerHTML = '<option value="">Selecione</option>';
   paises.forEach(p => {
     const opt = document.createElement('option');
@@ -88,7 +127,7 @@ function preencherSelectRegioes(paisId) {
     return;
   }
 
-  const regioes = (getOthers()?.opcoes?.regioes ?? []).filter(r => r.pais_id == paisId);
+  const regioes = getOptions('regioes', []).filter(r => r.pais_id == paisId);
   regioes.forEach(r => {
     const opt = document.createElement('option');
     opt.value = r.id;
@@ -107,7 +146,7 @@ function preencherSelectCidades(regiaoId) {
     return;
   }
 
-  const cidades = (getOthers()?.opcoes?.cidades ?? []).filter(c => c.regiao_id == regiaoId);
+  const cidades = getOptions('cidades', []).filter(c => c.regiao_id == regiaoId);
   cidades.forEach(c => {
     const opt = document.createElement('option');
     opt.value = c.id;
@@ -262,16 +301,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnNovo          = document.getElementById('btn-novo');
   const btnCancelar      = document.getElementById('btn-cancelar');
   const btnExcluir       = document.getElementById('btn-excluir');
+  const btnSalvar        = document.getElementById('btn-salvar');
   const formFiltro       = document.getElementById(nomeFormCons);
   const tabelaCorpo      = document.getElementById('tabela-corpo');
 
   function aplicarPermissoesNaInterface() {
     const permissoes = obterPermissoesCliente();
+    const estadoAtual = getForm(nomeForm)?.estado ?? 'visualizar';
+    const botoesControlados = [btnSalvar, btnEditar, btnNovo, btnCancelar, btnExcluir];
 
     btnAbrirPesquisa.classList.toggle('d-none', !permissoes.consultar);
-    btnNovo.classList.toggle('d-none', !permissoes.incluir);
-    btnEditar.classList.toggle('d-none', !permissoes.editar);
-    btnExcluir.classList.toggle('d-none', !permissoes.excluir);
+
+    botoesControlados.forEach(botao => {
+      const visivelNoEstado = botaoDeveFicarVisivel(botao, estadoAtual);
+      const visivelNaPermissao = podeExibirBotaoPorPermissao(botao.id, estadoAtual);
+      botao.classList.toggle('d-none', !(visivelNoEstado && visivelNaPermissao));
+    });
 
     if (!permissoes.consultar && !divPesquisa.classList.contains('d-none')) {
       alternarTelas();

@@ -3,6 +3,7 @@ import logging
 from django.shortcuts import redirect
 from django.http import JsonResponse
 from django.middleware.csrf import get_token
+from pages.filial.services import ACTIVE_FILIAL_COOKIE, FILIAL_ACTIVATE_PATH, FILIAL_NO_ACCESS_PATH, FILIAL_SELECT_PATH, listar_filiais_permitidas, obter_filial_unica_se_existir, obter_nivel_acesso, validar_filial_ativa
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
@@ -13,6 +14,12 @@ ROTAS_PUBLICAS = [
     "/app/usuario/login/",
     "/app/usuario/logout/",
     "/static/",
+]
+
+ROTAS_AUTENTICADAS_SEM_FILIAL = [
+    FILIAL_SELECT_PATH,
+    FILIAL_ACTIVATE_PATH,
+    FILIAL_NO_ACCESS_PATH,
 ]
 
 # Headers que indicam que é uma requisição API
@@ -34,6 +41,10 @@ class JWTAuthMiddleware:
     def __call__(self, request):
         # --- Captura da sisVar vinda do Front-End ---
         request.sisvar_front = self._extract_json_body(request)
+        request.filiais_permitidas = []
+        request.filial_ativa = None
+        request.filial_access = {"consultar": False, "escrever": False}
+        request._new_access_token = None
 
         # --- Lógica de Autenticação ---
         path = request.path
@@ -45,16 +56,23 @@ class JWTAuthMiddleware:
             # request.user.is_authenticated e agir conforme necessário.
             self._try_authenticate_silent(request)
             response = self.get_response(request)
-            return self._inject_csrf_token(request, response)
+            return self._finalize_response(request, response)
 
         # Autentica o usuário (bloqueia se não autenticado)
         auth_response = self._authenticate_user(request)
         if auth_response:
             return auth_response
 
+        self._resolve_filial_context(request)
+
+        if not self._is_authenticated_route_without_filial_allowed(path):
+            branch_response = self._ensure_filial_context(request)
+            if branch_response:
+                return branch_response
+
         # Resposta padrão para usuários autenticados
         response = self.get_response(request)
-        return self._inject_csrf_token(request, response)
+        return self._finalize_response(request, response)
 
     def _try_authenticate_silent(self, request):
         """
@@ -81,6 +99,7 @@ class JWTAuthMiddleware:
                 new_access = str(refresh.access_token)
                 validated = self.jwt_auth.get_validated_token(new_access)
                 request.user = self.jwt_auth.get_user(validated)
+                request._new_access_token = new_access
             except (InvalidToken, TokenError):
                 pass
             except Exception as e:
@@ -138,22 +157,8 @@ class JWTAuthMiddleware:
             # Valida o novo token
             validated = self.jwt_auth.get_validated_token(new_access_token)
             request.user = self.jwt_auth.get_user(validated)
-
-            # Processa a resposta
-            response = self.get_response(request)
-            response = self._inject_csrf_token(request, response)
-            
-            # Define o novo access token no cookie
-            response.set_cookie(
-                "access_token",
-                new_access_token,
-                httponly=True,
-                samesite="Lax",
-                secure=True,  # ← Adicione True em produção (HTTPS)
-                max_age=15 * 60  # 15 minutos
-            )
-            
-            return response
+            request._new_access_token = new_access_token
+            return None
 
         except TokenError as e:
             logger.warning(f"Erro ao processar refresh token: {e}")
@@ -207,6 +212,56 @@ class JWTAuthMiddleware:
             logger.error(f"Erro inesperado ao injetar CSRF token: {e}")
         
         return response
+
+    def _finalize_response(self, request, response):
+        response = self._inject_csrf_token(request, response)
+
+        if getattr(request, "_new_access_token", None):
+            response.set_cookie(
+                "access_token",
+                request._new_access_token,
+                httponly=True,
+                samesite="Lax",
+                secure=True,
+                max_age=15 * 60
+            )
+
+        return response
+
+    def _resolve_filial_context(self, request):
+        filiais = listar_filiais_permitidas(getattr(request, "user", None))
+        request.filiais_permitidas = filiais
+
+        filial_cookie = request.COOKIES.get(ACTIVE_FILIAL_COOKIE)
+        filial_ativa = validar_filial_ativa(getattr(request, "user", None), filial_cookie)
+
+        request.filial_ativa = filial_ativa
+        request.filial_access = obter_nivel_acesso(getattr(request, "user", None), filial_ativa)
+
+    def _ensure_filial_context(self, request):
+        filiais = getattr(request, "filiais_permitidas", [])
+        filial_ativa = getattr(request, "filial_ativa", None)
+
+        if filial_ativa is not None:
+            return None
+
+        if not filiais:
+            response = redirect(FILIAL_NO_ACCESS_PATH)
+            response.delete_cookie(ACTIVE_FILIAL_COOKIE)
+            return self._finalize_response(request, response)
+
+        filial_unica = obter_filial_unica_se_existir(request.user)
+        if filial_unica is not None:
+            response = redirect(request.get_full_path())
+            response.set_cookie(ACTIVE_FILIAL_COOKIE, str(filial_unica.id), httponly=True, samesite="Lax")
+            return self._finalize_response(request, response)
+
+        response = redirect(FILIAL_SELECT_PATH)
+        response.delete_cookie(ACTIVE_FILIAL_COOKIE)
+        return self._finalize_response(request, response)
+
+    def _is_authenticated_route_without_filial_allowed(self, path):
+        return any(path.startswith(route) for route in ROTAS_AUTENTICADAS_SEM_FILIAL)
 
     def _is_api_request(self, request):
         """

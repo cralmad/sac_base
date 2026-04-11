@@ -1,10 +1,62 @@
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
+from pages.auditoria.models import AuditEvent
+from pages.auditoria.utils import diff_snapshots, registrar_auditoria
 from sac_base.form_validador import SchemaValidator
+from sac_base.sisvar_builders import build_error_payload, build_form_response, build_form_state, build_forms_response, build_records_response, build_sisvar_payload
 
 User = get_user_model()
+
+
+def snapshot_auth_group(grupo):
+    return {
+        "name": grupo.name,
+        "permissions": sorted(
+            f"{app_label}.{codename}"
+            for app_label, codename in grupo.permissions.values_list(
+                "content_type__app_label", "codename"
+            )
+        ),
+    }
+
+
+def snapshot_usuario_permissoes(usuario):
+    return {
+        "grupos": list(usuario.groups.order_by("name").values_list("id", flat=True)),
+        "permissoes": sorted(serializar_permissoes_usuario(usuario)),
+    }
+
+
+PERMISSOES_GRUPO = {
+    "acessar": "auth.view_group",
+    "consultar": "auth.view_group",
+    "incluir": "auth.add_group",
+    "editar": "auth.change_group",
+    "excluir": "auth.delete_group",
+}
+
+PERMISSOES_PERMISSAO_USUARIO = {
+    "acessar": "usuario.view_usuarios",
+    "consultar": "usuario.view_usuarios",
+    "editar": "usuario.change_usuarios",
+}
+
+
+def obter_acoes_permitidas(permissoes_map, usuario):
+    if not usuario or not getattr(usuario, "is_authenticated", False):
+        return {acao: False for acao in permissoes_map}
+
+    return {
+        acao: usuario.has_perm(codename)
+        for acao, codename in permissoes_map.items()
+    }
+
+
+def resposta_sem_permissao(mensagem, status=403):
+    return JsonResponse(build_error_payload(mensagem), status=status)
 
 
 def resolver_permissoes(codenames):
@@ -144,10 +196,12 @@ def resolver_grupos(grupo_ids):
     return grupos_ordenados, grupos_invalidos
 
 
+@permission_required(PERMISSOES_GRUPO["acessar"], raise_exception=True)
 def cadastro_grupo_view(request):
     template    = "permissao.html"
     nomeForm    = "cadGrupo"
     nomeFormCons = "consGrupo"
+    acoes_permitidas = obter_acoes_permitidas(PERMISSOES_GRUPO, getattr(request, "user", None))
 
     schema = {
         nomeForm: {
@@ -161,27 +215,28 @@ def cadastro_grupo_view(request):
 
     # ---------- GET ----------
     if request.method == "GET":
-        request.sisvar_extra = {
-            "schema": schema,
-            "form": {
-                nomeForm: {
-                    "estado": "novo",
-                    "update": None,
-                    "campos": {
-                        "id":         None,
-                        "nome":       "",
+        request.sisvar_extra = build_sisvar_payload(
+            schema=schema,
+            forms={
+                nomeForm: build_form_state(
+                    estado="novo" if acoes_permitidas["incluir"] else "visualizar",
+                    campos={
+                        "id": None,
+                        "nome": "",
                         "permissoes": [],
-                    }
-                },
-                nomeFormCons: {
-                    "estado": "novo",
-                    "campos": {
-                        "nome_cons":      "",
+                    },
+                ),
+                nomeFormCons: build_form_state(
+                    campos={
+                        "nome_cons": "",
                         "id_selecionado": None,
-                    }
-                }
-            }
-        }
+                    },
+                ),
+            },
+            permissions={
+                "permissao_grupo": acoes_permitidas,
+            },
+        )
         return render(request, template)
 
     # ---------- POST ----------
@@ -190,6 +245,15 @@ def cadastro_grupo_view(request):
     campos    = form.get("campos", {})
     estado    = form.get("estado", "")
 
+    if estado == 'novo' and not acoes_permitidas['incluir']:
+        return resposta_sem_permissao('Você não possui permissão para incluir grupos de permissão.')
+
+    if estado == 'editar' and not acoes_permitidas['editar']:
+        return resposta_sem_permissao('Você não possui permissão para editar grupos de permissão.')
+
+    if estado == 'excluir' and not acoes_permitidas['excluir']:
+        return resposta_sem_permissao('Você não possui permissão para excluir grupos de permissão.')
+
     # Validação de schema
     validator = SchemaValidator(schema[nomeForm])
     if not validator.validate(campos):
@@ -197,9 +261,7 @@ def cadastro_grupo_view(request):
             f"{campo} - {', '.join(msgs)}"
             for campo, msgs in validator.get_errors().items()
         ]
-        return JsonResponse({
-            "mensagens": {"erro": {"conteudo": erros, "ignorar": False}}
-        }, status=400)
+        return JsonResponse(build_error_payload(erros), status=400)
 
     id_grupo    = campos.get("id")
     nome        = campos.get("nome", "").strip().upper()
@@ -207,38 +269,31 @@ def cadastro_grupo_view(request):
     grupo       = None
 
     if not isinstance(permissoes, list):
-        return JsonResponse({
-            "mensagens": {"erro": {"conteudo": ["Lista de permissões inválida"], "ignorar": False}}
-        }, status=400)
+        return JsonResponse(build_error_payload("Lista de permissões inválida"), status=400)
 
     # Carrega registro existente no modo editar
     if id_grupo:
         try:
             grupo = Group.objects.get(id=id_grupo)
         except Group.DoesNotExist:
-            return JsonResponse({
-                "mensagens": {"erro": {"conteudo": ["Registro não encontrado"], "ignorar": False}}
-            }, status=404)
+            return JsonResponse(build_error_payload("Registro não encontrado"), status=404)
+        before = snapshot_auth_group(grupo)
+    else:
+        before = {}
 
     # Validação: nome duplicado
     qs_nome = Group.objects.filter(name=nome)
     if id_grupo:
         qs_nome = qs_nome.exclude(id=id_grupo)
     if qs_nome.exists():
-        return JsonResponse({
-            "mensagens": {"erro": {"conteudo": ["Já existe um grupo com este nome"], "ignorar": False}}
-        }, status=422)
+        return JsonResponse(build_error_payload("Já existe um grupo com este nome"), status=422)
 
     perm_objects, permissoes_invalidas = resolver_permissoes(permissoes)
     if permissoes_invalidas:
-        return JsonResponse({
-            "mensagens": {
-                "erro": {
-                    "conteudo": [f"Permissões inválidas: {', '.join(sorted(permissoes_invalidas))}"],
-                    "ignorar": False
-                }
-            }
-        }, status=422)
+        return JsonResponse(
+            build_error_payload(f"Permissões inválidas: {', '.join(sorted(permissoes_invalidas))}"),
+            status=422,
+        )
 
     match estado:
 
@@ -251,28 +306,33 @@ def cadastro_grupo_view(request):
 
         case 'excluir':
             if not id_grupo:
-                return JsonResponse({
-                    "mensagens": {"erro": {"conteudo": ["ID não informado para exclusão"], "ignorar": False}}
-                }, status=400)
+                return JsonResponse(build_error_payload("ID não informado para exclusão"), status=400)
+            registrar_auditoria(
+                actor=request.user,
+                action=AuditEvent.ACTION_DELETE,
+                instance=grupo,
+                changed_fields=before,
+            )
             grupo.delete()
-            return JsonResponse({
-                "success": True,
-                "form": {
-                    nomeForm: {
-                        "estado": "novo",
-                        "update": None,
-                        "campos": {"id": None, "nome": "", "permissoes": []}
-                    }
-                },
-                "mensagens": {"sucesso": {"ignorar": True, "conteudo": ["Grupo excluído com sucesso!"]}}
-            })
+            return JsonResponse(build_form_response(
+                form_id=nomeForm,
+                estado="novo",
+                update=None,
+                campos={"id": None, "nome": "", "permissoes": []},
+                mensagem_sucesso="Grupo excluído com sucesso!",
+            ))
 
         case _:
-            return JsonResponse({
-                "mensagens": {"erro": {"conteudo": [f"Estado inválido: '{estado}'"], "ignorar": False}}
-            }, status=400)
+            return JsonResponse(build_error_payload(f"Estado inválido: '{estado}'"), status=400)
 
     grupo.permissions.set(perm_objects)
+    after = snapshot_auth_group(grupo)
+    registrar_auditoria(
+        actor=request.user,
+        action=AuditEvent.ACTION_CREATE if estado == 'novo' else AuditEvent.ACTION_UPDATE,
+        instance=grupo,
+        changed_fields=diff_snapshots(before, after),
+    )
 
     # Monta lista de codenames salvos para retorno ao front
     permissoes_salvas = list(
@@ -282,23 +342,20 @@ def cadastro_grupo_view(request):
     )
     permissoes_salvas_fmt = [f"{a}.{c}" for a, c in permissoes_salvas]
 
-    return JsonResponse({
-        "success": True,
-        "form": {
-            nomeForm: {
-                "estado": "visualizar",
-                "update": None,
-                "campos": {
-                    "id":         grupo.id,
-                    "nome":       grupo.name,
-                    "permissoes": permissoes_salvas_fmt,
-                }
-            }
+    return JsonResponse(build_form_response(
+        form_id=nomeForm,
+        estado="visualizar",
+        update=None,
+        campos={
+            "id": grupo.id,
+            "nome": grupo.name,
+            "permissoes": permissoes_salvas_fmt,
         },
-        "mensagens": {"sucesso": {"ignorar": True, "conteudo": ["Operação realizada com sucesso!"]}}
-    })
+        mensagem_sucesso="Operação realizada com sucesso!",
+    ))
 
 
+@permission_required(PERMISSOES_GRUPO["consultar"], raise_exception=True)
 def cadastro_grupo_cons_view(request):
     """
     Consulta/pesquisa de grupos. Padrão idêntico ao cadastro_cons_view de usuário.
@@ -306,53 +363,52 @@ def cadastro_grupo_cons_view(request):
     nomeForm     = "cadGrupo"
     nomeFormCons = "consGrupo"
 
-    if request.method == "POST":
-        dataFront = request.sisvar_front
-        form      = dataFront.get("form", {}).get(nomeFormCons, {})
-        campos    = form.get("campos", {})
+    if request.method != "POST":
+        return JsonResponse(build_error_payload("Método não permitido."), status=405)
 
-        id_selecionado = int(campos.get("id_selecionado") or 0)
+    dataFront = request.sisvar_front
+    form = dataFront.get("form", {}).get(nomeFormCons, {})
+    campos = form.get("campos", {})
 
-        if id_selecionado:
-            try:
-                grupo = Group.objects.get(id=id_selecionado)
-                permissoes_fmt = [
-                    f"{a}.{c}"
-                    for a, c in grupo.permissions.values_list(
-                        'content_type__app_label', 'codename'
-                    )
-                ]
-                return JsonResponse({
-                    "form": {
-                        nomeForm: {
-                            "estado": "visualizar",
-                            "update": None,
-                            "campos": {
-                                "id":         grupo.id,
-                                "nome":       grupo.name,
-                                "permissoes": permissoes_fmt,
-                            }
-                        }
-                    }
-                })
-            except Group.DoesNotExist:
-                return JsonResponse({
-                    "mensagens": {"erro": {"conteudo": ["Registro não encontrado"], "ignorar": False}}
-                }, status=404)
+    id_selecionado = int(campos.get("id_selecionado") or 0)
 
-        nome_filtro = campos.get("nome_cons", "").strip()
-        filtros = {}
-        if nome_filtro:
-            filtros["name__icontains"] = nome_filtro
+    if id_selecionado:
+        try:
+            grupo = Group.objects.get(id=id_selecionado)
+            permissoes_fmt = [
+                f"{a}.{c}"
+                for a, c in grupo.permissions.values_list(
+                    "content_type__app_label", "codename"
+                )
+            ]
+            return JsonResponse(build_form_response(
+                form_id=nomeForm,
+                estado="visualizar",
+                update=None,
+                campos={
+                    "id": grupo.id,
+                    "nome": grupo.name,
+                    "permissoes": permissoes_fmt,
+                },
+            ))
+        except Group.DoesNotExist:
+            return JsonResponse(build_error_payload("Registro não encontrado"), status=404)
 
-        grupos = Group.objects.filter(**filtros).values("id", "name")
-        return JsonResponse({"registros": list(grupos)})
+    nome_filtro = campos.get("nome_cons", "").strip()
+    filtros = {}
+    if nome_filtro:
+        filtros["name__icontains"] = nome_filtro
+
+    grupos = Group.objects.filter(**filtros).values("id", "name")
+    return JsonResponse(build_records_response(list(grupos)))
 
 
+@permission_required(PERMISSOES_PERMISSAO_USUARIO["acessar"], raise_exception=True)
 def permissao_usuario_view(request):
     template = "permissao_usuario.html"
     nomeForm = "cadPermissaoUsuario"
     nomeFormCons = "consPermissaoUsuario"
+    acoes_permitidas = obter_acoes_permitidas(PERMISSOES_PERMISSAO_USUARIO, getattr(request, "user", None))
 
     schema = {
         nomeForm: {
@@ -367,34 +423,34 @@ def permissao_usuario_view(request):
 
     if request.method == "GET":
         operador = getattr(request, "user", None)
-        request.sisvar_extra = {
-            "schema": schema,
-            "form": {
-                nomeForm: {
-                    "estado": "novo",
-                    "update": None,
-                    "campos": {
+        request.sisvar_extra = build_sisvar_payload(
+            schema=schema,
+            forms={
+                nomeForm: build_form_state(
+                    campos={
                         "usuario_id": None,
                         "grupos": [],
                         "permissoes": [],
-                    }
-                },
-                nomeFormCons: {
-                    "estado": "novo",
-                    "campos": {
+                    },
+                ),
+                nomeFormCons: build_form_state(
+                    campos={
                         "first_name_cons": "",
                         "username_cons": "",
                         "id_selecionado": None,
-                    }
-                }
+                    },
+                ),
             },
-            "others": {
+            permissions={
+                "permissao_usuario": acoes_permitidas,
+            },
+            datasets={
                 "usuarios_ativos": listar_usuarios_ativos(operador),
                 "grupos_cadastrados": listar_grupos_cadastrados(),
                 "grupos_gerenciaveis_ids": listar_ids_grupos_gerenciaveis(operador),
                 "permissoes_gerenciaveis": sorted(obter_permissoes_gerenciaveis(operador)),
-            }
-        }
+            },
+        )
         return render(request, template)
 
     dataFront = request.sisvar_front
@@ -402,35 +458,30 @@ def permissao_usuario_view(request):
     campos = form.get("campos", {})
     estado = form.get("estado", "")
 
+    if estado in {'novo', 'editar'} and not acoes_permitidas['editar']:
+        return resposta_sem_permissao('Você não possui permissão para alterar permissões de usuários.')
+
     validator = SchemaValidator(schema[nomeForm])
     if not validator.validate(campos):
         erros = [
             f"{campo} - {', '.join(msgs)}"
             for campo, msgs in validator.get_errors().items()
         ]
-        return JsonResponse({
-            "mensagens": {"erro": {"conteudo": erros, "ignorar": False}}
-        }, status=400)
+        return JsonResponse(build_error_payload(erros), status=400)
 
     try:
         usuario_id = int(campos.get("usuario_id"))
     except (TypeError, ValueError):
-        return JsonResponse({
-            "mensagens": {"erro": {"conteudo": ["Usuário inválido"], "ignorar": False}}
-        }, status=400)
+        return JsonResponse(build_error_payload("Usuário inválido"), status=400)
 
     grupos = campos.get("grupos", [])
     permissoes = campos.get("permissoes", [])
 
     if not isinstance(grupos, list):
-        return JsonResponse({
-            "mensagens": {"erro": {"conteudo": ["Lista de grupos inválida"], "ignorar": False}}
-        }, status=400)
+        return JsonResponse(build_error_payload("Lista de grupos inválida"), status=400)
 
     if not isinstance(permissoes, list):
-        return JsonResponse({
-            "mensagens": {"erro": {"conteudo": ["Lista de permissões inválida"], "ignorar": False}}
-        }, status=400)
+        return JsonResponse(build_error_payload("Lista de permissões inválida"), status=400)
 
     operador = getattr(request, "user", None)
     permissoes_gerenciaveis = obter_permissoes_gerenciaveis(operador)
@@ -438,62 +489,45 @@ def permissao_usuario_view(request):
 
     usuario = buscar_usuario_alvo(usuario_id, operador)
     if not usuario:
-        return JsonResponse({
-            "mensagens": {"erro": {"conteudo": ["Usuário elegível não encontrado"], "ignorar": False}}
-        }, status=404)
+        return JsonResponse(build_error_payload("Usuário elegível não encontrado"), status=404)
+    before = snapshot_usuario_permissoes(usuario)
 
     grupos_obj, grupos_invalidos = resolver_grupos(grupos)
     if grupos_invalidos:
-        return JsonResponse({
-            "mensagens": {
-                "erro": {
-                    "conteudo": [f"Grupos inválidos: {', '.join(sorted(grupos_invalidos))}"],
-                    "ignorar": False
-                }
-            }
-        }, status=422)
+        return JsonResponse(
+            build_error_payload(f"Grupos inválidos: {', '.join(sorted(grupos_invalidos))}"),
+            status=422,
+        )
 
     permissoes_obj, permissoes_invalidas = resolver_permissoes(permissoes)
     if permissoes_invalidas:
-        return JsonResponse({
-            "mensagens": {
-                "erro": {
-                    "conteudo": [f"Permissões inválidas: {', '.join(sorted(permissoes_invalidas))}"],
-                    "ignorar": False
-                }
-            }
-        }, status=422)
+        return JsonResponse(
+            build_error_payload(f"Permissões inválidas: {', '.join(sorted(permissoes_invalidas))}"),
+            status=422,
+        )
 
     grupos_sem_alcada = sorted(
         str(grupo.id) for grupo in grupos_obj if grupo.id not in grupos_gerenciaveis_ids
     )
     if grupos_sem_alcada:
-        return JsonResponse({
-            "mensagens": {
-                "erro": {
-                    "conteudo": [
-                        f"Você só pode atribuir grupos dentro do seu escopo: {', '.join(grupos_sem_alcada)}"
-                    ],
-                    "ignorar": False
-                }
-            }
-        }, status=403)
+        return JsonResponse(
+            build_error_payload(
+                f"Você só pode atribuir grupos dentro do seu escopo: {', '.join(grupos_sem_alcada)}"
+            ),
+            status=403,
+        )
 
     permissoes_sem_alcada = sorted(
         codename for codename in permissoes if codename not in permissoes_gerenciaveis
     )
     if permissoes_sem_alcada:
-        return JsonResponse({
-            "mensagens": {
-                "erro": {
-                    "conteudo": [
-                        "Você só pode atribuir permissões que já possui: "
-                        f"{', '.join(permissoes_sem_alcada)}"
-                    ],
-                    "ignorar": False
-                }
-            }
-        }, status=403)
+        return JsonResponse(
+            build_error_payload(
+                "Você só pode atribuir permissões que já possui: "
+                f"{', '.join(permissoes_sem_alcada)}"
+            ),
+            status=403,
+        )
 
     match estado:
         case 'novo' | 'editar':
@@ -510,33 +544,31 @@ def permissao_usuario_view(request):
 
             usuario.groups.set([*grupos_preservados, *grupos_obj])
             usuario.user_permissions.set([*permissoes_preservadas, *permissoes_obj])
+            after = snapshot_usuario_permissoes(usuario)
+            registrar_auditoria(
+                actor=request.user,
+                action=AuditEvent.ACTION_PERMISSION_ASSIGN,
+                instance=usuario,
+                changed_fields=diff_snapshots(before, after),
+            )
         case _:
-            return JsonResponse({
-                "mensagens": {"erro": {"conteudo": [f"Estado inválido: '{estado}'"], "ignorar": False}}
-            }, status=400)
+            return JsonResponse(build_error_payload(f"Estado inválido: '{estado}'"), status=400)
 
-    return JsonResponse({
-        "success": True,
-        "form": {
-            nomeForm: serializar_form_permissao_usuario(usuario)
+    return JsonResponse(build_forms_response(
+        forms={
+            nomeForm: serializar_form_permissao_usuario(usuario),
         },
-        "mensagens": {
-            "sucesso": {
-                "ignorar": True,
-                "conteudo": ["Permissões do usuário atualizadas com sucesso!"]
-            }
-        }
-    })
+        mensagem_sucesso="Permissões do usuário atualizadas com sucesso!",
+    ))
 
 
+@permission_required(PERMISSOES_PERMISSAO_USUARIO["consultar"], raise_exception=True)
 def permissao_usuario_cons_view(request):
     nomeForm = "cadPermissaoUsuario"
     nomeFormCons = "consPermissaoUsuario"
 
     if request.method != "POST":
-        return JsonResponse({
-            "mensagens": {"erro": {"conteudo": ["Método não permitido"], "ignorar": False}}
-        }, status=405)
+        return JsonResponse(build_error_payload("Método não permitido"), status=405)
 
     dataFront = request.sisvar_front
     form = dataFront.get("form", {}).get(nomeFormCons, {})
@@ -548,16 +580,13 @@ def permissao_usuario_cons_view(request):
     if id_selecionado:
         usuario = buscar_usuario_alvo(id_selecionado, operador)
         if not usuario:
-            return JsonResponse({
-                "mensagens": {"erro": {"conteudo": ["Usuário elegível não encontrado"], "ignorar": False}}
-            }, status=404)
+            return JsonResponse(build_error_payload("Usuário elegível não encontrado"), status=404)
 
-        return JsonResponse({
-            "success": True,
-            "form": {
-                nomeForm: serializar_form_permissao_usuario(usuario)
-            }
-        })
+        return JsonResponse(build_forms_response(
+            forms={
+                nomeForm: serializar_form_permissao_usuario(usuario),
+            },
+        ))
 
     nome_filtro = campos.get("first_name_cons", "").strip()
     username_filtro = campos.get("username_cons", "").strip()
@@ -577,4 +606,4 @@ def permissao_usuario_cons_view(request):
         for usuario in usuarios
     ]
 
-    return JsonResponse({"success": True, "registros": registros})
+    return JsonResponse(build_records_response(registros))

@@ -69,6 +69,8 @@ export const PERMISSOES_SCHEMA = {
     { codename: "usuario.add_usuarios",    label: "Incluir Usuário" },
     { codename: "usuario.change_usuarios", label: "Editar Usuário" },
     { codename: "usuario.delete_usuarios", label: "Excluir Usuário" },
+    // --- Auditoria ---
+    { codename: "auditoria.acessar_consulta_auditoria", label: "Acessar Consulta de Auditoria" },
     // --- Grupos de Permissão ---
     { codename: "auth.view_group",   label: "Visualizar Grupo de Permissão" },
     { codename: "auth.add_group",    label: "Incluir Grupo de Permissão" },

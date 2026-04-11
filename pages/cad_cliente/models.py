@@ -1,10 +1,12 @@
 from django.db import models
+from django.db.models import Q
 from django.core.validators import MinLengthValidator
 from pages.cad_grupo_cli.models import GrupoCli
 from pages.core.models import Pais, Regiao, Cidade
+from pages.auditoria.models import AuditFieldsMixin, SoftDeleteMixin
 
 
-class Cliente(models.Model):
+class Cliente(AuditFieldsMixin, SoftDeleteMixin, models.Model):
     id = models.BigAutoField(primary_key=True)
 
     grupo = models.ForeignKey(
@@ -63,7 +65,6 @@ class Cliente(models.Model):
     identificador = models.CharField(max_length=20, null=True, blank=True)
 
     observacao = models.CharField(max_length=500, null=True, blank=True)
-
     atualizacao = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
@@ -73,11 +74,13 @@ class Cliente(models.Model):
 
     class Meta:
         db_table = 'cliente'
+        base_manager_name = 'all_objects'
 
         constraints = [
             models.UniqueConstraint(
                 fields=['identificador'],
-                name='unique_identificador'
+                condition=Q(is_deleted=False, identificador__isnull=False) & ~Q(identificador=''),
+                name='unique_identificador_active'
             )
         ]
 

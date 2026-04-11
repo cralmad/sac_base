@@ -6,7 +6,9 @@ import {
   definirMensagem,
   hidratarFormulario,
   setFormState,
-  confirmar
+  confirmar,
+  getScreenPermissions,
+  getDataBackEnd
 } from "/static/js/sisVar.js";
 import { fazerRequisicao } from "/static/js/base.js";
 import { initSmartInputs } from "/static/js/input_rules.js";
@@ -17,6 +19,67 @@ const nomeForm = "cadUsuario";
 const nomeFormCons = "consUsuario";
 const form = document.getElementById(nomeForm);
 const form2 = document.getElementById(nomeFormCons);
+
+getDataBackEnd();
+
+function obterPermissoesUsuario() {
+  return getScreenPermissions('usuario', {
+    acessar: false,
+    consultar: false,
+    incluir: false,
+    editar: false,
+    excluir: false,
+  });
+}
+
+function podeExecutarAcao(acao) {
+  return Boolean(obterPermissoesUsuario()?.[acao]);
+}
+
+function botaoDeveFicarVisivel(botao, estado) {
+  const estadosPermitidos = (botao.dataset.showOn || '')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
+
+  return estadosPermitidos.includes(estado);
+}
+
+function podeExibirBotaoPorPermissao(botaoId, estado) {
+  if (botaoId === 'btn-novo') {
+    return podeExecutarAcao('incluir');
+  }
+
+  if (botaoId === 'btn-editar') {
+    return podeExecutarAcao('editar');
+  }
+
+  if (botaoId === 'btn-salvar' || botaoId === 'btn-cancelar') {
+    if (estado === 'novo') {
+      return podeExecutarAcao('incluir');
+    }
+
+    if (estado === 'editar') {
+      return podeExecutarAcao('editar');
+    }
+  }
+
+  return true;
+}
+
+function validarPermissaoPorEstado(estado) {
+  if (estado === 'novo' && !podeExecutarAcao('incluir')) {
+    definirMensagem('erro', 'Você não possui permissão para incluir usuários.', false);
+    return false;
+  }
+
+  if (estado === 'editar' && !podeExecutarAcao('editar')) {
+    definirMensagem('erro', 'Você não possui permissão para editar usuários.', false);
+    return false;
+  }
+
+  return true;
+}
 
 // Configuração dos atualizadores de formulário
 const updater = criarAtualizadorForm({
@@ -53,6 +116,10 @@ form.addEventListener("submit", async e => {
   clearMessages();
 
   const formData = getForm(nomeForm);
+  if (!validarPermissaoPorEstado(formData?.estado)) {
+    return;
+  }
+
   if (!formData || !formData.campos || Object.keys(formData.campos).length === 0) {
     definirMensagem('aviso', 'Preencha o formulário antes de enviar');
     return;
@@ -75,7 +142,11 @@ form.addEventListener("submit", async e => {
       const resultado = await fazerRequisicao("/app/usuario/cadastro/", sisVarPayload);
 
       if (!resultado.success) {
-        definirMensagem('erro', `Erro ao enviar dados: ${resultado.error}`, false);
+        if (resultado.data) {
+          updateState(resultado.data);
+        } else {
+          definirMensagem('erro', `Erro ao enviar dados: ${resultado.error}`, false);
+        }
         AppLoader.hide();
         return;
       }
@@ -96,8 +167,27 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnEditar = document.getElementById('btn-editar');
   const btnNovo = document.getElementById('btn-novo');
   const btnCancelar = document.getElementById('btn-cancelar');
+  const btnSalvar = document.getElementById('btn-salvar');
   const formFiltro = document.getElementById(nomeFormCons);
   const tabelaCorpo = document.getElementById('tabela-corpo');
+
+  function aplicarPermissoesNaInterface() {
+    const permissoes = obterPermissoesUsuario();
+    const estadoAtual = getForm(nomeForm)?.estado ?? 'visualizar';
+    const botoesControlados = [btnSalvar, btnEditar, btnNovo, btnCancelar];
+
+    btnAbrirPesquisa.classList.toggle('d-none', !permissoes.consultar);
+
+    botoesControlados.forEach(botao => {
+      const visivelNoEstado = botaoDeveFicarVisivel(botao, estadoAtual);
+      const visivelNaPermissao = podeExibirBotaoPorPermissao(botao.id, estadoAtual);
+      botao.classList.toggle('d-none', !(visivelNoEstado && visivelNaPermissao));
+    });
+
+    if (!permissoes.consultar && !divPesquisa.classList.contains('d-none')) {
+      alternarTelas();
+    }
+  }
 
   const alternarTelas = () => {
     divPrincipal.classList.toggle('d-none');
@@ -113,7 +203,14 @@ document.addEventListener('DOMContentLoaded', () => {
    * applyFormState cuida de tudo: inputs, botões e sufixo do título
    */
   btnEditar.addEventListener('click', () => {
+    clearMessages();
+    if (!podeExecutarAcao('editar')) {
+      definirMensagem('erro', 'Você não possui permissão para editar usuários.', false);
+      return;
+    }
+
     setFormState(nomeForm, 'editar');
+    aplicarPermissoesNaInterface();
   });
 
   /**
@@ -121,7 +218,14 @@ document.addEventListener('DOMContentLoaded', () => {
    * applyFormState cuida de tudo: inputs, botões e sufixo do título
    */
   btnNovo.addEventListener('click', () => {
+    clearMessages();
+    if (!podeExecutarAcao('incluir')) {
+      definirMensagem('erro', 'Você não possui permissão para incluir usuários.', false);
+      return;
+    }
+
     setFormState(nomeForm, 'novo');
+    aplicarPermissoesNaInterface();
   });
 
   /**
@@ -132,7 +236,8 @@ document.addEventListener('DOMContentLoaded', () => {
       titulo: 'Confirmar Cancelamento',
       mensagem: 'Deseja cancelar? Os dados não salvos serão perdidos.',
       onConfirmar: () => {
-        setFormState(nomeForm, 'novo');
+        setFormState(nomeForm, podeExecutarAcao('incluir') ? 'novo' : 'visualizar');
+        aplicarPermissoesNaInterface();
       }
     });
   });
@@ -145,6 +250,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     clearMessages();
 
+    if (!podeExecutarAcao('consultar')) {
+      definirMensagem('erro', 'Você não possui permissão para consultar usuários.', false);
+      return;
+    }
+
+    AppLoader.show();
+
     const sisVarPayload = {
       form: {
         [nomeFormCons]: getForm(nomeFormCons)
@@ -154,12 +266,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultado = await fazerRequisicao("/app/usuario/cadastro/cons", sisVarPayload);
 
     if (!resultado.success) {
-      definirMensagem('erro', `Erro ao buscar usuários: ${resultado.error}`, false);
+      if (resultado.data) {
+        updateState(resultado.data);
+      } else {
+        definirMensagem('erro', `Erro ao buscar usuários: ${resultado.error}`, false);
+      }
       AppLoader.hide();
       return;
     }
 
     updateState(resultado.data);
+    aplicarPermissoesNaInterface();
 
     if (resultado.data?.registros && resultado.data.registros.length > 0) {
       renderizarTabela(resultado.data.registros);
@@ -218,6 +335,11 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    if (!podeExecutarAcao('consultar')) {
+      definirMensagem('erro', 'Você não possui permissão para consultar usuários.', false);
+      return;
+    }
+
     await carregarRegistro(id);
   });
 
@@ -226,6 +348,13 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   async function carregarRegistro(id) {
     clearMessages();
+
+    if (!podeExecutarAcao('consultar')) {
+      definirMensagem('erro', 'Você não possui permissão para consultar usuários.', false);
+      return;
+    }
+
+    AppLoader.show();
 
     // Grava o ID, captura o payload como cópia profunda e zera imediatamente
     updateFormField(nomeFormCons, 'id_selecionado', id);
@@ -244,7 +373,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultado = await fazerRequisicao("/app/usuario/cadastro/cons", sisVarPayload);
 
     if (!resultado.success) {
-      definirMensagem('erro', `Erro ao carregar registro: ${resultado.error}`, false);
+      if (resultado.data) {
+        updateState(resultado.data);
+      } else {
+        definirMensagem('erro', `Erro ao carregar registro: ${resultado.error}`, false);
+      }
       AppLoader.hide();
       return;
     }
@@ -252,7 +385,10 @@ document.addEventListener('DOMContentLoaded', () => {
     updateState(resultado.data);
     hidratarFormulario(nomeForm);
     setFormState(nomeForm, 'visualizar');
+    aplicarPermissoesNaInterface();
     alternarTelas();
     AppLoader.hide();
   }
+
+  aplicarPermissoesNaInterface();
 });

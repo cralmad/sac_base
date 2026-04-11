@@ -30,6 +30,7 @@
             <div class="container-fluid">
 
                 <!-- Botão hamburguer (mobile): abre o offcanvas da sidebar -->
+                {% if sisVar.usuario.autenticado %}
                 <button class="navbar-toggler border-0 me-2"
                         type="button"
                         data-bs-toggle="offcanvas"
@@ -38,6 +39,7 @@
                         aria-label="Abrir menu">
                     <span class="navbar-toggler-icon"></span>
                 </button>
+                {% endif %}
 
                 <a class="navbar-brand" href="/">SacBase</a>
 
@@ -50,6 +52,7 @@
             <div class="row flex-nowrap">
 
                 <!-- SIDEBAR (offcanvas no mobile, estática no desktop) -->
+                {% if sisVar.usuario.autenticado %}
                 <div class="offcanvas-lg offcanvas-start bg-white border-end sidebar-wrapper"
                      id="sidebarOffcanvas"
                      tabindex="-1"
@@ -96,12 +99,12 @@
                                                 <div class="collapse" id="submenu-comercial-cadastro">
                                                     <ul class="nav flex-column ms-3">
                                                         <li class="nav-item">
-                                                            <a class="nav-link sidebar-sublink" href="/app/cad/cliente/">
+                                                            <a class="nav-link sidebar-sublink" href="/app/cad/cliente/" data-required-permission="cad_cliente.view_cliente">
                                                                 <i class="bi bi-dot me-1"></i>Clientes
                                                             </a>
                                                         </li>
                                                         <li class="nav-item">
-                                                            <a class="nav-link sidebar-sublink" href="/app/cad/grupocli/">
+                                                            <a class="nav-link sidebar-sublink" href="/app/cad/grupocli/" data-required-permission="cad_grupo_cli.view_grupocli">
                                                                 <i class="bi bi-dot me-1"></i>Grupos de Clientes
                                                             </a>
                                                         </li>
@@ -484,17 +487,17 @@
                                                 <div class="collapse" id="submenu-admin-cadastro">
                                                     <ul class="nav flex-column ms-3">
                                                         <li class="nav-item">
-                                                            <a class="nav-link sidebar-sublink" href="/app/usuario/cadastro/">
+                                                            <a class="nav-link sidebar-sublink" href="/app/usuario/cadastro/" data-required-permission="usuario.view_usuarios">
                                                                 <i class="bi bi-dot me-1"></i>Usuários
                                                             </a>
                                                         </li>
                                                         <li class="nav-item">
-                                                            <a class="nav-link sidebar-sublink" href="/app/permissao/grupos/">
+                                                            <a class="nav-link sidebar-sublink" href="/app/permissao/grupos/" data-required-permission="auth.view_group">
                                                                 <i class="bi bi-dot me-1"></i>Perfis de Acesso
                                                             </a>
                                                         </li>
                                                         <li class="nav-item">
-                                                            <a class="nav-link sidebar-sublink" href="/app/permissao/usuario/">
+                                                            <a class="nav-link sidebar-sublink" href="/app/permissao/usuario/" data-required-permission="usuario.view_usuarios">
                                                                 <i class="bi bi-dot me-1"></i>Permissões por Usuário
                                                             </a>
                                                         </li>
@@ -520,7 +523,7 @@
                                                             </a>
                                                         </li>
                                                         <li class="nav-item">
-                                                            <a class="nav-link sidebar-sublink" href="/admin/movimentacao/auditoria/">
+                                                            <a class="nav-link sidebar-sublink" href="/app/auditoria/consulta/" data-required-permission="auditoria.acessar_consulta_auditoria">
                                                                 <i class="bi bi-dot me-1"></i>Auditoria
                                                             </a>
                                                         </li>
@@ -562,9 +565,10 @@
                         </nav>
                     </div>
                 </div><!-- /#sidebarOffcanvas -->
+                {% endif %}
 
                 <!-- ÁREA PRINCIPAL -->
-                <div class="col flex-grow-1 px-0">
+                <div class="{% if sisVar.usuario.autenticado %}col flex-grow-1 px-0{% else %}col-12 px-0{% endif %}">
                     <main class="px-3 px-md-4 py-4">
 
                         <!-- Mensagens ao Usuário -->

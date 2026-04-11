@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}SacBase - Auditoria{% endblock %}
+
+{% block page_title %}Consulta de Auditoria{% endblock %}
+
+{% block content %}
+<form id="consAuditoria" data-form-lock="consAuditoria" method="POST">
+    {% csrf_token %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">Filtros</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-12 col-md-4">
+                    <label for="actor_id" class="form-label mb-0">Usuário executor</label>
+                    <select id="actor_id" name="actor_id" class="form-select smart-input">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="action" class="form-label mb-0">Ação</label>
+                    <select id="action" name="action" class="form-select smart-input">
+                        <option value="">Todas</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="object_id" class="form-label mb-0">ID do objeto</label>
+                    <input id="object_id" name="object_id" type="text" class="form-control smart-input" maxlength="64">
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="app_label" class="form-label mb-0">Aplicação</label>
+                    <select id="app_label" name="app_label" class="form-select smart-input">
+                        <option value="">Todas</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="model" class="form-label mb-0">Modelo</label>
+                    <select id="model" name="model" class="form-select smart-input">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-2">
+                    <label for="data_inicio" class="form-label mb-0">Data inicial</label>
+                    <input id="data_inicio" name="data_inicio" type="date" class="form-control smart-input">
+                </div>
+                <div class="col-12 col-md-2">
+                    <label for="data_fim" class="form-label mb-0">Data final</label>
+                    <input id="data_fim" name="data_fim" type="date" class="form-control smart-input">
+                </div>
+                <input type="hidden" id="page" name="page">
+                <input type="hidden" id="per_page" name="per_page">
+            </div>
+
+            <div class="d-flex gap-2 mt-4 flex-wrap">
+                <button id="btn-filtrar" type="submit" class="btn btn-success">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+                <button id="btn-limpar" type="button" class="btn btn-outline-secondary">
+                    <i class="bi bi-eraser"></i> Limpar
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-dark text-white">Eventos</div>
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <div id="auditoria-resumo-paginacao" class="text-muted small">0 registros</div>
+            <div class="d-flex align-items-center gap-2">
+                <button id="btn-pagina-anterior" type="button" class="btn btn-outline-secondary btn-sm d-none">
+                    <i class="bi bi-arrow-left"></i> Anterior
+                </button>
+                <span id="auditoria-pagina-atual" class="small text-muted">Página 1 de 1</span>
+                <button id="btn-proxima-pagina" type="button" class="btn btn-outline-secondary btn-sm d-none">
+                    Próxima <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover table-sm border align-middle mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Data/Hora</th>
+                        <th>Usuário</th>
+                        <th>Ação</th>
+                        <th>Entidade</th>
+                        <th>Objeto</th>
+                        <th>Resumo</th>
+                        <th class="text-center">Detalhes</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-auditoria-corpo">
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">Nenhum evento encontrado.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modal-auditoria-detalhes" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalhes do Evento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <h6 class="mb-2">Alterações</h6>
+                    <pre id="auditoria-changed-fields" class="bg-light border rounded p-3 mb-0"></pre>
+                </div>
+                <div>
+                    <h6 class="mb-2">Dados extras</h6>
+                    <pre id="auditoria-extra-data" class="bg-light border rounded p-3 mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'auditoria/js/scripts.js' %}"></script>
+{% endblock %}

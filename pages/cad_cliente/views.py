@@ -1,7 +1,10 @@
 from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render
 from django.http import JsonResponse
+from pages.auditoria.models import AuditEvent
+from pages.auditoria.utils import diff_snapshots, registrar_auditoria, snapshot_instance
 from sac_base.form_validador import SchemaValidator
+from sac_base.sisvar_builders import build_error_payload, build_form_response, build_form_state, build_records_response, build_sisvar_payload
 from pages.cad_grupo_cli.models import GrupoCli
 from pages.core.models import Pais, Regiao, Cidade
 from .models import Cliente
@@ -27,10 +30,7 @@ def obter_acoes_permitidas_cliente(usuario):
 
 
 def resposta_sem_permissao(mensagem, status=403):
-    return JsonResponse({
-        "success": False,
-        "mensagens": {"erro": {"conteudo": [mensagem], "ignorar": False}}
-    }, status=status)
+    return JsonResponse(build_error_payload(mensagem), status=status)
 
 
 @permission_required(PERMISSOES_CLIENTE["acessar"], raise_exception=True)
@@ -71,51 +71,46 @@ def cad_cliente_view(request):
         cidades = list(Cidade.objects.values('id', 'nome', 'regiao_id').order_by('nome'))
         estado_inicial = 'novo' if acoes_permitidas['incluir'] else 'visualizar'
 
-        request.sisvar_extra = {
-            "schema": schema,
-            "form": {
-                nomeForm: {
-                    "estado": estado_inicial,
-                    "update": None,
-                    "campos": {
-                        "id":            None,
-                        "grupo":         None,
-                        "nome":          "",
-                        "rsocial":       "",
-                        "logradouro":    "",
-                        "endereco":      "",
-                        "numero":        "",
-                        "complemento":   "",
-                        "bairro":        "",
-                        "pais":          None,
-                        "regiao":        None,
-                        "cidade":        None,
-                        "codpostal":     "",
+        request.sisvar_extra = build_sisvar_payload(
+            schema=schema,
+            forms={
+                nomeForm: build_form_state(
+                    estado=estado_inicial,
+                    campos={
+                        "id": None,
+                        "grupo": None,
+                        "nome": "",
+                        "rsocial": "",
+                        "logradouro": "",
+                        "endereco": "",
+                        "numero": "",
+                        "complemento": "",
+                        "bairro": "",
+                        "pais": None,
+                        "regiao": None,
+                        "cidade": None,
+                        "codpostal": "",
                         "identificador": "",
-                        "observacao":    "",
-                    }
-                },
-                nomeFormCons: {
-                    "estado": "novo",
-                    "update": None,
-                    "campos": {
-                        "nome_cons":      "",
+                        "observacao": "",
+                    },
+                ),
+                nomeFormCons: build_form_state(
+                    campos={
+                        "nome_cons": "",
                         "id_selecionado": None,
-                    }
-                }
+                    },
+                ),
             },
-            "others": {
-                "permissoes": {
-                    "cad_cliente": acoes_permitidas,
-                },
-                "opcoes": {
-                    "grupos":  grupos,
-                    "paises":  paises,
-                    "regioes": regioes,
-                    "cidades": cidades,
-                }
-            }
-        }
+            permissions={
+                "cad_cliente": acoes_permitidas,
+            },
+            options={
+                "grupos": grupos,
+                "paises": paises,
+                "regioes": regioes,
+                "cidades": cidades,
+            },
+        )
         return render(request, template)
 
     # ---------- POST ----------
@@ -140,9 +135,7 @@ def cad_cliente_view(request):
             f"{campo} - {', '.join(msgs)}"
             for campo, msgs in validator.get_errors().items()
         ]
-        return JsonResponse({
-            "mensagens": {"erro": {"conteudo": erros, "ignorar": False}}
-        }, status=400)
+        return JsonResponse(build_error_payload(erros), status=400)
     ###########################################################################
 
     id_cliente    = campos.get("id")
@@ -178,16 +171,24 @@ def cad_cliente_view(request):
                 codpostal     = codpostal,
                 identificador = identificador,
                 observacao    = observacao,
+                created_by    = request.user,
+                updated_by    = request.user,
             )
             cliente.save()
+            registrar_auditoria(
+                actor=request.user,
+                action=AuditEvent.ACTION_CREATE,
+                instance=cliente,
+                changed_fields=diff_snapshots({}, snapshot_instance(cliente)),
+            )
 
         case "editar":
             try:
                 cliente = Cliente.objects.get(pk=id_cliente)
             except Cliente.DoesNotExist:
-                return JsonResponse({
-                    "mensagens": {"erro": {"conteudo": ["Registro não encontrado."], "ignorar": False}}
-                }, status=404)
+                return JsonResponse(build_error_payload("Registro não encontrado."), status=404)
+
+            before = snapshot_instance(cliente)
 
             cliente.grupo_id      = grupo_id
             cliente.nome          = nome
@@ -203,72 +204,75 @@ def cad_cliente_view(request):
             cliente.codpostal     = codpostal
             cliente.identificador = identificador
             cliente.observacao    = observacao
+            cliente.updated_by    = request.user
             cliente.save()
+            changed_fields = diff_snapshots(before, snapshot_instance(cliente))
+            if changed_fields:
+                registrar_auditoria(
+                    actor=request.user,
+                    action=AuditEvent.ACTION_UPDATE,
+                    instance=cliente,
+                    changed_fields=changed_fields,
+                )
 
         case "excluir":
             try:
                 cliente = Cliente.objects.get(pk=id_cliente)
-                cliente.delete()
             except Cliente.DoesNotExist:
-                return JsonResponse({
-                    "mensagens": {"erro": {"conteudo": ["Registro não encontrado."], "ignorar": False}}
-                }, status=404)
+                return JsonResponse(build_error_payload("Registro não encontrado."), status=404)
 
-            return JsonResponse({
-                "success": True,
-                "form": {
-                    nomeForm: {
-                        "estado": "novo",
-                        "update": None,
-                        "campos": {
-                            "id": None, "grupo": None, "nome": "", "rsocial": "",
-                            "logradouro": "", "endereco": "", "numero": "",
-                            "complemento": "", "bairro": "", "pais": None,
-                            "regiao": None, "cidade": None,
-                            "codpostal": "", "identificador": "", "observacao": "",
-                        }
-                    }
+            before = snapshot_instance(cliente)
+            cliente.soft_delete(request.user, "Exclusão via cadastro de cliente")
+            cliente.save()
+            registrar_auditoria(
+                actor=request.user,
+                action=AuditEvent.ACTION_SOFT_DELETE,
+                instance=cliente,
+                changed_fields=diff_snapshots(before, snapshot_instance(cliente)),
+                extra_data={"reason": cliente.delete_reason},
+            )
+
+            return JsonResponse(build_form_response(
+                form_id=nomeForm,
+                estado="novo",
+                update=None,
+                campos={
+                    "id": None, "grupo": None, "nome": "", "rsocial": "",
+                    "logradouro": "", "endereco": "", "numero": "",
+                    "complemento": "", "bairro": "", "pais": None,
+                    "regiao": None, "cidade": None,
+                    "codpostal": "", "identificador": "", "observacao": "",
                 },
-                "mensagens": {
-                    "sucesso": {"ignorar": True, "conteudo": ["Registro excluído com sucesso!"]}
-                }
-            })
+                mensagem_sucesso="Registro excluído com sucesso!",
+            ))
 
         case _:
-            return JsonResponse({
-                "mensagens": {"erro": {"conteudo": [f"Estado inválido: '{estado}'"], "ignorar": False}}
-            }, status=400)
+            return JsonResponse(build_error_payload(f"Estado inválido: '{estado}'"), status=400)
 
     # ===== RESPOSTA JSON =====
-    return JsonResponse({
-        "success": True,
-        "form": {
-            nomeForm: {
-                "estado": "visualizar",
-                "update": cliente.atualizacao,
-                "campos": {
-                    "id":            cliente.id,
-                    "grupo":         cliente.grupo_id,
-                    "nome":          cliente.nome,
-                    "rsocial":       cliente.rsocial,
-                    "logradouro":    cliente.logradouro,
-                    "endereco":      cliente.endereco,
-                    "numero":        cliente.numero,
-                    "complemento":   cliente.complemento,
-                    "bairro":        cliente.bairro,
-                    "pais":          cliente.pais_id,
-                    "regiao":        cliente.regiao_id,
-                    "cidade":        cliente.cidade_id,
-                    "codpostal":     cliente.codpostal,
-                    "identificador": cliente.identificador,
-                    "observacao":    cliente.observacao,
-                }
-            }
+    return JsonResponse(build_form_response(
+        form_id=nomeForm,
+        estado="visualizar",
+        update=cliente.atualizacao,
+        campos={
+            "id": cliente.id,
+            "grupo": cliente.grupo_id,
+            "nome": cliente.nome,
+            "rsocial": cliente.rsocial,
+            "logradouro": cliente.logradouro,
+            "endereco": cliente.endereco,
+            "numero": cliente.numero,
+            "complemento": cliente.complemento,
+            "bairro": cliente.bairro,
+            "pais": cliente.pais_id,
+            "regiao": cliente.regiao_id,
+            "cidade": cliente.cidade_id,
+            "codpostal": cliente.codpostal,
+            "identificador": cliente.identificador,
+            "observacao": cliente.observacao,
         },
-        "mensagens": {
-            "sucesso": {"ignorar": True, "conteudo": ["Registro salvo com sucesso!"]}
-        }
-    })
+        mensagem_sucesso="Registro salvo com sucesso!",
+    ))
 
 
 @permission_required(PERMISSOES_CLIENTE["consultar"], raise_exception=True)
@@ -285,10 +289,7 @@ def cad_cliente_cons_view(request):
     nomeFormCons = 'consCliente'
 
     if request.method != 'POST':
-        return JsonResponse({
-            "success": False,
-            "mensagens": {"erro": {"ignorar": False, "conteudo": ["Método não permitido."]}}
-        }, status=405)
+        return JsonResponse(build_error_payload("Método não permitido."), status=405)
 
     dataFront   = request.sisvar_front
     form_cons   = dataFront.get("form", {}).get(nomeFormCons, {})
@@ -301,38 +302,30 @@ def cad_cliente_cons_view(request):
         try:
             cli = Cliente.objects.get(pk=id_selecionado)
         except Cliente.DoesNotExist:
-            return JsonResponse({
-                "success": False,
-                "mensagens": {"erro": {"ignorar": False, "conteudo": ["Registro não encontrado."]}}
-            }, status=404)
+            return JsonResponse(build_error_payload("Registro não encontrado."), status=404)
 
-        return JsonResponse({
-            "success": True,
-            "form": {
-                nomeForm: {
-                    "estado": "visualizar",
-                    "update": cli.atualizacao,
-                    "campos": {
-                        "id":            cli.id,
-                        "grupo":         cli.grupo_id,
-                        "nome":          cli.nome,
-                        "rsocial":       cli.rsocial,
-                        "logradouro":    cli.logradouro,
-                        "endereco":      cli.endereco,
-                        "numero":        cli.numero,
-                        "complemento":   cli.complemento,
-                        "bairro":        cli.bairro,
-                        "pais":          cli.pais_id,
-                        "regiao":        cli.regiao_id,
-                        "cidade":        cli.cidade_id,
-                        "codpostal":     cli.codpostal,
-                        "identificador": cli.identificador,
-                        "observacao":    cli.observacao,
-                    }
-                }
+        return JsonResponse(build_form_response(
+            form_id=nomeForm,
+            estado="visualizar",
+            update=cli.atualizacao,
+            campos={
+                "id": cli.id,
+                "grupo": cli.grupo_id,
+                "nome": cli.nome,
+                "rsocial": cli.rsocial,
+                "logradouro": cli.logradouro,
+                "endereco": cli.endereco,
+                "numero": cli.numero,
+                "complemento": cli.complemento,
+                "bairro": cli.bairro,
+                "pais": cli.pais_id,
+                "regiao": cli.regiao_id,
+                "cidade": cli.cidade_id,
+                "codpostal": cli.codpostal,
+                "identificador": cli.identificador,
+                "observacao": cli.observacao,
             },
-            "mensagens": {}
-        })
+        ))
 
     # ── Pesquisa por filtro ───────────────────────────────────────────────────
     nome_cons = campos.get("nome_cons", "").strip()
@@ -355,8 +348,4 @@ def cad_cliente_cons_view(request):
         for c in qs.order_by('nome')[:200]
     ]
 
-    return JsonResponse({
-        "success": True,
-        "registros": registros,
-        "mensagens": {}
-    })
+    return JsonResponse(build_records_response(registros))

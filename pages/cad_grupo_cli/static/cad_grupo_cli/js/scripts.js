@@ -2,7 +2,7 @@
 import {
   updateFormField, getForm, updateState,
   clearMessages, definirMensagem,
-  hidratarFormulario, setFormState, confirmar, getOthers
+  hidratarFormulario, setFormState, confirmar, getScreenPermissions, getDataBackEnd
 } from '/static/js/sisVar.js';
 import { fazerRequisicao }      from '/static/js/base.js';
 import { initSmartInputs }      from '/static/js/input_rules.js';
@@ -15,18 +15,55 @@ const nomeFormCons = 'consGrupoCli';
 const form  = document.getElementById(nomeForm);
 const form2 = document.getElementById(nomeFormCons);
 
+getDataBackEnd();
+
 function obterPermissoesGrupoCli() {
-  return getOthers()?.permissoes?.cad_grupo_cli ?? {
+  return getScreenPermissions('cad_grupo_cli', {
     acessar: false,
     consultar: false,
     incluir: false,
     editar: false,
     excluir: false,
-  };
+  });
 }
 
 function podeExecutarAcao(acao) {
   return Boolean(obterPermissoesGrupoCli()?.[acao]);
+}
+
+function botaoDeveFicarVisivel(botao, estado) {
+  const estadosPermitidos = (botao.dataset.showOn || '')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
+
+  return estadosPermitidos.includes(estado);
+}
+
+function podeExibirBotaoPorPermissao(botaoId, estado) {
+  if (botaoId === 'btn-novo') {
+    return podeExecutarAcao('incluir');
+  }
+
+  if (botaoId === 'btn-editar') {
+    return podeExecutarAcao('editar');
+  }
+
+  if (botaoId === 'btn-excluir') {
+    return podeExecutarAcao('excluir');
+  }
+
+  if (botaoId === 'btn-salvar' || botaoId === 'btn-cancelar') {
+    if (estado === 'novo') {
+      return podeExecutarAcao('incluir');
+    }
+
+    if (estado === 'editar') {
+      return podeExecutarAcao('editar');
+    }
+  }
+
+  return true;
 }
 
 // 3. VÍNCULO sisVar ↔ inputs do formulário principal
@@ -123,15 +160,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnNovo          = document.getElementById('btn-novo');
   const btnExcluir       = document.getElementById('btn-excluir');
   const btnCancelar      = document.getElementById('btn-cancelar');
+  const btnSalvar        = document.getElementById('btn-salvar');
   const tabelaCorpo      = document.getElementById('tabela-corpo');
 
   function aplicarPermissoesNaInterface() {
     const permissoes = obterPermissoesGrupoCli();
+    const estadoAtual = getForm(nomeForm)?.estado ?? 'visualizar';
+    const botoesControlados = [btnSalvar, btnEditar, btnNovo, btnExcluir, btnCancelar];
 
     btnAbrirPesquisa.classList.toggle('d-none', !permissoes.consultar);
-    btnNovo.classList.toggle('d-none', !permissoes.incluir);
-    btnEditar.classList.toggle('d-none', !permissoes.editar);
-    btnExcluir.classList.toggle('d-none', !permissoes.excluir);
+
+    botoesControlados.forEach(botao => {
+      const visivelNoEstado = botaoDeveFicarVisivel(botao, estadoAtual);
+      const visivelNaPermissao = podeExibirBotaoPorPermissao(botao.id, estadoAtual);
+      botao.classList.toggle('d-none', !(visivelNoEstado && visivelNaPermissao));
+    });
 
     if (!permissoes.consultar && !divPesquisa.classList.contains('d-none')) {
       alternarTelas();

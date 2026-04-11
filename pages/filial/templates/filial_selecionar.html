@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Selecionar Matriz/Filial{% endblock %}
+
+{% block page_title %}Selecionar Matriz/Filial{% endblock %}
+
+{% block content %}
+<form id="selecionarFilialForm" data-form-lock="selecionarFilialForm" class="card border-0 shadow-sm p-4 mx-auto" style="max-width: 520px;">
+    {% csrf_token %}
+    <div class="mb-3">
+        <label for="filial_id" class="form-label">Matriz/Filial</label>
+        <select id="filial_id" name="filial_id" class="form-select" required>
+            <option value="">Selecione</option>
+        </select>
+    </div>
+    <div class="d-flex justify-content-end gap-2">
+        <a href="/app/usuario/logout/" class="btn btn-outline-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-primary show-loader">Confirmar</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'filial/js/selecionar.js' %}"></script>
+{% endblock %}

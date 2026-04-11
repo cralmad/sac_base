@@ -3,8 +3,10 @@ import json
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.exceptions import PermissionDenied
+from django.db import IntegrityError, transaction
 from django.test import RequestFactory, TestCase
 
+from pages.auditoria.models import AuditEvent
 from .models import GrupoCli
 from .views import cad_grupo_cli_cons_view, cad_grupo_cli_del_view, cad_grupo_cli_view
 
@@ -91,6 +93,11 @@ class CadGrupoCliPermissaoViewTests(TestCase):
 				'excluir': False,
 			},
 		)
+		conteudo = response.content.decode('utf-8')
+		self.assertIn('id="btn-salvar"', conteudo)
+		self.assertIn('btn btn-primary d-none', conteudo)
+		self.assertIn('id="btn-abrir-pesquisa"', conteudo)
+		self.assertIn('btn btn-secondary d-none', conteudo)
 
 	def test_post_novo_exige_permissao_add(self):
 		usuario = self.criar_usuario('semadd', [self.perm_view])
@@ -113,6 +120,7 @@ class CadGrupoCliPermissaoViewTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertTrue(data['success'])
 		self.assertTrue(GrupoCli.objects.filter(descricao='ATACADO').exists())
+		self.assertTrue(AuditEvent.objects.filter(action='create').exists())
 
 	def test_post_editar_exige_permissao_change(self):
 		usuario = self.criar_usuario('semchange', [self.perm_view])
@@ -161,3 +169,39 @@ class CadGrupoCliPermissaoViewTests(TestCase):
 		self.assertEqual(response.status_code, 403)
 		self.assertIn('excluir grupos de cliente', data['mensagens']['erro']['conteudo'][0])
 		self.assertTrue(GrupoCli.objects.filter(id=grupo.id).exists())
+
+	def test_delete_realiza_soft_delete_e_auditoria(self):
+		usuario = self.criar_usuario('comdelete', [self.perm_view, self.perm_delete])
+		grupo = GrupoCli.objects.create(descricao='SOFTDELETE')
+		request = self.build_post_request(
+			'/app/cad/grupocli/del',
+			self.payload_form(grupo_id=grupo.id, descricao=grupo.descricao),
+			usuario,
+		)
+
+		response = cad_grupo_cli_del_view(request)
+		data = json.loads(response.content)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertTrue(data['success'])
+		self.assertFalse(GrupoCli.objects.filter(id=grupo.id).exists())
+		grupo_soft = GrupoCli.all_objects.get(id=grupo.id)
+		self.assertTrue(grupo_soft.is_deleted)
+		self.assertTrue(AuditEvent.objects.filter(action='soft_delete', object_id=str(grupo.id)).exists())
+
+	def test_descricao_ativa_permanece_unica(self):
+		GrupoCli.objects.create(descricao='VAREJO')
+
+		with self.assertRaises(IntegrityError):
+			with transaction.atomic():
+				GrupoCli.objects.create(descricao='varejo')
+
+	def test_descricao_pode_ser_reutilizada_apos_soft_delete(self):
+		grupo = GrupoCli.objects.create(descricao='VAREJO')
+		grupo.soft_delete(reason='teste')
+		grupo.save()
+
+		novo_grupo = GrupoCli.objects.create(descricao='varejo')
+
+		self.assertNotEqual(grupo.id, novo_grupo.id)
+		self.assertEqual(novo_grupo.descricao, 'VAREJO')

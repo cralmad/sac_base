@@ -6,7 +6,9 @@ import {
   definirMensagem,
   hidratarFormulario,
   setFormState,
-  confirmar
+  confirmar,
+  getScreenPermissions,
+  getDataBackEnd
 } from "/static/js/sisVar.js";
 import { fazerRequisicao } from "/static/js/base.js";
 import { initSmartInputs } from "/static/js/input_rules.js";
@@ -18,6 +20,76 @@ const nomeForm     = "cadGrupo";
 const nomeFormCons = "consGrupo";
 const form         = document.getElementById(nomeForm);
 const form2        = document.getElementById(nomeFormCons);
+
+getDataBackEnd();
+
+function obterPermissoesGrupo() {
+  return getScreenPermissions('permissao_grupo', {
+    acessar: false,
+    consultar: false,
+    incluir: false,
+    editar: false,
+    excluir: false,
+  });
+}
+
+function podeExecutarAcao(acao) {
+  return Boolean(obterPermissoesGrupo()?.[acao]);
+}
+
+function botaoDeveFicarVisivel(botao, estado) {
+  const estadosPermitidos = (botao.dataset.showOn || '')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
+
+  return estadosPermitidos.includes(estado);
+}
+
+function podeExibirBotaoPorPermissao(botaoId, estado) {
+  if (botaoId === "btn-novo") {
+    return podeExecutarAcao("incluir");
+  }
+
+  if (botaoId === "btn-editar") {
+    return podeExecutarAcao("editar");
+  }
+
+  if (botaoId === "btn-excluir") {
+    return podeExecutarAcao("excluir");
+  }
+
+  if (botaoId === "btn-salvar" || botaoId === "btn-cancelar") {
+    if (estado === "novo") {
+      return podeExecutarAcao("incluir");
+    }
+
+    if (estado === "editar") {
+      return podeExecutarAcao("editar");
+    }
+  }
+
+  return true;
+}
+
+function validarPermissaoPorEstado(estado) {
+  if (estado === "novo" && !podeExecutarAcao("incluir")) {
+    definirMensagem("erro", "Você não possui permissão para incluir grupos de permissão.", false);
+    return false;
+  }
+
+  if (estado === "editar" && !podeExecutarAcao("editar")) {
+    definirMensagem("erro", "Você não possui permissão para editar grupos de permissão.", false);
+    return false;
+  }
+
+  if (estado === "excluir" && !podeExecutarAcao("excluir")) {
+    definirMensagem("erro", "Você não possui permissão para excluir grupos de permissão.", false);
+    return false;
+  }
+
+  return true;
+}
 
 // ---------------------------------------------------------------------------
 // Sincronismo de checkboxes: marcar um codename em qualquer aba
@@ -129,6 +201,10 @@ form.addEventListener("submit", async e => {
   atualizarPermissoesNoSisVar();
 
   const formData = getForm(nomeForm);
+  if (!validarPermissaoPorEstado(formData?.estado)) {
+    return;
+  }
+
   if (!formData?.campos?.nome) {
     definirMensagem("aviso", "Preencha o nome do grupo antes de salvar.");
     return;
@@ -183,8 +259,27 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnNovo            = document.getElementById("btn-novo");
   const btnCancelar        = document.getElementById("btn-cancelar");
   const btnExcluir         = document.getElementById("btn-excluir");
+  const btnSalvar          = document.getElementById("btn-salvar");
   const formFiltro         = document.getElementById(nomeFormCons);
   const tabelaCorpo        = document.getElementById("tabela-corpo");
+
+  function aplicarPermissoesNaInterface() {
+    const permissoes = obterPermissoesGrupo();
+    const estadoAtual = getForm(nomeForm)?.estado ?? "visualizar";
+    const botoesControlados = [btnSalvar, btnEditar, btnNovo, btnExcluir, btnCancelar];
+
+    btnAbrirPesquisa.classList.toggle("d-none", !permissoes.consultar);
+
+    botoesControlados.forEach(botao => {
+      const visivelNoEstado = botaoDeveFicarVisivel(botao, estadoAtual);
+      const visivelNaPermissao = podeExibirBotaoPorPermissao(botao.id, estadoAtual);
+      botao.classList.toggle("d-none", !(visivelNoEstado && visivelNaPermissao));
+    });
+
+    if (!permissoes.consultar && !divPesquisa.classList.contains("d-none")) {
+      alternarTelas();
+    }
+  }
 
   const alternarTelas = () => {
     divPrincipal.classList.toggle("d-none");
@@ -197,15 +292,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Botão Editar
   btnEditar.addEventListener("click", () => {
+    clearMessages();
+    if (!podeExecutarAcao("editar")) {
+      definirMensagem("erro", "Você não possui permissão para editar grupos de permissão.", false);
+      return;
+    }
+
     setFormState(nomeForm, "editar");
     bloquearCheckboxes(false);
+    aplicarPermissoesNaInterface();
   });
 
   // Botão Novo
   btnNovo.addEventListener("click", () => {
+    clearMessages();
+    if (!podeExecutarAcao("incluir")) {
+      definirMensagem("erro", "Você não possui permissão para incluir grupos de permissão.", false);
+      return;
+    }
+
     setFormState(nomeForm, "novo");
     aplicarPermissoesNosCheckboxes([]);
     bloquearCheckboxes(false);
+    aplicarPermissoesNaInterface();
   });
 
   // Botão Cancelar
@@ -214,9 +323,10 @@ document.addEventListener("DOMContentLoaded", () => {
       titulo: "Confirmar Cancelamento",
       mensagem: "Deseja cancelar? Os dados não salvos serão perdidos.",
       onConfirmar: () => {
-        setFormState(nomeForm, "novo");
+        setFormState(nomeForm, podeExecutarAcao("incluir") ? "novo" : "visualizar");
         aplicarPermissoesNosCheckboxes([]);
         bloquearCheckboxes(false);
+        aplicarPermissoesNaInterface();
       }
     });
   });
@@ -232,6 +342,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const formData = getForm(nomeForm);
         formData.estado = "excluir";
+
+        if (!validarPermissaoPorEstado(formData.estado)) {
+          AppLoader.hide();
+          return;
+        }
 
         const resultado = await fazerRequisicao("/app/permissao/grupos/", {
           form: { [nomeForm]: formData }
@@ -251,6 +366,7 @@ document.addEventListener("DOMContentLoaded", () => {
         hidratarFormulario(nomeForm);
         aplicarPermissoesNosCheckboxes([]);
         bloquearCheckboxes(false);
+        aplicarPermissoesNaInterface();
         AppLoader.hide();
       }
     });
@@ -260,6 +376,11 @@ document.addEventListener("DOMContentLoaded", () => {
   formFiltro.addEventListener("submit", async e => {
     e.preventDefault();
     clearMessages();
+
+    if (!podeExecutarAcao("consultar")) {
+      definirMensagem("erro", "Você não possui permissão para consultar grupos de permissão.", false);
+      return;
+    }
 
     const resultado = await fazerRequisicao("/app/permissao/grupos/cons", {
       form: { [nomeFormCons]: getForm(nomeFormCons) }
@@ -276,6 +397,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     updateState(resultado.data);
+  aplicarPermissoesNaInterface();
 
     if (resultado.data?.registros?.length > 0) {
       renderizarTabela(resultado.data.registros);
@@ -316,12 +438,22 @@ document.addEventListener("DOMContentLoaded", () => {
     const id = e.target.dataset.id;
     if (!id) { definirMensagem("aviso", "Erro ao selecionar o registro."); return; }
 
+    if (!podeExecutarAcao("consultar")) {
+      definirMensagem("erro", "Você não possui permissão para consultar grupos de permissão.", false);
+      return;
+    }
+
     await carregarRegistro(id);
   });
 
   // Carrega grupo selecionado
   async function carregarRegistro(id) {
     clearMessages();
+
+    if (!podeExecutarAcao("consultar")) {
+      definirMensagem("erro", "Você não possui permissão para consultar grupos de permissão.", false);
+      return;
+    }
 
     updateFormField(nomeFormCons, "id_selecionado", id);
     const sisVarPayload = { form: { [nomeFormCons]: structuredClone(getForm(nomeFormCons)) } };
@@ -348,7 +480,10 @@ document.addEventListener("DOMContentLoaded", () => {
     bloquearCheckboxes(true);
 
     setFormState(nomeForm, "visualizar");
+    aplicarPermissoesNaInterface();
     alternarTelas();
     AppLoader.hide();
   }
+
+  aplicarPermissoesNaInterface();
 });

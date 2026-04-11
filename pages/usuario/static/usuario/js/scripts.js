@@ -38,7 +38,7 @@ form.addEventListener("submit", async e => {
 
     if (data.success) {
       // O redirecionamento mata a página atual, então o loader some sozinho
-      window.location.href = "/app/home/";
+      window.location.href = data.redirect || "/app/home/";
     } else {
       // Erro de credenciais ou validação
       updateState(data);

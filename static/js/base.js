@@ -7,6 +7,8 @@ import {
 
 import { AppLoader } from "/static/js/loader.js";
 
+getDataBackEnd();
+
 /**
  * Função utilitária para fazer requisições POST com CSRF token.
  * Status tratados como resposta legível (não lançam exceção):
@@ -65,7 +67,7 @@ export async function fazerRequisicao(url, payload) {
  */
 export async function inicializarNavbarUsuario() {
   try {
-    await getDataBackEnd();
+    getDataBackEnd();
 
     const usuario = getUsuario();
 
@@ -135,10 +137,42 @@ function marcarLinkAtivo() {
   });
 }
 
+function aplicarPermissoesSidebar() {
+  const usuario = getUsuario();
+  const permissoes = new Set(usuario?.permissoes || []);
+
+  document.querySelectorAll("#sidebar-nav .sidebar-sublink[data-required-permission]").forEach(link => {
+    const permissao = link.dataset.requiredPermission;
+    const item = link.closest("li.nav-item");
+    const permitido = !permissao || permissoes.has(permissao);
+
+    if (item) {
+      item.classList.toggle("d-none", !permitido);
+    }
+  });
+
+  const collapses = Array.from(document.querySelectorAll("#sidebar-nav .collapse")).reverse();
+  collapses.forEach(collapse => {
+    const lista = collapse.querySelector(":scope > ul");
+    if (!lista) {
+      return;
+    }
+
+    const temFilhoVisivel = Array.from(lista.children).some(child => !child.classList.contains("d-none"));
+    collapse.classList.toggle("d-none", !temFilhoVisivel);
+
+    const itemPai = collapse.closest("li.nav-item");
+    if (itemPai) {
+      itemPai.classList.toggle("d-none", !temFilhoVisivel);
+    }
+  });
+}
+
 // Inicializa AppLoader e navbar quando DOM está pronto
 document.addEventListener("DOMContentLoaded", async () => {
   AppLoader.init();
   await inicializarNavbarUsuario();
+  aplicarPermissoesSidebar();
   AppLoader.hide();
 });
 

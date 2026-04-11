@@ -3,9 +3,11 @@ import {
   confirmar,
   definirMensagem,
   getForm,
-  getOthers,
+  getDataset,
+  getScreenPermissions,
   hidratarFormulario,
   setFormState,
+  getDataBackEnd,
   updateFormField,
   updateState,
 } from "/static/js/sisVar.js";
@@ -20,12 +22,39 @@ const nomeFormCons = "consPermissaoUsuario";
 const form = document.getElementById(nomeForm);
 const form2 = document.getElementById(nomeFormCons);
 
+getDataBackEnd();
+
+function obterPermissoesTela() {
+  return getScreenPermissions('permissao_usuario', {
+    acessar: false,
+    consultar: false,
+    editar: false,
+  });
+}
+
+function podeConsultar() {
+  return Boolean(obterPermissoesTela().consultar);
+}
+
+function podeEditar() {
+  return Boolean(obterPermissoesTela().editar);
+}
+
+function botaoDeveFicarVisivel(botao, estado) {
+  const estadosPermitidos = (botao.dataset.showOn || '')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
+
+  return estadosPermitidos.includes(estado);
+}
+
 function getPermissoesGerenciaveis() {
-  return new Set(getOthers().permissoes_gerenciaveis || []);
+  return new Set(getDataset('permissoes_gerenciaveis', []));
 }
 
 function getGruposGerenciaveis() {
-  return new Set((getOthers().grupos_gerenciaveis_ids || []).map(String));
+  return new Set((getDataset('grupos_gerenciaveis_ids', []) || []).map(String));
 }
 
 function alternarSecaoPermissoes(exibir) {
@@ -51,7 +80,7 @@ function renderizarUsuariosSelect() {
   if (!select) return;
 
   const usuarioSelecionado = String(getForm(nomeForm)?.campos?.usuario_id ?? "");
-  const usuarios = getOthers().usuarios_ativos || [];
+  const usuarios = getDataset('usuarios_ativos', []);
 
   select.innerHTML = '<option value="">Selecione um usuário</option>';
   usuarios.forEach(usuario => {
@@ -68,7 +97,7 @@ function renderizarGrupos() {
   const container = document.getElementById("grupos-disponiveis");
   if (!container) return;
 
-  const grupos = getOthers().grupos_cadastrados || [];
+  const grupos = getDataset('grupos_cadastrados', []);
   container.innerHTML = "";
 
   if (grupos.length === 0) {
@@ -183,7 +212,7 @@ function aplicarPermissoesNosCheckboxes(permissoes = []) {
 function aplicarEstadoAssociacoes() {
   const estado = getForm(nomeForm)?.estado;
   const usuarioSelecionado = Boolean(getForm(nomeForm)?.campos?.usuario_id);
-  const somenteLeitura = !usuarioSelecionado || estado === "visualizar";
+  const somenteLeitura = !podeEditar() || !usuarioSelecionado || estado === "visualizar";
   const gruposGerenciaveis = getGruposGerenciaveis();
   const permissoesGerenciaveis = getPermissoesGerenciaveis();
 
@@ -205,6 +234,32 @@ function resetarSelecaoUsuario() {
   aplicarEstadoAssociacoes();
 }
 
+function aplicarPermissoesNaInterface() {
+  const permissoes = obterPermissoesTela();
+  const estadoAtual = getForm(nomeForm)?.estado ?? "visualizar";
+  const btnSalvar = document.getElementById("btn-salvar");
+  const btnEditar = document.getElementById("btn-editar");
+  const btnNovo = document.getElementById("btn-novo");
+  const btnCancelar = document.getElementById("btn-cancelar");
+  const btnAbrirPesquisa = document.getElementById("btn-abrir-pesquisa");
+
+  if (btnSalvar) {
+    btnSalvar.classList.toggle("d-none", !(botaoDeveFicarVisivel(btnSalvar, estadoAtual) && permissoes.editar));
+  }
+  if (btnEditar) {
+    btnEditar.classList.toggle("d-none", !(botaoDeveFicarVisivel(btnEditar, estadoAtual) && permissoes.editar));
+  }
+  if (btnNovo) {
+    btnNovo.classList.toggle("d-none", !(botaoDeveFicarVisivel(btnNovo, estadoAtual) && permissoes.editar));
+  }
+  if (btnCancelar) {
+    btnCancelar.classList.toggle("d-none", !(botaoDeveFicarVisivel(btnCancelar, estadoAtual) && permissoes.editar));
+  }
+  if (btnAbrirPesquisa) {
+    btnAbrirPesquisa.classList.toggle("d-none", !permissoes.consultar);
+  }
+}
+
 const updater = criarAtualizadorForm({ formId: nomeForm, setter: updateFormField, form });
 form.addEventListener("input", updater);
 form.addEventListener("change", updater);
@@ -222,6 +277,11 @@ form.addEventListener("submit", async e => {
   clearMessages();
   atualizarGruposNoSisVar();
   atualizarPermissoesNoSisVar();
+
+  if (!podeEditar()) {
+    definirMensagem("erro", "Você não possui permissão para alterar permissões de usuários.", false);
+    return;
+  }
 
   const formData = getForm(nomeForm);
   if (!formData?.campos?.usuario_id) {
@@ -287,13 +347,27 @@ document.addEventListener("DOMContentLoaded", () => {
   btnFechar.addEventListener("click", alternarTelas);
 
   btnEditar.addEventListener("click", () => {
+    clearMessages();
+    if (!podeEditar()) {
+      definirMensagem("erro", "Você não possui permissão para alterar permissões de usuários.", false);
+      return;
+    }
+
     setFormState(nomeForm, "editar");
     alternarSecaoPermissoes(true);
     aplicarEstadoAssociacoes();
+    aplicarPermissoesNaInterface();
   });
 
   btnNovo.addEventListener("click", () => {
+    clearMessages();
+    if (!podeEditar()) {
+      definirMensagem("erro", "Você não possui permissão para alterar permissões de usuários.", false);
+      return;
+    }
+
     resetarSelecaoUsuario();
+    aplicarPermissoesNaInterface();
   });
 
   btnCancelar.addEventListener("click", () => {
@@ -302,12 +376,19 @@ document.addEventListener("DOMContentLoaded", () => {
       mensagem: "Deseja cancelar? Os dados não salvos serão perdidos.",
       onConfirmar: () => {
         resetarSelecaoUsuario();
+        aplicarPermissoesNaInterface();
       }
     });
   });
 
   selectUsuario.addEventListener("change", async e => {
     const id = e.target.value;
+
+    if (!podeConsultar()) {
+      definirMensagem("erro", "Você não possui permissão para consultar usuários.", false);
+      e.target.value = "";
+      return;
+    }
 
     if (!id) {
       resetarSelecaoUsuario();
@@ -320,6 +401,11 @@ document.addEventListener("DOMContentLoaded", () => {
   form2.addEventListener("submit", async e => {
     e.preventDefault();
     clearMessages();
+
+    if (!podeConsultar()) {
+      definirMensagem("erro", "Você não possui permissão para consultar usuários.", false);
+      return;
+    }
 
     const resultado = await fazerRequisicao("/app/permissao/usuario/cons", {
       form: { [nomeFormCons]: getForm(nomeFormCons) }
@@ -336,6 +422,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     updateState(resultado.data);
+  aplicarPermissoesNaInterface();
 
     if (resultado.data?.registros?.length > 0) {
       renderizarTabela(resultado.data.registros);
@@ -378,11 +465,21 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    if (!podeConsultar()) {
+      definirMensagem("erro", "Você não possui permissão para consultar usuários.", false);
+      return;
+    }
+
     await carregarRegistro(id, true);
   });
 
   async function carregarRegistro(id, fecharPesquisa = false) {
     clearMessages();
+
+    if (!podeConsultar()) {
+      definirMensagem("erro", "Você não possui permissão para consultar usuários.", false);
+      return;
+    }
 
     updateFormField(nomeFormCons, "id_selecionado", id);
     const sisVarPayload = { form: { [nomeFormCons]: structuredClone(getForm(nomeFormCons)) } };
@@ -408,6 +505,7 @@ document.addEventListener("DOMContentLoaded", () => {
     alternarSecaoPermissoes(true);
     setFormState(nomeForm, "visualizar");
     aplicarEstadoAssociacoes();
+    aplicarPermissoesNaInterface();
 
     if (fecharPesquisa && !divPesquisa.classList.contains("d-none")) {
       alternarTelas();
@@ -420,4 +518,5 @@ document.addEventListener("DOMContentLoaded", () => {
   aplicarGruposNosCheckboxes(getForm(nomeForm)?.campos?.grupos || []);
   aplicarPermissoesNosCheckboxes(getForm(nomeForm)?.campos?.permissoes || []);
   aplicarEstadoAssociacoes();
+  aplicarPermissoesNaInterface();
 });

@@ -3,8 +3,10 @@ import json
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.exceptions import PermissionDenied
+from django.db import IntegrityError, transaction
 from django.test import RequestFactory, TestCase
 
+from pages.auditoria.models import AuditEvent
 from pages.cad_grupo_cli.models import GrupoCli
 from pages.core.models import Cidade, Pais, Regiao
 
@@ -132,6 +134,11 @@ class CadClientePermissaoViewTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(request.sisvar_extra['form']['cadCliente']['estado'], 'novo')
+		conteudo = response.content.decode('utf-8')
+		self.assertIn('id="btn-salvar"', conteudo)
+		self.assertIn('btn btn-primary d-none', conteudo)
+		self.assertIn('id="btn-abrir-pesquisa"', conteudo)
+		self.assertIn('btn btn-secondary d-none', conteudo)
 
 	def test_get_sem_permissao_view_levanta_permission_denied(self):
 		usuario = self.criar_usuario('semview')
@@ -164,6 +171,7 @@ class CadClientePermissaoViewTests(TestCase):
 		self.assertTrue(data['success'])
 		self.assertEqual(Cliente.objects.count(), 1)
 		self.assertEqual(data['form']['cadCliente']['estado'], 'visualizar')
+		self.assertTrue(AuditEvent.objects.filter(action='create').exists())
 
 	def test_post_editar_exige_permissao_change(self):
 		usuario = self.criar_usuario('semchange', [self.perm_view])
@@ -190,6 +198,22 @@ class CadClientePermissaoViewTests(TestCase):
 		self.assertIn('excluir clientes', data['mensagens']['erro']['conteudo'][0])
 		self.assertTrue(Cliente.objects.filter(id=cliente.id).exists())
 
+	def test_post_excluir_realiza_soft_delete_e_auditoria(self):
+		usuario = self.criar_usuario('comdelete', [self.perm_view, self.perm_delete])
+		cliente = self.criar_cliente()
+		payload = self.payload_cliente(estado='excluir', cliente_id=cliente.id)
+		request = self.build_post_request('/app/cad/cliente/', payload, usuario)
+
+		response = cad_cliente_view(request)
+		data = json.loads(response.content)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertTrue(data['success'])
+		self.assertFalse(Cliente.objects.filter(id=cliente.id).exists())
+		cliente_soft = Cliente.all_objects.get(id=cliente.id)
+		self.assertTrue(cliente_soft.is_deleted)
+		self.assertTrue(AuditEvent.objects.filter(action='soft_delete', object_id=str(cliente.id)).exists())
+
 	def test_consulta_exige_permissao_view(self):
 		usuario = self.criar_usuario('semview')
 		payload = {
@@ -206,3 +230,50 @@ class CadClientePermissaoViewTests(TestCase):
 
 		with self.assertRaises(PermissionDenied):
 			cad_cliente_cons_view(request)
+
+	def test_identificador_ativo_permanece_unico(self):
+		self.criar_cliente()
+
+		with self.assertRaises(IntegrityError):
+			with transaction.atomic():
+				Cliente.objects.create(
+					grupo=self.grupo,
+					nome='Outro Cliente',
+					rsocial='Outro Cliente LTDA',
+					logradouro='Rua',
+					endereco='Outra',
+					numero='20',
+					complemento='',
+					bairro='Centro',
+					pais=self.pais,
+					regiao=self.regiao,
+					cidade=self.cidade,
+					codpostal='01000-001',
+					identificador='DOC-EXISTENTE',
+					observacao='Duplicado ativo',
+				)
+
+	def test_identificador_pode_ser_reutilizado_apos_soft_delete(self):
+		cliente = self.criar_cliente()
+		cliente.soft_delete(reason='teste')
+		cliente.save()
+
+		novo_cliente = Cliente.objects.create(
+			grupo=self.grupo,
+			nome='Novo Cliente',
+			rsocial='Novo Cliente LTDA',
+			logradouro='Rua',
+			endereco='Nova',
+			numero='30',
+			complemento='',
+			bairro='Centro',
+			pais=self.pais,
+			regiao=self.regiao,
+			cidade=self.cidade,
+			codpostal='01000-002',
+			identificador='DOC-EXISTENTE',
+			observacao='Reuso apos exclusao logica',
+		)
+
+		self.assertNotEqual(cliente.id, novo_cliente.id)
+		self.assertEqual(novo_cliente.identificador, 'DOC-EXISTENTE')

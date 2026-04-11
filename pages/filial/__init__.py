@@ -1,0 +1,1 @@
+# App de escopo por matriz/filial.

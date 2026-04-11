@@ -1,18 +1,158 @@
-// 1.
-// Definição do Estado com Proxy Reativo
-
-// FIX #1: Flag para evitar múltiplas execuções de getDataBackEnd()
 let _dataBackEndProcessado = false;
+
+const _dadosBE = 'sisDados';
+const _estadosFormularioValidos = ['novo', 'editar', 'visualizar'];
+const _estadoAplicadoPorFormulario = new Map();
+
+function createDefaultMessages() {
+  return {
+    sucesso: { conteudo: [], ignorar: true },
+    erro: { conteudo: [], ignorar: true },
+    aviso: { conteudo: [], ignorar: true },
+    info: { conteudo: [], ignorar: true }
+  };
+}
+
+function createDefaultMeta() {
+  return {
+    security: {
+      csrfTokenValue: ''
+    },
+    permissions: {},
+    options: {},
+    datasets: {}
+  };
+}
+
+function isPlainObject(value) {
+  return Object.prototype.toString.call(value) === '[object Object]';
+}
+
+function cloneValue(value) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof structuredClone === 'function') {
+    return structuredClone(value);
+  }
+
+  return JSON.parse(JSON.stringify(value));
+}
+
+function mergeObjects(base, patch) {
+  const baseObj = isPlainObject(base) ? base : {};
+  const patchObj = isPlainObject(patch) ? patch : {};
+  const result = { ...baseObj };
+
+  Object.entries(patchObj).forEach(([key, value]) => {
+    if (isPlainObject(value) && isPlainObject(result[key])) {
+      result[key] = mergeObjects(result[key], value);
+      return;
+    }
+
+    result[key] = cloneValue(value);
+  });
+
+  return result;
+}
+
+function buildLegacyOthersFromMeta(meta) {
+  const normalizedMeta = isPlainObject(meta) ? meta : createDefaultMeta();
+  return {
+    csrf_token_value: normalizedMeta.security?.csrfTokenValue || '',
+    permissoes: cloneValue(normalizedMeta.permissions || {}),
+    opcoes: cloneValue(normalizedMeta.options || {}),
+    ...cloneValue(normalizedMeta.datasets || {})
+  };
+}
+
+function normalizeLegacyOthers(others) {
+  const normalizedMeta = createDefaultMeta();
+
+  if (!isPlainObject(others)) {
+    return normalizedMeta;
+  }
+
+  const {
+    csrf_token_value,
+    permissoes,
+    opcoes,
+    ...datasets
+  } = others;
+
+  normalizedMeta.security.csrfTokenValue = csrf_token_value || '';
+  normalizedMeta.permissions = isPlainObject(permissoes) ? cloneValue(permissoes) : {};
+  normalizedMeta.options = isPlainObject(opcoes) ? cloneValue(opcoes) : {};
+  normalizedMeta.datasets = cloneValue(datasets);
+
+  return normalizedMeta;
+}
+
+function normalizeMeta(meta) {
+  const normalizedMeta = createDefaultMeta();
+
+  if (!isPlainObject(meta)) {
+    return normalizedMeta;
+  }
+
+  if (isPlainObject(meta.security)) {
+    normalizedMeta.security = mergeObjects(normalizedMeta.security, meta.security);
+  }
+
+  if (isPlainObject(meta.permissions)) {
+    normalizedMeta.permissions = cloneValue(meta.permissions);
+  }
+
+  if (isPlainObject(meta.options)) {
+    normalizedMeta.options = cloneValue(meta.options);
+  }
+
+  if (isPlainObject(meta.datasets)) {
+    normalizedMeta.datasets = cloneValue(meta.datasets);
+  }
+
+  if ('csrfTokenValue' in meta || 'csrf_token_value' in meta) {
+    normalizedMeta.security.csrfTokenValue = meta.csrfTokenValue ?? meta.csrf_token_value ?? '';
+  }
+
+  Object.entries(meta).forEach(([key, value]) => {
+    if (['security', 'permissions', 'options', 'datasets', 'csrfTokenValue', 'csrf_token_value'].includes(key)) {
+      return;
+    }
+
+    normalizedMeta.datasets[key] = cloneValue(value);
+  });
+
+  return normalizedMeta;
+}
+
+function mergeFormState(currentForm, incomingForm) {
+  const current = isPlainObject(currentForm) ? currentForm : {};
+  const incoming = isPlainObject(incomingForm) ? incomingForm : {};
+  const result = { ...current };
+
+  Object.entries(incoming).forEach(([formId, formData]) => {
+    const atual = current[formId] || {};
+    const proximo = { ...atual, ...cloneValue(formData) };
+
+    if (isPlainObject(atual.campos) && isPlainObject(formData?.campos)) {
+      proximo.campos = mergeObjects(atual.campos, formData.campos);
+    }
+
+    result[formId] = proximo;
+  });
+
+  return result;
+}
 
 let _rawState = {
   form: {},
   schema: {},
-  mensagens: {},
+  mensagens: createDefaultMessages(),
   usuario: {},
-  // Local centralizado para metadados e tokens de segurança
-  others: {
-    csrf_token_value: ""
-  }
+  meta: createDefaultMeta(),
+  others: buildLegacyOthersFromMeta(createDefaultMeta())
 };
 
 const _state = new Proxy(_rawState, {
@@ -39,12 +179,12 @@ const _state = new Proxy(_rawState, {
   }
 });
 
-const _dadosBE = 'sisDados';
+function syncLegacyOthersFromMeta() {
+  _rawState.others = buildLegacyOthersFromMeta(_rawState.meta);
+}
 
-// 2.
-// Controlador de Interface (DOM)
-
-function applyFormState(formId, estado) {
+function applyFormState(formId, estado, options = {}) {
+  const { force = false } = options;
 
   const form = document.querySelector(`[data-form-lock="${formId}"]`);
   if (!form) return;
@@ -52,7 +192,8 @@ function applyFormState(formId, estado) {
   // 'novo': limpa o DOM e habilita inputs
   // 'editar': apenas habilita inputs (dados carregados permanecem no DOM)
   // 'visualizar': desabilita inputs (hidratarFormulario() deve ter sido chamado antes)
-  if (estado === 'novo') {
+  const estadoAnterior = _estadoAplicadoPorFormulario.get(formId);
+  if (estado === 'novo' && (force || estadoAnterior !== 'novo')) {
     clearFormFields(form);
   }
 
@@ -76,6 +217,8 @@ function applyFormState(formId, estado) {
   if (pageTitleSuffix) {
     pageTitleSuffix.textContent = estado === 'editar' ? ' — Edição de Registro' : '';
   }
+
+  _estadoAplicadoPorFormulario.set(formId, estado);
 }
 
 function clearFormFields(form) {
@@ -103,19 +246,63 @@ export function getForm(formId = null) {
 }
 
 export function getSchema(schemaId = null) {
-  if (schemaId) return _state.schema[schemaId] || null;
-  return _state.schema;
+  if (schemaId) {
+    const schema = _state.schema[schemaId];
+    return schema ? cloneValue(schema) : null;
+  }
+
+  return cloneValue(_state.schema);
 }
 
 export function getUsuario() {
-  return _state.usuario;
+  return cloneValue(_state.usuario);
+}
+
+export function getMeta(section = null) {
+  if (section) {
+    return cloneValue(_state.meta?.[section] ?? null);
+  }
+
+  return cloneValue(_state.meta);
+}
+
+export function getFormState(formId) {
+  return _state.form?.[formId]?.estado ?? null;
+}
+
+export function getFormFields(formId) {
+  return cloneValue(_state.form?.[formId]?.campos ?? {});
+}
+
+export function getScreenPermissions(screenKey, fallback = {}) {
+  return cloneValue(_state.meta?.permissions?.[screenKey] ?? fallback);
+}
+
+export function hasScreenPermission(screenKey, action) {
+  return Boolean(_state.meta?.permissions?.[screenKey]?.[action]);
+}
+
+export function getOptions(optionKey = null, fallback = null) {
+  if (!optionKey) {
+    return cloneValue(_state.meta?.options ?? {});
+  }
+
+  return cloneValue(_state.meta?.options?.[optionKey] ?? fallback);
+}
+
+export function getDataset(datasetKey = null, fallback = null) {
+  if (!datasetKey) {
+    return cloneValue(_state.meta?.datasets ?? {});
+  }
+
+  return cloneValue(_state.meta?.datasets?.[datasetKey] ?? fallback);
 }
 
 /**
  * Recupera o token CSRF atual guardado no estado
  */
 export function getCsrfToken() {
-  return _state.others?.csrf_token_value || "";
+  return _state.meta?.security?.csrfTokenValue || _state.others?.csrf_token_value || "";
 }
 
 export function renderMensagens() {
@@ -364,24 +551,48 @@ export function getDataBackEnd() {
 export function updateState(newData) {
   if (!newData || typeof newData !== 'object') return;
 
-  if (newData.csrfToken) {
-    _state.others.csrf_token_value = newData.csrfToken;
-    delete newData.csrfToken;
+  const payload = cloneValue(newData);
+  const knownKeys = new Set(['form', 'schema', 'mensagens', 'messages', 'usuario', 'user', 'others', 'meta', 'csrfToken']);
+
+  if (payload.form) {
+    _state.form = mergeFormState(_state.form, payload.form);
+
+    Object.entries(payload.form).forEach(([formId, formData]) => {
+      if (formData?.estado === 'novo') {
+        applyFormState(formId, 'novo', { force: true });
+      }
+    });
   }
 
-  Object.entries(newData).forEach(([key, value]) => {
-    if (key === 'form' && _state.form) {
-      _state.form = { ..._state.form, ...value };
-    } 
-    else if (key === 'others' && _state.others) {
-      _state.others = { ..._state.others, ...value };
-    } 
-    else if (key === 'mensagens' && _state.mensagens) {
-      _state.mensagens = { ..._state.mensagens, ...value };
+  if (payload.schema) {
+    _state.schema = mergeObjects(_state.schema, payload.schema);
+  }
+
+  if (payload.mensagens || payload.messages) {
+    _state.mensagens = mergeObjects(createDefaultMessages(), payload.mensagens ?? payload.messages);
+  }
+
+  if (payload.usuario || payload.user) {
+    _state.usuario = mergeObjects(_state.usuario, payload.usuario ?? payload.user);
+  }
+
+  const metaFromOthers = normalizeLegacyOthers(payload.others);
+  const explicitMeta = normalizeMeta(payload.meta);
+  const nextMeta = mergeObjects(mergeObjects(_state.meta, metaFromOthers), explicitMeta);
+
+  if (payload.csrfToken) {
+    nextMeta.security.csrfTokenValue = payload.csrfToken;
+  }
+
+  _state.meta = nextMeta;
+  syncLegacyOthersFromMeta();
+
+  Object.entries(payload).forEach(([key, value]) => {
+    if (knownKeys.has(key)) {
+      return;
     }
-    else if (key !== 'csrfToken') {
-      _state[key] = value;
-    }
+
+    _state[key] = cloneValue(value);
   });
 }
 
@@ -389,12 +600,7 @@ export function updateState(newData) {
  * Limpa todas as mensagens do estado
  */
 export function clearMessages() {
-  _state.mensagens = {
-    sucesso: { conteudo: [], ignorar: true },
-    erro: { conteudo: [], ignorar: true },
-    aviso: { conteudo: [], ignorar: true },
-    info: { conteudo: [], ignorar: true }
-  };
+  _state.mensagens = createDefaultMessages();
 }
 
 /**
@@ -408,10 +614,8 @@ export function clearMessages() {
  *   'visualizar' → desabilita inputs; hidratarFormulario() deve ser chamado antes
  */
 export function setFormState(formId, estado) {
-  const estadosValidos = ['novo', 'editar', 'visualizar'];
-
-  if (!estadosValidos.includes(estado)) {
-    console.warn(`Estado inválido: "${estado}". Estados válidos: ${estadosValidos.join(', ')}`);
+  if (!_estadosFormularioValidos.includes(estado)) {
+    console.warn(`Estado inválido: "${estado}". Estados válidos: ${_estadosFormularioValidos.join(', ')}`);
     return;
   }
 
@@ -440,6 +644,47 @@ export function setFormState(formId, estado) {
       campos: camposAtualizados
     }
   };
+
+  applyFormState(formId, estado, { force: estado === 'novo' });
+}
+
+export function canTransitionFormState(formId, nextState) {
+  if (!_estadosFormularioValidos.includes(nextState)) {
+    return false;
+  }
+
+  const currentState = getFormState(formId);
+  if (!currentState) {
+    return false;
+  }
+
+  const allowedTransitions = {
+    novo: ['visualizar', 'editar', 'novo'],
+    editar: ['visualizar', 'novo', 'editar'],
+    visualizar: ['editar', 'novo', 'visualizar']
+  };
+
+  return allowedTransitions[currentState]?.includes(nextState) ?? false;
+}
+
+export function transitionFormState(formId, nextState) {
+  if (!canTransitionFormState(formId, nextState)) {
+    console.warn(`Transição inválida de estado para o formulário "${formId}": ${getFormState(formId)} -> ${nextState}`);
+    return false;
+  }
+
+  setFormState(formId, nextState);
+  return true;
+}
+
+export function resetFormState(formId) {
+  if (!_state.form[formId]) {
+    console.warn(`Formulário "${formId}" não encontrado no sisVar.`);
+    return false;
+  }
+
+  setFormState(formId, 'novo');
+  return true;
 }
 
 /**
@@ -448,7 +693,7 @@ export function setFormState(formId, estado) {
 export function setSchema(formId, schema) {
   _state.schema = {
     ..._state.schema,
-    [formId]: schema
+    [formId]: cloneValue(schema)
   };
 }
 
@@ -464,5 +709,6 @@ export function __debugState() {
  * Use para acessar chaves dinâmicas injetadas pelo backend (ex: opcoes).
  */
 export function getOthers() {
-  return structuredClone(_state.others);
+  syncLegacyOthersFromMeta();
+  return cloneValue(_state.others);
 }

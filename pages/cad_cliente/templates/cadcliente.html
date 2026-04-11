@@ -173,7 +173,7 @@
 
         {# ── Botões controlados pelo estado via data-show-on ── #}
         <div class="d-grid gap-2 d-md-flex mt-3">
-            <button id="btn-salvar"   class="btn btn-primary"                  data-show-on="novo,editar"  type="submit">
+            <button id="btn-salvar"   class="btn btn-primary d-none"           data-show-on="novo,editar"  type="submit">
                 <i class="bi bi-save"></i> Salvar
             </button>
             <button id="btn-editar"   class="btn btn-warning  d-none"          data-show-on="visualizar"   type="button">
@@ -188,7 +188,7 @@
             <button id="btn-excluir"  class="btn btn-danger   d-none"          data-show-on="visualizar"   type="button">
                 <i class="bi bi-trash"></i> Excluir
             </button>
-            <button id="btn-abrir-pesquisa" class="btn btn-secondary"          type="button">
+            <button id="btn-abrir-pesquisa" class="btn btn-secondary d-none"   type="button">
                 <i class="bi bi-search"></i> Pesquisar
             </button>
         </div>
