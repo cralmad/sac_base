@@ -20,7 +20,7 @@ from sac_base.sisvar_builders import (
     build_success_payload,
 )
 
-from .models import ESTADO_CHOICES, ORIGEM_CHOICES, TIPO_CHOICES, Pedido, TentativaEntrega
+from .models import ESTADO_CHOICES, ORIGEM_CHOICES, PERIODO_CHOICES, TIPO_CHOICES, Pedido, TentativaEntrega
 from .services.importador_csv import importar_csv
 
 
@@ -108,6 +108,7 @@ def _serialize_pedido_form(pedido):
         "cliente_id": pedido.cliente_id,
         "motorista_id": pedido.motorista_id,
         "peso": str(pedido.peso) if pedido.peso is not None else "",
+        "expresso": pedido.expresso,
     }
 
 
@@ -117,6 +118,10 @@ def _serialize_tentativa(reg):
         "pedido_id": reg.pedido_id,
         "data_tentativa": reg.data_tentativa.isoformat() if reg.data_tentativa else "",
         "estado": reg.estado or "",
+        "carro": reg.carro,
+        "motorista_id": reg.motorista_id,
+        "motorista_nome": reg.motorista.nome if reg.motorista_id else "",
+        "periodo": reg.periodo or "",
         "faturado": reg.faturado,
         "interno": reg.interno,
         "dt_entrega": reg.dt_entrega.isoformat() if reg.dt_entrega else "",
@@ -149,6 +154,7 @@ def _build_campos_pedido_iniciais():
         "cliente_id": None,
         "motorista_id": None,
         "peso": "",
+        "expresso": False,
     }
 
 
@@ -256,6 +262,7 @@ def pedidos_cadastro_view(request):
             "cliente_id": {"type": "string", "required": False, "value": ""},
             "motorista_id": {"type": "string", "required": False, "value": ""},
             "peso": {"type": "string", "required": False, "value": ""},
+            "expresso": {"type": "boolean", "required": False, "value": False},
         },
         nome_cons: {
             "filial_cons": {"type": "string", "required": False, "value": ""},
@@ -292,6 +299,7 @@ def pedidos_cadastro_view(request):
                 "estados": [{"value": k, "label": v} for k, v in ESTADO_CHOICES],
                 "origens": [{"value": k, "label": v} for k, v in ORIGEM_CHOICES],
                 "clientes": _listar_clientes_ativos(),
+                "periodos_mov": [{"value": k, "label": v} for k, v in PERIODO_CHOICES],
             },
             datasets={"filiais_escrita": listar_filiais_escrita(usuario)},
         )
@@ -355,6 +363,7 @@ def pedidos_cadastro_view(request):
                 "cliente_id": _parse_int(campos.get("cliente_id")),
                 "motorista_id": _parse_int(campos.get("motorista_id")),
                 "peso": _parse_decimal(campos.get("peso")),
+                "expresso": bool(campos.get("expresso", False)),
             }
 
             if estado_form == "editar" and pedido.origem == "IMPORTADO":
@@ -375,7 +384,7 @@ def pedidos_cadastro_view(request):
         form_id=nome_form,
         estado="visualizar",
         campos=_serialize_pedido_form(pedido),
-        extra_payload={"registros_mov": [_serialize_tentativa(t) for t in pedido.tentativas.order_by("-data_tentativa", "-id")]},
+        extra_payload={"registros_mov": [_serialize_tentativa(t) for t in pedido.tentativas.select_related("motorista").order_by("-data_tentativa", "-id")]},
         mensagem_sucesso="Pedido salvo com sucesso!",
     ))
 
@@ -401,7 +410,7 @@ def pedidos_cadastro_cons_view(request):
             form_id=nome_form,
             estado="visualizar",
             campos=_serialize_pedido_form(pedido),
-            extra_payload={"registros_mov": [_serialize_tentativa(t) for t in pedido.tentativas.order_by("-data_tentativa", "-id")]},
+            extra_payload={"registros_mov": [_serialize_tentativa(t) for t in pedido.tentativas.select_related("motorista").order_by("-data_tentativa", "-id")]},
         ))
 
     qs = Pedido.objects.filter(filial_id__in=filiais_ids).select_related("filial", "cliente", "motorista").order_by("-atualizacao", "-id")
@@ -456,7 +465,7 @@ def pedido_mov_list_view(request):
     if request.method != "POST":
         return JsonResponse(build_error_payload("Método não permitido."), status=405)
     pedido_id = request.sisvar_front.get("pedido_id")
-    regs = TentativaEntrega.objects.filter(pedido_id=pedido_id).order_by("-data_tentativa", "-id")
+    regs = TentativaEntrega.objects.filter(pedido_id=pedido_id).select_related("motorista").order_by("-data_tentativa", "-id")
     return JsonResponse(build_records_response([_serialize_tentativa(r) for r in regs]))
 
 
@@ -475,6 +484,19 @@ def pedido_mov_save_view(request):
     if not dt_tentativa:
         return JsonResponse(build_error_payload("Data da tentativa é obrigatória."), status=400)
 
+    carro = _parse_int(data.get("carro"))
+    motorista_id = _parse_int(data.get("motorista_id"))
+    periodo = (data.get("periodo") or "").strip().upper() or None
+
+    if periodo and periodo not in {codigo for codigo, _ in PERIODO_CHOICES}:
+        return JsonResponse(build_error_payload("Período inválido."), status=400)
+
+    motorista = None
+    if motorista_id is not None:
+        motorista = Motorista.objects.filter(id=motorista_id, filial_id=pedido.filial_id, is_deleted=False).first()
+        if not motorista:
+            return JsonResponse(build_error_payload("Motorista inválido para a filial do pedido."), status=400)
+
     if mov_id:
         mov = TentativaEntrega.objects.filter(id=mov_id, pedido=pedido).first()
         if not mov:
@@ -484,6 +506,9 @@ def pedido_mov_save_view(request):
 
     mov.data_tentativa = dt_tentativa
     mov.estado = (data.get("estado") or "").strip() or None
+    mov.carro = carro
+    mov.motorista = motorista
+    mov.periodo = periodo
     mov.dt_entrega = _parse_date(data.get("dt_entrega"))
     mov.faturado = bool(data.get("faturado", False))
     mov.interno = bool(data.get("interno", False))

@@ -11,7 +11,6 @@ import {
   getScreenPermissions,
   getDataset,
   getDataBackEnd,
-  getCsrfToken,
 } from '/static/js/sisVar.js';
 import { fazerRequisicao } from '/static/js/base.js';
 import { initSmartInputs } from '/static/js/input_rules.js';
@@ -86,39 +85,77 @@ function preencherEstados() {
   preencherSelect('mov_estado', estados, 'Selecione', e => ({ value: e.value, label: e.label }));
 }
 
+function preencherPeriodosMov() {
+  const periodos = getOptions('periodos_mov', []);
+  preencherSelect('mov_periodo', periodos, 'Selecione', p => ({ value: p.value, label: p.label }));
+}
+
 function preencherOrigens() {
   const origens = getOptions('origens', []);
   preencherSelect('origem_cons', origens, 'Todas', o => ({ value: o.value, label: o.label }));
 }
 
+function formEmVisualizacao() {
+  return (getForm(nomeForm)?.estado || 'visualizar') === 'visualizar';
+}
+
+function pedidoEstaSalvo() {
+  return Boolean(getForm(nomeForm)?.campos?.id);
+}
+
+function aplicarTravasMovimentacoes() {
+  const bloqueado = formEmVisualizacao();
+  const semPedidoSalvo = !pedidoEstaSalvo();
+  const btnNovoMov = document.getElementById('btn-mov-novo');
+  const btnSalvarMov = document.getElementById('btn-mov-salvar');
+
+  if (btnNovoMov) btnNovoMov.disabled = bloqueado || semPedidoSalvo;
+  if (btnSalvarMov) btnSalvarMov.disabled = bloqueado;
+
+  tabelaMovCorpo.querySelectorAll('.btn-mov-editar, .btn-mov-excluir').forEach(btn => {
+    btn.disabled = bloqueado;
+  });
+}
+
 function preencherMotoristasFilial(filialId) {
-  const select = document.getElementById('motorista_id');
-  const atual = getForm(nomeForm)?.campos?.motorista_id;
-  select.innerHTML = '<option value="">Selecione</option>';
+  const selectPedido = document.getElementById('motorista_id');
+  const selectMov = document.getElementById('mov_motorista');
+  const atualPedido = getForm(nomeForm)?.campos?.motorista_id;
+  const atualMov = document.getElementById('mov_motorista')?.value || '';
+
+  [selectPedido, selectMov].forEach(select => {
+    if (select) {
+      select.innerHTML = '<option value="">Selecione</option>';
+    }
+  });
+
   if (!filialId) {
     updateFormField(nomeForm, 'motorista_id', null);
     return;
   }
 
-  fetch('/app/logistica/pedidos/motoristas', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': getCsrfToken() || '',
-    },
-    body: JSON.stringify({ filial_id: filialId }),
-  })
-    .then(resp => resp.json())
-    .then(data => {
-      const registros = data.registros || [];
+  fazerRequisicao('/app/logistica/pedidos/motoristas', { filial_id: filialId })
+    .then(resultado => {
+      if (!resultado?.success) {
+        throw new Error('Falha ao buscar motoristas.');
+      }
+
+      const registros = resultado?.data?.registros || [];
       registros.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m.id;
-        opt.textContent = `${m.codigo || '-'} - ${m.nome}`;
-        select.appendChild(opt);
+        [selectPedido, selectMov].forEach(select => {
+          if (!select) return;
+          const opt = document.createElement('option');
+          opt.value = m.id;
+          opt.textContent = `${m.codigo || '-'} - ${m.nome}`;
+          select.appendChild(opt);
+        });
       });
-      if (atual) {
-        select.value = String(atual);
+
+      if (atualPedido && selectPedido) {
+        selectPedido.value = String(atualPedido);
+      }
+      if (atualMov && selectMov) {
+        selectMov.value = String(atualMov);
       }
     })
     .catch(() => {
@@ -159,7 +196,8 @@ function aplicarTravasImportados() {
 function renderMovimentacoes(registros = []) {
   tabelaMovCorpo.innerHTML = '';
   if (!registros.length) {
-    tabelaMovCorpo.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Nenhuma movimentação</td></tr>';
+    tabelaMovCorpo.innerHTML = '<tr><td colspan="10" class="text-center text-muted">Nenhuma movimentação</td></tr>';
+    aplicarTravasMovimentacoes();
     return;
   }
 
@@ -169,16 +207,21 @@ function renderMovimentacoes(registros = []) {
       <td>${m.id}</td>
       <td>${m.data_tentativa || ''}</td>
       <td>${m.estado || ''}</td>
+      <td>${m.carro ?? ''}</td>
+      <td>${m.motorista_nome || ''}</td>
+      <td>${m.periodo === 'MANHA' ? 'MANHÃ' : (m.periodo || '')}</td>
       <td>${m.dt_entrega || ''}</td>
       <td>${m.faturado ? 'Sim' : 'Não'}</td>
       <td>${m.interno ? 'Sim' : 'Não'}</td>
       <td class="text-center">
-        <button class="btn btn-sm btn-outline-warning me-1 btn-mov-editar" data-id="${m.id}">Editar</button>
-        <button class="btn btn-sm btn-outline-danger btn-mov-excluir" data-id="${m.id}">Excluir</button>
+        <button type="button" class="btn btn-sm btn-outline-warning me-1 btn-mov-editar" data-id="${m.id}" data-data-tentativa="${m.data_tentativa || ''}" data-estado="${m.estado || ''}" data-carro="${m.carro ?? ''}" data-motorista-id="${m.motorista_id ?? ''}" data-periodo="${m.periodo || ''}" data-dt-entrega="${m.dt_entrega || ''}" data-faturado="${m.faturado ? '1' : '0'}" data-interno="${m.interno ? '1' : '0'}">Editar</button>
+        <button type="button" class="btn btn-sm btn-outline-danger btn-mov-excluir" data-id="${m.id}">Excluir</button>
       </td>
     `;
     tabelaMovCorpo.appendChild(tr);
   });
+
+  aplicarTravasMovimentacoes();
 }
 
 async function carregarMovimentacoes() {
@@ -198,6 +241,9 @@ function abrirModalMov(reg = null) {
   document.getElementById('mov_id').value = reg?.id || '';
   document.getElementById('mov_data_tentativa').value = reg?.data_tentativa || '';
   document.getElementById('mov_estado').value = reg?.estado || '';
+  document.getElementById('mov_carro').value = reg?.carro ?? '';
+  document.getElementById('mov_motorista').value = reg?.motorista_id ? String(reg.motorista_id) : '';
+  document.getElementById('mov_periodo').value = reg?.periodo || '';
   document.getElementById('mov_dt_entrega').value = reg?.dt_entrega || '';
   document.getElementById('mov_faturado').checked = Boolean(reg?.faturado);
   document.getElementById('mov_interno').checked = Boolean(reg?.interno);
@@ -205,6 +251,11 @@ function abrirModalMov(reg = null) {
 }
 
 async function salvarMovimentacao() {
+  if (formEmVisualizacao()) {
+    definirMensagem('erro', 'Movimentações estão bloqueadas no modo visualização.', false);
+    return;
+  }
+
   const pedidoId = getForm(nomeForm)?.campos?.id;
   if (!pedidoId) {
     definirMensagem('erro', 'Salve o pedido antes de adicionar movimentações.', false);
@@ -216,6 +267,9 @@ async function salvarMovimentacao() {
     pedido_id: pedidoId,
     data_tentativa: document.getElementById('mov_data_tentativa').value,
     estado: document.getElementById('mov_estado').value,
+    carro: document.getElementById('mov_carro').value,
+    motorista_id: document.getElementById('mov_motorista').value,
+    periodo: document.getElementById('mov_periodo').value,
     dt_entrega: document.getElementById('mov_dt_entrega').value,
     faturado: document.getElementById('mov_faturado').checked,
     interno: document.getElementById('mov_interno').checked,
@@ -240,6 +294,14 @@ async function excluirMovimentacao(id) {
   }
   if (resp.data) updateState(resp.data);
   await carregarMovimentacoes();
+}
+
+async function resetarFormularioAposCancelamento() {
+  setFormState(nomeForm, pode('incluir') ? 'novo' : 'visualizar');
+  hidratarFormulario(nomeForm);
+  preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
+  await carregarMovimentacoes();
+  aplicarPermissoesNaInterface();
 }
 
 function renderPesquisa(registros = []) {
@@ -285,6 +347,7 @@ function aplicarPermissoesNaInterface() {
   });
 
   aplicarTravasImportados();
+  aplicarTravasMovimentacoes();
 }
 
 const updater = criarAtualizadorForm({ formId: nomeForm, setter: updateFormField, form });
@@ -305,6 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
   preencherClientes();
   preencherTipos();
   preencherEstados();
+  preencherPeriodosMov();
   preencherOrigens();
 
   hidratarFormulario(nomeForm);
@@ -340,12 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
     confirmar({
       titulo: 'Confirmar Cancelamento',
       mensagem: 'Deseja cancelar? Os dados não salvos serão perdidos.',
-      onConfirmar: () => {
-        setFormState(nomeForm, pode('incluir') ? 'novo' : 'visualizar');
-        hidratarFormulario(nomeForm);
-        preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
-        aplicarPermissoesNaInterface();
-      },
+      onConfirmar: async () => resetarFormularioAposCancelamento(),
     });
   });
 
@@ -433,6 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateState(resultado.data);
     hidratarFormulario(nomeForm);
+    preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
     await carregarMovimentacoes();
     updateFormField(nomeCons, 'id_selecionado', null);
     alternar();
@@ -440,23 +500,35 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('btn-mov-novo').addEventListener('click', () => {
+    if (formEmVisualizacao()) return;
+    if (!pedidoEstaSalvo()) {
+      definirMensagem('aviso', 'Salve o pedido antes de adicionar movimentações.');
+      return;
+    }
     abrirModalMov(null);
   });
 
   document.getElementById('btn-mov-salvar').addEventListener('click', salvarMovimentacao);
 
   tabelaMovCorpo.addEventListener('click', (e) => {
+    if (e.target.closest('.btn-mov-editar, .btn-mov-excluir')) {
+      e.preventDefault();
+    }
+
+    if (formEmVisualizacao()) return;
+
     const btnEditar = e.target.closest('.btn-mov-editar');
     if (btnEditar) {
-      const id = Number(btnEditar.dataset.id);
-      const tr = btnEditar.closest('tr');
       abrirModalMov({
-        id,
-        data_tentativa: tr.children[1].textContent.trim(),
-        estado: tr.children[2].textContent.trim(),
-        dt_entrega: tr.children[3].textContent.trim(),
-        faturado: tr.children[4].textContent.trim() === 'Sim',
-        interno: tr.children[5].textContent.trim() === 'Sim',
+        id: Number(btnEditar.dataset.id),
+        data_tentativa: btnEditar.dataset.dataTentativa,
+        estado: btnEditar.dataset.estado,
+        carro: btnEditar.dataset.carro,
+        motorista_id: btnEditar.dataset.motoristaId,
+        periodo: btnEditar.dataset.periodo,
+        dt_entrega: btnEditar.dataset.dtEntrega,
+        faturado: btnEditar.dataset.faturado === '1',
+        interno: btnEditar.dataset.interno === '1',
       });
       return;
     }

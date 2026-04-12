@@ -44,6 +44,8 @@ class ZonaEntrega(AuditFieldsMixin, SoftDeleteMixin, models.Model):
     valor_cobranca_unitario_pedido = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     valor_pagamento_unitario_entrega = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     valor_pagamento_fixo_rota = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    valor_pagamento_unitario_entrega_pesado = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    valor_pagamento_fixo_rota_pesado = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     observacao = models.CharField(max_length=500, blank=True, default="")
 
     class Meta:

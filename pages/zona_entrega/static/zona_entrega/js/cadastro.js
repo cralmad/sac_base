@@ -97,6 +97,10 @@ function getPaisAtuacaoSigla() {
   return getFilialSelecionada()?.pais_atuacao_sigla || '';
 }
 
+function formEmVisualizacao() {
+  return (getForm(nomeForm)?.estado ?? 'visualizar') === 'visualizar';
+}
+
 function atualizarFaixasNoSisVar() {
   const faixas = [];
   document.querySelectorAll('#tabela-faixas-zona tr[data-index]').forEach((row) => {
@@ -127,6 +131,7 @@ function renderizarFaixas() {
   const tbody = document.getElementById('tabela-faixas-zona');
   if (!tbody) return;
   const faixas = getForm(nomeForm)?.campos?.faixas || [];
+  const bloqueado = formEmVisualizacao();
 
   if (!faixas.length) {
     tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhuma faixa cadastrada.</td></tr>';
@@ -136,15 +141,15 @@ function renderizarFaixas() {
   tbody.innerHTML = faixas.map((faixa, index) => `
     <tr data-index="${index}">
       <td>
-        <select class="form-select faixa-tipo">
+        <select class="form-select faixa-tipo" ${bloqueado ? 'disabled' : ''}>
           <option value="CP4" ${faixa.tipo_intervalo === 'CP4' ? 'selected' : ''}>CP4</option>
           <option value="CP7" ${faixa.tipo_intervalo !== 'CP4' ? 'selected' : ''}>CP7</option>
         </select>
       </td>
-      <td><input type="text" class="form-control faixa-inicial" maxlength="8" value="${faixa.codigo_postal_inicial || ''}" placeholder="0000-000"></td>
-      <td><input type="text" class="form-control faixa-final" maxlength="8" value="${faixa.codigo_postal_final || ''}" placeholder="0000-000"></td>
-      <td class="text-center"><input type="checkbox" class="form-check-input faixa-ativa" ${faixa.ativa !== false ? 'checked' : ''}></td>
-      <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger btn-remover-faixa">Remover</button></td>
+      <td><input type="text" class="form-control faixa-inicial" maxlength="8" value="${faixa.codigo_postal_inicial || ''}" placeholder="0000-000" ${bloqueado ? 'disabled' : ''}></td>
+      <td><input type="text" class="form-control faixa-final" maxlength="8" value="${faixa.codigo_postal_final || ''}" placeholder="0000-000" ${bloqueado ? 'disabled' : ''}></td>
+      <td class="text-center"><input type="checkbox" class="form-check-input faixa-ativa" ${faixa.ativa !== false ? 'checked' : ''} ${bloqueado ? 'disabled' : ''}></td>
+      <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger btn-remover-faixa" ${bloqueado ? 'disabled' : ''}>Remover</button></td>
     </tr>
   `).join('');
 
@@ -165,6 +170,7 @@ function renderizarExcecoes() {
   const tbody = document.getElementById('tabela-excecoes-zona');
   if (!tbody) return;
   const excecoes = getForm(nomeForm)?.campos?.excecoes || [];
+  const bloqueado = formEmVisualizacao();
 
   if (!excecoes.length) {
     tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhuma exceção cadastrada.</td></tr>';
@@ -174,15 +180,15 @@ function renderizarExcecoes() {
   tbody.innerHTML = excecoes.map((excecao, index) => `
     <tr data-index="${index}">
       <td>
-        <select class="form-select excecao-tipo">
+        <select class="form-select excecao-tipo" ${bloqueado ? 'disabled' : ''}>
           <option value="EXCLUIR" ${excecao.tipo_excecao !== 'INCLUIR' ? 'selected' : ''}>Excluir</option>
           <option value="INCLUIR" ${excecao.tipo_excecao === 'INCLUIR' ? 'selected' : ''}>Incluir</option>
         </select>
       </td>
-      <td><input type="text" class="form-control excecao-codigo" maxlength="8" value="${excecao.codigo_postal || ''}" placeholder="0000-000"></td>
-      <td class="text-center"><input type="checkbox" class="form-check-input excecao-ativa" ${excecao.ativa !== false ? 'checked' : ''}></td>
-      <td><input type="text" class="form-control excecao-observacao" maxlength="200" value="${excecao.observacao || ''}"></td>
-      <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger btn-remover-excecao">Remover</button></td>
+      <td><input type="text" class="form-control excecao-codigo" maxlength="8" value="${excecao.codigo_postal || ''}" placeholder="0000-000" ${bloqueado ? 'disabled' : ''}></td>
+      <td class="text-center"><input type="checkbox" class="form-check-input excecao-ativa" ${excecao.ativa !== false ? 'checked' : ''} ${bloqueado ? 'disabled' : ''}></td>
+      <td><input type="text" class="form-control excecao-observacao" maxlength="200" value="${excecao.observacao || ''}" ${bloqueado ? 'disabled' : ''}></td>
+      <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger btn-remover-excecao" ${bloqueado ? 'disabled' : ''}>Remover</button></td>
     </tr>
   `).join('');
 
@@ -229,11 +235,13 @@ function aplicarDefaultsNovo() {
   updateFormField(nomeForm, 'valor_cobranca_unitario_pedido', '0.00');
   updateFormField(nomeForm, 'valor_pagamento_unitario_entrega', '0.00');
   updateFormField(nomeForm, 'valor_pagamento_fixo_rota', '0.00');
+  updateFormField(nomeForm, 'valor_pagamento_unitario_entrega_pesado', '0.00');
+  updateFormField(nomeForm, 'valor_pagamento_fixo_rota_pesado', '0.00');
   updateFormField(nomeForm, 'faixas', []);
   updateFormField(nomeForm, 'excecoes', []);
-  hidratarFormulario(nomeForm);
   renderizarFaixas();
   renderizarExcecoes();
+  hidratarFormulario(nomeForm);
 }
 
 const updater = criarAtualizadorForm({ formId: nomeForm, setter: updateFormField, form });
@@ -303,14 +311,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const permissoes = obterPermissoesZona();
     const estadoAtual = getForm(nomeForm)?.estado ?? 'visualizar';
     const botoesControlados = [btnSalvar, btnEditar, btnNovo, btnExcluir, btnCancelar];
+    const bloqueado = estadoAtual === 'visualizar';
 
     btnAbrirPesquisa.classList.toggle('d-none', !permissoes.consultar);
+    btnAddFaixa.disabled = bloqueado;
+    btnAddExcecao.disabled = bloqueado;
 
     botoesControlados.forEach((botao) => {
       const visivelNoEstado = botaoDeveFicarVisivel(botao, estadoAtual);
       const visivelNaPermissao = podeExibirBotaoPorPermissao(botao.id, estadoAtual);
       botao.classList.toggle('d-none', !(visivelNoEstado && visivelNaPermissao));
     });
+  }
+
+  function resetarFormularioAposCancelamento() {
+    setFormState(nomeForm, podeExecutarAcao('incluir') ? 'novo' : 'visualizar');
+
+    if (podeExecutarAcao('incluir')) {
+      aplicarDefaultsNovo();
+    } else {
+      updateFormField(nomeForm, 'faixas', []);
+      updateFormField(nomeForm, 'excecoes', []);
+      renderizarFaixas();
+      renderizarExcecoes();
+      hidratarFormulario(nomeForm);
+    }
+
+    renderizarFiliais();
+    aplicarPermissoesNaInterface();
   }
 
   function alternarTelas() {
@@ -339,12 +367,14 @@ document.addEventListener('DOMContentLoaded', () => {
   selectFilial?.addEventListener('change', renderizarFiliais);
 
   btnAddFaixa.addEventListener('click', () => {
+    if (formEmVisualizacao()) return;
     const faixas = [...(getForm(nomeForm)?.campos?.faixas || []), { tipo_intervalo: 'CP7', codigo_postal_inicial: '', codigo_postal_final: '', ativa: true }];
     updateFormField(nomeForm, 'faixas', faixas);
     renderizarFaixas();
   });
 
   btnAddExcecao.addEventListener('click', () => {
+    if (formEmVisualizacao()) return;
     const excecoes = [...(getForm(nomeForm)?.campos?.excecoes || []), { tipo_excecao: 'EXCLUIR', codigo_postal: '', ativa: true, observacao: '' }];
     updateFormField(nomeForm, 'excecoes', excecoes);
     renderizarExcecoes();
@@ -357,6 +387,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     setFormState(nomeForm, 'editar');
+    renderizarFaixas();
+    renderizarExcecoes();
     aplicarPermissoesNaInterface();
   });
 
@@ -376,14 +408,7 @@ document.addEventListener('DOMContentLoaded', () => {
     confirmar({
       titulo: 'Confirmar Cancelamento',
       mensagem: 'Deseja cancelar? Os dados não salvos serão perdidos.',
-      onConfirmar: () => {
-        setFormState(nomeForm, podeExecutarAcao('incluir') ? 'novo' : 'visualizar');
-        if (podeExecutarAcao('incluir')) {
-          aplicarDefaultsNovo();
-        }
-        renderizarFiliais();
-        aplicarPermissoesNaInterface();
-      },
+      onConfirmar: () => resetarFormularioAposCancelamento(),
     });
   });
 

@@ -33,6 +33,7 @@ CAMPOS_ATUALIZAVEIS = [
     "obs",
     "motorista_id",
     "peso",
+    "expresso",
 ]
 
 
@@ -141,6 +142,7 @@ def _normalizar_linha(num_linha, row):
         "nome_cliente_csv": (row.get("Nome cliente") or "").strip() or None,
         "nome_motorista_csv": (row.get("Nome utilizador condutor") or "").strip() or None,
         "peso": _parse_decimal(row.get("Peso")),
+        "expresso": str(row.get("Expresso") or "").strip().lower() in {"1", "true", "sim", "s", "yes", "y"},
     }, []
 
 
@@ -339,6 +341,7 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
                         cliente_id=dados["cliente_id"],
                         motorista_id=dados["motorista_id"],
                         peso=dados["peso"],
+                        expresso=dados["expresso"],
                     )
                     novos_pedidos.append(p)
                     novos_dados.append(dados)
@@ -370,6 +373,7 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
                     existente.obs = dados["obs"]
                     existente.motorista_id = dados["motorista_id"]
                     existente.peso = dados["peso"]
+                    existente.expresso = dados["expresso"]
                     pedidos_para_atualizar.append(existente)
                     atualizados += 1
 
@@ -381,6 +385,7 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
 
                         if tentativa_existente:
                             tentativa_existente.estado = dados["estado"]
+                            tentativa_existente.motorista_id = dados["motorista_id"]
                             tentativa_existente.dt_entrega = dados["dt_entrega"]
                             tentativas_para_atualizar.append(tentativa_existente)
                         elif nova_prev_entrega != prev_entrega_anterior:
@@ -389,6 +394,7 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
                                     pedido=existente,
                                     data_tentativa=nova_prev_entrega,
                                     estado=dados["estado"],
+                                    motorista_id=dados["motorista_id"],
                                     dt_entrega=dados["dt_entrega"],
                                 )
                             )
@@ -403,6 +409,7 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
                                 pedido=p,
                                 data_tentativa=p.prev_entrega,
                                 estado=p.estado,
+                                motorista_id=p.motorista_id,
                                 dt_entrega=p.dt_entrega,
                             )
                         )
@@ -412,7 +419,7 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
                 Pedido.objects.bulk_update(pedidos_para_atualizar, CAMPOS_ATUALIZAVEIS)
 
             if tentativas_para_atualizar:
-                TentativaEntrega.objects.bulk_update(tentativas_para_atualizar, ["estado", "dt_entrega"])
+                TentativaEntrega.objects.bulk_update(tentativas_para_atualizar, ["estado", "motorista_id", "dt_entrega"])
 
             if novas_tentativas:
                 TentativaEntrega.objects.bulk_create(novas_tentativas)

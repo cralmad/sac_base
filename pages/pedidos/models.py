@@ -16,6 +16,11 @@ ORIGEM_CHOICES = [
     ("MANUAL", "Manual"),
 ]
 
+PERIODO_CHOICES = [
+    ("MANHA", "MANHÃ"),
+    ("TARDE", "TARDE"),
+]
+
 ESTADO_CHOICES = [
     ("created", "Criado"),
     ("assigned", "Atribuído"),
@@ -95,6 +100,7 @@ class Pedido(AuditFieldsMixin, models.Model):
         related_name="pedidos",
     )
     peso = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    expresso = models.BooleanField(default=False)
 
     class Meta:
         db_table = "pedido"
@@ -124,6 +130,16 @@ class TentativaEntrega(models.Model):
     )
     data_tentativa = models.DateField()
     estado = models.CharField(max_length=50, choices=ESTADO_CHOICES, null=True, blank=True)
+    carro = models.SmallIntegerField(null=True, blank=True)
+    motorista = models.ForeignKey(
+        Motorista,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column="motorista_id",
+        related_name="tentativas_entrega",
+    )
+    periodo = models.CharField(max_length=5, choices=PERIODO_CHOICES, null=True, blank=True)
     faturado = models.BooleanField(default=False)
     interno = models.BooleanField(default=False)
     dt_entrega = models.DateField(null=True, blank=True)

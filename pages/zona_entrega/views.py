@@ -90,6 +90,8 @@ def build_zona_campos_iniciais():
         "valor_cobranca_unitario_pedido": "0.00",
         "valor_pagamento_unitario_entrega": "0.00",
         "valor_pagamento_fixo_rota": "0.00",
+        "valor_pagamento_unitario_entrega_pesado": "0.00",
+        "valor_pagamento_fixo_rota_pesado": "0.00",
         "observacao": "",
         "ativa": True,
         "faixas": [],
@@ -131,6 +133,8 @@ def serializar_form_zona(zona):
         "valor_cobranca_unitario_pedido": f"{zona.valor_cobranca_unitario_pedido:.2f}",
         "valor_pagamento_unitario_entrega": f"{zona.valor_pagamento_unitario_entrega:.2f}",
         "valor_pagamento_fixo_rota": f"{zona.valor_pagamento_fixo_rota:.2f}",
+        "valor_pagamento_unitario_entrega_pesado": f"{zona.valor_pagamento_unitario_entrega_pesado:.2f}",
+        "valor_pagamento_fixo_rota_pesado": f"{zona.valor_pagamento_fixo_rota_pesado:.2f}",
         "observacao": zona.observacao,
         "ativa": zona.ativa,
         "faixas": serializar_faixas(zona),
@@ -200,6 +204,8 @@ def cadastro_zona_entrega_view(request):
             "valor_cobranca_unitario_pedido": {"type": "string", "required": False, "value": "0.00"},
             "valor_pagamento_unitario_entrega": {"type": "string", "required": False, "value": "0.00"},
             "valor_pagamento_fixo_rota": {"type": "string", "required": False, "value": "0.00"},
+            "valor_pagamento_unitario_entrega_pesado": {"type": "string", "required": False, "value": "0.00"},
+            "valor_pagamento_fixo_rota_pesado": {"type": "string", "required": False, "value": "0.00"},
             "observacao": {"type": "string", "maxlength": 500, "required": False, "value": ""},
             "ativa": {"type": "boolean", "required": False, "value": True},
         },
@@ -282,6 +288,8 @@ def cadastro_zona_entrega_view(request):
                     valor_cobranca_unitario_pedido=campos.get("valor_cobranca_unitario_pedido") or 0,
                     valor_pagamento_unitario_entrega=campos.get("valor_pagamento_unitario_entrega") or 0,
                     valor_pagamento_fixo_rota=campos.get("valor_pagamento_fixo_rota") or 0,
+                    valor_pagamento_unitario_entrega_pesado=campos.get("valor_pagamento_unitario_entrega_pesado") or 0,
+                    valor_pagamento_fixo_rota_pesado=campos.get("valor_pagamento_fixo_rota_pesado") or 0,
                     observacao=observacao,
                     ativa=bool(campos.get("ativa", True)),
                 )
@@ -298,6 +306,8 @@ def cadastro_zona_entrega_view(request):
                 zona.valor_cobranca_unitario_pedido = campos.get("valor_cobranca_unitario_pedido") or 0
                 zona.valor_pagamento_unitario_entrega = campos.get("valor_pagamento_unitario_entrega") or 0
                 zona.valor_pagamento_fixo_rota = campos.get("valor_pagamento_fixo_rota") or 0
+                zona.valor_pagamento_unitario_entrega_pesado = campos.get("valor_pagamento_unitario_entrega_pesado") or 0
+                zona.valor_pagamento_fixo_rota_pesado = campos.get("valor_pagamento_fixo_rota_pesado") or 0
                 zona.observacao = observacao
                 zona.ativa = bool(campos.get("ativa", True))
             else:

@@ -302,7 +302,22 @@ export function getDataset(datasetKey = null, fallback = null) {
  * Recupera o token CSRF atual guardado no estado
  */
 export function getCsrfToken() {
-  return _state.meta?.security?.csrfTokenValue || _state.others?.csrf_token_value || "";
+  const tokenEstado = _state.meta?.security?.csrfTokenValue || _state.others?.csrf_token_value;
+  if (tokenEstado) {
+    return tokenEstado;
+  }
+
+  const tokenInput = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
+  if (tokenInput) {
+    return tokenInput;
+  }
+
+  const tokenCookie = document.cookie
+    .split(';')
+    .map(item => item.trim())
+    .find(item => item.startsWith('csrftoken='));
+
+  return tokenCookie ? decodeURIComponent(tokenCookie.split('=').slice(1).join('=')) : "";
 }
 
 export function renderMensagens() {
@@ -576,9 +591,17 @@ export function updateState(newData) {
     _state.usuario = mergeObjects(_state.usuario, payload.usuario ?? payload.user);
   }
 
-  const metaFromOthers = normalizeLegacyOthers(payload.others);
-  const explicitMeta = normalizeMeta(payload.meta);
-  const nextMeta = mergeObjects(mergeObjects(_state.meta, metaFromOthers), explicitMeta);
+  let nextMeta = cloneValue(_state.meta);
+
+  if (isPlainObject(payload.others)) {
+    const metaFromOthers = normalizeLegacyOthers(payload.others);
+    nextMeta = mergeObjects(nextMeta, metaFromOthers);
+  }
+
+  if (isPlainObject(payload.meta)) {
+    const explicitMeta = normalizeMeta(payload.meta);
+    nextMeta = mergeObjects(nextMeta, explicitMeta);
+  }
 
   if (payload.csrfToken) {
     nextMeta.security.csrfTokenValue = payload.csrfToken;
