@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}SacBase - Matriz e Filiais{% endblock %}
+
+{% block page_title %}Cadastro de Matriz e Filiais{% endblock %}
+
+{% block content %}
+  <form id="cadFilial" data-form-lock="cadFilial" method="POST">
+    {% csrf_token %}
+    <div class="container-md-3 my-3 mx-auto">
+      <div class="row g-3">
+        <div class="col-12 col-sm-3">
+          <label class="form-label mb-0">Código</label>
+          <input type="text" name="codigo" class="form-control smart-input" data-textcase="upper" maxlength="20" minlength="2" required>
+        </div>
+
+        <div class="col-12 col-sm-6">
+          <label class="form-label mb-0">Nome</label>
+          <input type="text" name="nome" class="form-control smart-input" data-textcase="upper" maxlength="100" minlength="3" required>
+        </div>
+
+        <div class="col-12 col-sm-6">
+          <label class="form-label mb-0" for="pais_endereco_id">País do Endereço</label>
+          <select name="pais_endereco_id" id="pais_endereco_id" class="form-select" required>
+            <option value="">Selecione</option>
+          </select>
+        </div>
+
+        <div class="col-12 col-sm-6">
+          <label class="form-label mb-0" for="pais_atuacao_id">País de Atuação</label>
+          <select name="pais_atuacao_id" id="pais_atuacao_id" class="form-select" required>
+            <option value="">Selecione</option>
+          </select>
+        </div>
+
+        <div class="col-12 col-sm-3 d-flex flex-column justify-content-end">
+          <div class="form-check mb-2">
+            <input id="is_matriz" type="checkbox" name="is_matriz" class="form-check-input">
+            <label for="is_matriz" class="form-check-label">É matriz</label>
+          </div>
+          <div class="form-check">
+            <input id="ativa" type="checkbox" name="ativa" class="form-check-input">
+            <label for="ativa" class="form-check-label">Ativa</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button id="btn-salvar" class="btn btn-primary d-none" data-show-on="novo,editar" type="submit">
+      <i class="bi bi-save"></i> Salvar
+    </button>
+    <button id="btn-editar" type="button" data-show-on="visualizar" class="btn btn-warning d-none">
+      <i class="bi bi-pencil"></i> Editar
+    </button>
+    <button id="btn-novo" type="button" data-show-on="visualizar" class="btn btn-success d-none">
+      <i class="bi bi-plus-circle"></i> Novo
+    </button>
+    <button id="btn-excluir" type="button" data-show-on="visualizar" class="btn btn-danger d-none">
+      <i class="bi bi-trash"></i> Excluir
+    </button>
+    <button id="btn-cancelar" type="button" data-show-on="novo,editar" class="btn btn-outline-secondary d-none">
+      <i class="bi bi-x-circle"></i> Cancelar
+    </button>
+    <button type="button" id="btn-abrir-pesquisa" class="btn btn-secondary d-none">
+      <i class="bi bi-search"></i> Pesquisar
+    </button>
+  </form>
+
+  <div id="div-pesquisa" class="container d-none">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <span>Consultar Matriz e Filiais</span>
+        <button type="button" id="btn-fechar" class="btn-close btn-close-white"></button>
+      </div>
+      <div class="card-body">
+        <form id="consFilial" method="POST">
+          <div class="container-md-3 my-3 mx-auto">
+            <div class="row g-3">
+              <div class="col-12 col-sm-4">
+                <label class="form-label mb-0">Código</label>
+                <input type="text" name="codigo_cons" class="form-control smart-input" data-textcase="upper" maxlength="20">
+              </div>
+              <div class="col-12 col-sm-5">
+                <label class="form-label mb-0">Nome</label>
+                <input type="text" name="nome_cons" class="form-control smart-input" data-textcase="upper" maxlength="100">
+              </div>
+              <div class="col-12 col-sm-3 d-grid gap-2 d-sm-flex align-items-end">
+                <button type="submit" class="btn btn-success show-loader">Filtrar</button>
+                <button type="button" class="btn btn-outline-danger" id="btn-voltar">Voltar</button>
+              </div>
+            </div>
+          </div>
+        </form>
+
+        <div class="table-responsive mt-4">
+          <table class="table table-hover table-sm border">
+            <thead class="table-dark">
+              <tr>
+                <th>ID</th>
+                <th>Código</th>
+                <th>Nome</th>
+                <th>País Atuação</th>
+                <th>Tipo</th>
+                <th>Ativa</th>
+                <th class="text-center">Ação</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-corpo"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="{% static 'filial/js/cadastro.js' %}"></script>
+{% endblock %}

@@ -466,7 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!Array.isArray(registros) || registros.length === 0) {
       const tr = document.createElement('tr');
       const td = document.createElement('td');
-      td.colSpan = 9;
+      td.colSpan = 10;
       td.className = 'text-center';
       td.textContent = 'Nenhum registro encontrado';
       tr.appendChild(td);
@@ -478,7 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const tr = document.createElement('tr');
 
       // Colunas de texto — textContent garante segurança contra XSS
-      [r.id, r.nome, r.rsocial, r.grupo, r.pais, r.regiao, r.cidade, r.identificador].forEach(valor => {
+      [r.id, r.codigo, r.nome, r.rsocial, r.grupo, r.pais, r.regiao, r.cidade, r.identificador].forEach(valor => {
         const td = document.createElement('td');
         td.textContent = valor ?? '';
         tr.appendChild(td);

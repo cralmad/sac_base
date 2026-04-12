@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}SacBase - Cadastro de Pedidos{% endblock %}
+
+{% block estilo %}
+<link rel="stylesheet" href="{% static 'pedidos/css/styles.css' %}">
+{% endblock %}
+
+{% block page_title %}Cadastro Administrativo de Pedidos{% endblock %}
+
+{% block content %}
+<div id="area-cadastro">
+  <ul class="nav nav-tabs" id="pedidoTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="tab-geral" data-bs-toggle="tab" data-bs-target="#geral" type="button" role="tab">GERAL</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-mov" data-bs-toggle="tab" data-bs-target="#mov" type="button" role="tab">MOVIMENTAÇÕES</button>
+    </li>
+  </ul>
+
+  <form id="cadPedido" data-form-lock="cadPedido" method="POST">
+    {% csrf_token %}
+    <div class="tab-content border border-top-0 p-2" id="pedidoTabsContent">
+      <div class="tab-pane fade show active" id="geral" role="tabpanel">
+        <div class="container-md-3 my-3 mx-auto">
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0" for="filial_id">Matriz/Filial *</label>
+              <select id="filial_id" name="filial_id" class="form-select" required>
+                <option value="">Selecione</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-2">
+              <label class="form-label mb-0" for="origem">Origem</label>
+              <input id="origem" name="origem" class="form-control" readonly>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0" for="id_vonzu">ID Vonzu *</label>
+              <input id="id_vonzu" name="id_vonzu" class="form-control" type="number" min="0" step="1" inputmode="numeric" required>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0" for="pedido">Referência</label>
+              <input id="pedido" name="pedido" class="form-control" maxlength="100">
+            </div>
+
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0" for="tipo">Tipo *</label>
+              <select id="tipo" name="tipo" class="form-select" required></select>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0" for="estado">Estado</label>
+              <select id="estado" name="estado" class="form-select"></select>
+            </div>
+            <div class="col-12 col-md-2">
+              <label class="form-label mb-0" for="volume">Volume</label>
+              <input id="volume" name="volume" class="form-control" type="number" min="0" step="1" inputmode="numeric">
+            </div>
+            <div class="col-12 col-md-2">
+              <label class="form-label mb-0" for="peso">Peso</label>
+              <input id="peso" name="peso" class="form-control" type="number" min="0" step="0.001" inputmode="decimal">
+            </div>
+            <div class="col-12 col-md-2">
+              <label class="form-label mb-0" for="prev_entrega">Prev. Entrega</label>
+              <input id="prev_entrega" name="prev_entrega" class="form-control" type="date">
+            </div>
+
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0" for="criado">Data Criação *</label>
+              <input id="criado" name="criado" class="form-control" type="datetime-local" required>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0" for="atualizacao">Data Atualização *</label>
+              <input id="atualizacao" name="atualizacao" class="form-control" type="datetime-local" required>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0" for="dt_entrega">Data Entrega</label>
+              <input id="dt_entrega" name="dt_entrega" class="form-control" type="date">
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0" for="cliente_id">Cliente</label>
+              <select id="cliente_id" name="cliente_id" class="form-select">
+                <option value="">Selecione</option>
+              </select>
+            </div>
+
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0" for="motorista_id">Motorista</label>
+              <select id="motorista_id" name="motorista_id" class="form-select">
+                <option value="">Selecione</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-8">
+              <label class="form-label mb-0" for="nome_dest">Nome Destinatário</label>
+              <input id="nome_dest" name="nome_dest" class="form-control" maxlength="150">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0" for="email_dest">Email Destinatário</label>
+              <input id="email_dest" name="email_dest" class="form-control" maxlength="150">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0" for="fone_dest">Telefone 1</label>
+              <input id="fone_dest" name="fone_dest" class="form-control" maxlength="30">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0" for="fone_dest2">Telefone 2</label>
+              <input id="fone_dest2" name="fone_dest2" class="form-control" maxlength="30">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label mb-0" for="codpost_dest">Código Postal</label>
+              <input id="codpost_dest" name="codpost_dest" class="form-control" maxlength="20">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label mb-0" for="cidade_dest">Cidade</label>
+              <input id="cidade_dest" name="cidade_dest" class="form-control" maxlength="100">
+            </div>
+            <div class="col-12">
+              <label class="form-label mb-0" for="endereco_dest">Endereço</label>
+              <input id="endereco_dest" name="endereco_dest" class="form-control" maxlength="300">
+            </div>
+            <div class="col-12">
+              <label class="form-label mb-0" for="obs">Comentários</label>
+              <textarea id="obs" name="obs" class="form-control" rows="5"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-pane fade" id="mov" role="tabpanel">
+        <div class="container-md-3 my-3 mx-auto">
+          <div class="d-flex gap-2 mb-3">
+            <button id="btn-mov-novo" type="button" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-plus-circle"></i> Nova Movimentação
+            </button>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover table-sm border">
+              <thead class="table-dark">
+                <tr>
+                  <th>ID</th>
+                  <th>Data Tentativa</th>
+                  <th>Estado</th>
+                  <th>Data Entrega</th>
+                  <th>Faturado</th>
+                  <th>Interno</th>
+                  <th class="text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-mov-corpo"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-grid gap-2 d-md-flex mt-3">
+      <button id="btn-salvar" class="btn btn-primary d-none" data-show-on="novo,editar" type="submit"><i class="bi bi-save"></i> Salvar</button>
+      <button id="btn-editar" class="btn btn-warning d-none" data-show-on="visualizar" type="button"><i class="bi bi-pencil"></i> Editar</button>
+      <button id="btn-novo" class="btn btn-success d-none" data-show-on="visualizar" type="button"><i class="bi bi-plus-circle"></i> Novo</button>
+      <button id="btn-cancelar" class="btn btn-outline-secondary d-none" data-show-on="novo,editar" type="button"><i class="bi bi-x-circle"></i> Cancelar</button>
+      <button id="btn-excluir" class="btn btn-danger d-none" data-show-on="visualizar" type="button"><i class="bi bi-trash"></i> Excluir</button>
+      <button id="btn-abrir-pesquisa" class="btn btn-secondary d-none" type="button"><i class="bi bi-search"></i> Pesquisar</button>
+    </div>
+  </form>
+</div>
+
+<div id="div-pesquisa" class="container-md-3 d-none mt-3">
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+      <span>Consultar Pedidos</span>
+      <button type="button" id="btn-fechar" class="btn-close btn-close-white"></button>
+    </div>
+    <div class="card-body">
+      <form id="consPedido" method="POST">
+        <div class="row g-3">
+          <div class="col-12 col-md-3">
+            <label class="form-label mb-0">Matriz/Filial</label>
+            <select id="filial_cons" name="filial_cons" class="form-select"><option value="">Todas</option></select>
+          </div>
+          <div class="col-12 col-md-2">
+            <label class="form-label mb-0">Origem</label>
+            <select id="origem_cons" name="origem_cons" class="form-select"><option value="">Todas</option></select>
+          </div>
+          <div class="col-12 col-md-2">
+            <label class="form-label mb-0">ID Vonzu</label>
+            <input class="form-control" name="id_vonzu_cons" maxlength="20">
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label mb-0">Referência</label>
+            <input class="form-control" name="pedido_cons" maxlength="100">
+          </div>
+          <div class="col-12 col-md-2">
+            <label class="form-label mb-0">Estado</label>
+            <select id="estado_cons" name="estado_cons" class="form-select"><option value="">Todos</option></select>
+          </div>
+          <div class="col-12 d-grid gap-2 d-sm-flex align-items-end">
+            <button type="submit" class="btn btn-success"><i class="bi bi-search"></i> Filtrar</button>
+            <button type="button" id="btn-voltar" class="btn btn-outline-danger">Voltar</button>
+          </div>
+        </div>
+      </form>
+
+      <div class="table-responsive mt-3">
+        <table class="table table-hover table-sm border">
+          <thead class="table-dark">
+            <tr>
+              <th>ID</th>
+              <th>Filial</th>
+              <th>Origem</th>
+              <th>ID Vonzu</th>
+              <th>Referência</th>
+              <th>Tipo</th>
+              <th>Estado</th>
+              <th>Prev. Entrega</th>
+              <th>Destinatário</th>
+              <th class="text-center">Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-pedido-corpo"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalMov" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="modalMovTitulo">Movimentação</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formMov">
+          <input type="hidden" id="mov_id">
+          <div class="row g-3">
+            <div class="col-12 col-md-6">
+              <label class="form-label mb-0" for="mov_data_tentativa">Data Tentativa *</label>
+              <input id="mov_data_tentativa" class="form-control" type="date" required>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label mb-0" for="mov_dt_entrega">Data Entrega</label>
+              <input id="mov_dt_entrega" class="form-control" type="date">
+            </div>
+            <div class="col-12">
+              <label class="form-label mb-0" for="mov_estado">Estado</label>
+              <select id="mov_estado" class="form-select"></select>
+            </div>
+            <div class="col-12 d-flex gap-4">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="mov_faturado">
+                <label class="form-check-label" for="mov_faturado">Faturado</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="mov_interno">
+                <label class="form-check-label" for="mov_interno">Interno</label>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="btn-mov-salvar" class="btn btn-primary">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'pedidos/js/cadastro.js' %}"></script>
+{% endblock %}

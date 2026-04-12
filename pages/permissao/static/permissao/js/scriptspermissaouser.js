@@ -57,12 +57,16 @@ function getGruposGerenciaveis() {
   return new Set((getDataset('grupos_gerenciaveis_ids', []) || []).map(String));
 }
 
+function getFiliaisCadastradas() {
+  return getDataset('filiais_cadastradas', []);
+}
+
 function alternarSecaoPermissoes(exibir) {
   const secao = document.getElementById("secao-permissoes-usuario");
   const placeholder = document.getElementById("permissoes-usuario-placeholder");
 
   if (secao) {
-    secao.classList.toggle("d-none", !exibir);
+    secao.classList.remove("d-none");
   }
 
   if (placeholder) {
@@ -223,6 +227,141 @@ function aplicarEstadoAssociacoes() {
   document.querySelectorAll(".perm-checkbox").forEach(cb => {
     cb.disabled = somenteLeitura || !permissoesGerenciaveis.has(cb.dataset.codename);
   });
+
+  document.querySelectorAll('.filial-vinculo, .filial-consultar, .filial-escrever').forEach(input => {
+    const row = input.closest('tr');
+    if (!row) return;
+
+    const vinculo = row.querySelector('.filial-vinculo');
+    const consultar = row.querySelector('.filial-consultar');
+    const escrever = row.querySelector('.filial-escrever');
+    const bloqueado = somenteLeitura;
+
+    vinculo.disabled = bloqueado;
+    consultar.disabled = bloqueado || !vinculo.checked;
+    escrever.disabled = bloqueado || !vinculo.checked;
+  });
+}
+
+function renderizarFiliais() {
+  const tabela = document.getElementById('tabela-filiais-usuario');
+  if (!tabela) return;
+
+  const filiais = getFiliaisCadastradas();
+  tabela.innerHTML = '';
+
+  if (!filiais.length) {
+    tabela.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Nenhuma matriz/filial cadastrada.</td></tr>';
+    return;
+  }
+
+  filiais.forEach((filial) => {
+    const linha = document.createElement('tr');
+    linha.dataset.filialId = String(filial.id);
+    linha.innerHTML = `
+      <td>${filial.codigo}</td>
+      <td>${filial.nome}</td>
+      <td>${filial.is_matriz ? 'Matriz' : 'Filial'}</td>
+      <td>${filial.ativa ? 'Ativa' : 'Inativa'}</td>
+      <td class="text-center"><input type="checkbox" class="form-check-input filial-vinculo"></td>
+      <td class="text-center"><input type="checkbox" class="form-check-input filial-consultar"></td>
+      <td class="text-center"><input type="checkbox" class="form-check-input filial-escrever"></td>
+    `;
+    tabela.appendChild(linha);
+  });
+
+  tabela.querySelectorAll('.filial-vinculo').forEach((checkbox) => {
+    checkbox.addEventListener('change', () => {
+      const row = checkbox.closest('tr');
+      const consultar = row.querySelector('.filial-consultar');
+      const escrever = row.querySelector('.filial-escrever');
+
+      if (!checkbox.checked) {
+        consultar.checked = false;
+        escrever.checked = false;
+      } else if (!consultar.checked && !escrever.checked) {
+        consultar.checked = true;
+      }
+
+      atualizarFiliaisNoSisVar();
+      aplicarEstadoAssociacoes();
+    });
+  });
+
+  tabela.querySelectorAll('.filial-consultar').forEach((checkbox) => {
+    checkbox.addEventListener('change', () => {
+      const row = checkbox.closest('tr');
+      const vinculo = row.querySelector('.filial-vinculo');
+      const escrever = row.querySelector('.filial-escrever');
+
+      if (checkbox.checked) {
+        vinculo.checked = true;
+      }
+
+      if (!checkbox.checked && escrever.checked) {
+        checkbox.checked = true;
+      }
+
+      if (!checkbox.checked && !escrever.checked) {
+        vinculo.checked = false;
+      }
+
+      atualizarFiliaisNoSisVar();
+      aplicarEstadoAssociacoes();
+    });
+  });
+
+  tabela.querySelectorAll('.filial-escrever').forEach((checkbox) => {
+    checkbox.addEventListener('change', () => {
+      const row = checkbox.closest('tr');
+      const vinculo = row.querySelector('.filial-vinculo');
+      const consultar = row.querySelector('.filial-consultar');
+
+      if (checkbox.checked) {
+        vinculo.checked = true;
+        consultar.checked = true;
+      }
+
+      atualizarFiliaisNoSisVar();
+      aplicarEstadoAssociacoes();
+    });
+  });
+}
+
+function atualizarFiliaisNoSisVar() {
+  const filiais = [];
+  document.querySelectorAll('#tabela-filiais-usuario tr[data-filial-id]').forEach((row) => {
+    const ativo = row.querySelector('.filial-vinculo')?.checked || false;
+    const podeConsultar = row.querySelector('.filial-consultar')?.checked || false;
+    const podeEscrever = row.querySelector('.filial-escrever')?.checked || false;
+
+    filiais.push({
+      filial_id: Number(row.dataset.filialId),
+      ativo,
+      pode_consultar: ativo && (podeConsultar || podeEscrever),
+      pode_escrever: ativo && podeEscrever,
+    });
+  });
+
+  updateFormField(nomeForm, 'filiais', filiais);
+}
+
+function aplicarFiliaisNosCheckboxes(vinculos = []) {
+  const vinculosMap = new Map((vinculos || []).map((item) => [String(item.filial_id), item]));
+
+  document.querySelectorAll('#tabela-filiais-usuario tr[data-filial-id]').forEach((row) => {
+    const vinculo = vinculosMap.get(row.dataset.filialId) || {
+      ativo: false,
+      pode_consultar: false,
+      pode_escrever: false,
+    };
+
+    row.querySelector('.filial-vinculo').checked = Boolean(vinculo.ativo);
+    row.querySelector('.filial-consultar').checked = Boolean(vinculo.ativo && (vinculo.pode_consultar || vinculo.pode_escrever));
+    row.querySelector('.filial-escrever').checked = Boolean(vinculo.ativo && vinculo.pode_escrever);
+  });
+
+  atualizarFiliaisNoSisVar();
 }
 
 function resetarSelecaoUsuario() {
@@ -230,6 +369,7 @@ function resetarSelecaoUsuario() {
   renderizarUsuariosSelect();
   aplicarGruposNosCheckboxes([]);
   aplicarPermissoesNosCheckboxes([]);
+  aplicarFiliaisNosCheckboxes([]);
   alternarSecaoPermissoes(false);
   aplicarEstadoAssociacoes();
 }
@@ -277,6 +417,7 @@ form.addEventListener("submit", async e => {
   clearMessages();
   atualizarGruposNoSisVar();
   atualizarPermissoesNoSisVar();
+  atualizarFiliaisNoSisVar();
 
   if (!podeEditar()) {
     definirMensagem("erro", "Você não possui permissão para alterar permissões de usuários.", false);
@@ -311,8 +452,10 @@ form.addEventListener("submit", async e => {
 
       updateState(resultado.data);
       hidratarFormulario(nomeForm);
+      renderizarFiliais();
       aplicarGruposNosCheckboxes(resultado.data?.form?.[nomeForm]?.campos?.grupos || []);
       aplicarPermissoesNosCheckboxes(resultado.data?.form?.[nomeForm]?.campos?.permissoes || []);
+      aplicarFiliaisNosCheckboxes(resultado.data?.form?.[nomeForm]?.campos?.filiais || []);
       renderizarUsuariosSelect();
       alternarSecaoPermissoes(true);
       aplicarEstadoAssociacoes();
@@ -325,6 +468,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderizarUsuariosSelect();
   renderizarGrupos();
   renderizarAbas();
+  renderizarFiliais();
 
   const divPrincipal = document.getElementById(nomeForm);
   const divPesquisa = document.getElementById("div-pesquisa");
@@ -500,8 +644,10 @@ document.addEventListener("DOMContentLoaded", () => {
     updateState(resultado.data);
     hidratarFormulario(nomeForm);
     renderizarUsuariosSelect();
+    renderizarFiliais();
     aplicarGruposNosCheckboxes(resultado.data?.form?.[nomeForm]?.campos?.grupos || []);
     aplicarPermissoesNosCheckboxes(resultado.data?.form?.[nomeForm]?.campos?.permissoes || []);
+    aplicarFiliaisNosCheckboxes(resultado.data?.form?.[nomeForm]?.campos?.filiais || []);
     alternarSecaoPermissoes(true);
     setFormState(nomeForm, "visualizar");
     aplicarEstadoAssociacoes();
@@ -517,6 +663,7 @@ document.addEventListener("DOMContentLoaded", () => {
   alternarSecaoPermissoes(Boolean(getForm(nomeForm)?.campos?.usuario_id));
   aplicarGruposNosCheckboxes(getForm(nomeForm)?.campos?.grupos || []);
   aplicarPermissoesNosCheckboxes(getForm(nomeForm)?.campos?.permissoes || []);
+  aplicarFiliaisNosCheckboxes(getForm(nomeForm)?.campos?.filiais || []);
   aplicarEstadoAssociacoes();
   aplicarPermissoesNaInterface();
 });

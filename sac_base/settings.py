@@ -18,6 +18,23 @@ from datetime import timedelta
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_list(name, default=None):
+    value = os.environ.get(name)
+    if value is None:
+        return list(default or [])
+
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 URL_BD = os.environ.get('BANCO_DE_DADOS')
 SETTINGS_MODULE = os.environ.get('DJANGO_SETTINGS_MODULE', '')
 USANDO_SETTINGS_TESTE_LOCAL = SETTINGS_MODULE == 'sac_base.settings_test'
@@ -26,12 +43,39 @@ USANDO_SETTINGS_TESTE_LOCAL = SETTINGS_MODULE == 'sac_base.settings_test'
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-m44*&kjf0q4in5%2t%l-1d9oemu2=@8fmv)e9b1bd#^^xhax+p'
+DEFAULT_DEV_SECRET_KEY = 'django-dev-sac-base-insecure-key'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', DEFAULT_DEV_SECRET_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_bool('DJANGO_DEBUG', default=not USANDO_SETTINGS_TESTE_LOCAL)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env_list(
+    'DJANGO_ALLOWED_HOSTS',
+    default=['127.0.0.1', 'localhost'] if DEBUG else [],
+)
+
+CSRF_TRUSTED_ORIGINS = env_list('DJANGO_CSRF_TRUSTED_ORIGINS', default=[])
+
+SESSION_COOKIE_SECURE = env_bool('DJANGO_SESSION_COOKIE_SECURE', default=not DEBUG)
+CSRF_COOKIE_SECURE = env_bool('DJANGO_CSRF_COOKIE_SECURE', default=not DEBUG)
+SECURE_SSL_REDIRECT = env_bool('DJANGO_SECURE_SSL_REDIRECT', default=False)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https') if env_bool('DJANGO_USE_X_FORWARDED_PROTO', default=False) else None
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = 'same-origin'
+X_FRAME_OPTIONS = 'DENY'
+
+AUTH_COOKIE_HTTPONLY = True
+AUTH_COOKIE_SAMESITE = os.environ.get('DJANGO_AUTH_COOKIE_SAMESITE', 'Lax')
+AUTH_COOKIE_SECURE = env_bool('DJANGO_AUTH_COOKIE_SECURE', default=not DEBUG)
+ACTIVE_FILIAL_COOKIE_HTTPONLY = True
+ACTIVE_FILIAL_COOKIE_SAMESITE = os.environ.get('DJANGO_ACTIVE_FILIAL_COOKIE_SAMESITE', AUTH_COOKIE_SAMESITE)
+ACTIVE_FILIAL_COOKIE_SECURE = env_bool('DJANGO_ACTIVE_FILIAL_COOKIE_SECURE', default=AUTH_COOKIE_SECURE)
+
+if not DEBUG and not USANDO_SETTINGS_TESTE_LOCAL and SECRET_KEY == DEFAULT_DEV_SECRET_KEY:
+    raise RuntimeError('Defina DJANGO_SECRET_KEY para executar com DEBUG desabilitado')
+
+if not DEBUG and not USANDO_SETTINGS_TESTE_LOCAL and not ALLOWED_HOSTS:
+    raise RuntimeError('Defina DJANGO_ALLOWED_HOSTS para executar com DEBUG desabilitado')
 
 
 # Application definition
@@ -53,6 +97,9 @@ INSTALLED_APPS = [
     'pages.permissao',
     'pages.auditoria',
     'pages.filial',
+    'pages.zona_entrega',
+    'pages.motorista',
+    'pages.pedidos',
 ]
 
 MIDDLEWARE = [
@@ -65,7 +112,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-
 REST_FRAMEWORK = {# Necessário para o app de usuário/autenticação
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',

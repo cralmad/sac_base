@@ -1,0 +1,5 @@
+/* Importação de Pedidos — estilos específicos */
+#resultado-importacao .table td:first-child {
+  font-weight: 500;
+  white-space: nowrap;
+}

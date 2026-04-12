@@ -2,6 +2,10 @@ from .settings import *
 
 
 DEBUG = False
+AUTH_COOKIE_SECURE = False
+ACTIVE_FILIAL_COOKIE_SECURE = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
 
 DATABASES = {
     'default': {

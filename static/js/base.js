@@ -1,5 +1,6 @@
 import {
   getDataBackEnd,
+  getMeta,
   getUsuario,
   renderMensagens,
   getCsrfToken
@@ -70,6 +71,8 @@ export async function inicializarNavbarUsuario() {
     getDataBackEnd();
 
     const usuario = getUsuario();
+    const security = getMeta("security") || {};
+    const filialAtiva = security.activeFilial || null;
 
     renderMensagens();
 
@@ -79,7 +82,18 @@ export async function inicializarNavbarUsuario() {
 
     const navbarContainer = document.getElementById("navbase");
 
+    const filialHtml = filialAtiva
+      ? `
+      <div class="d-flex align-items-center ms-auto me-2 text-light small" style="min-width: 0; max-width: 48vw;">
+        <i class="bi bi-buildings me-2"></i>
+        <span class="fw-semibold me-2 d-none d-md-inline">${filialAtiva.isMatriz ? "Matriz ativa:" : "Filial ativa:"}</span>
+        <span class="badge text-bg-light text-dark text-truncate" style="max-width: 100%;">${filialAtiva.nome} (${filialAtiva.codigo})</span>
+      </div>
+    `
+      : "<div class=\"ms-auto\"></div>";
+
     const dropdownHtml = `
+      ${filialHtml}
       <div class="dropdown ms-auto">
         <a class="nav-link dropdown-toggle text-light d-flex align-items-center gap-2"
            href="#"
@@ -168,11 +182,19 @@ function aplicarPermissoesSidebar() {
   });
 }
 
+function inicializarTooltips() {
+  const triggers = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+  triggers.forEach((element) => {
+    bootstrap.Tooltip.getOrCreateInstance(element);
+  });
+}
+
 // Inicializa AppLoader e navbar quando DOM está pronto
 document.addEventListener("DOMContentLoaded", async () => {
   AppLoader.init();
   await inicializarNavbarUsuario();
   aplicarPermissoesSidebar();
+  inicializarTooltips();
   AppLoader.hide();
 });
 

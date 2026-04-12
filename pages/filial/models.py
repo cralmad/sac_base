@@ -2,12 +2,27 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
+from pages.core.models import Pais
 
 
 class Filial(models.Model):
     id = models.BigAutoField(primary_key=True)
     codigo = models.CharField(max_length=20, unique=True)
     nome = models.CharField(max_length=100, unique=True)
+    pais_endereco = models.ForeignKey(
+        Pais,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="filiais_endereco",
+    )
+    pais_atuacao = models.ForeignKey(
+        Pais,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="filiais_atuacao",
+    )
     is_matriz = models.BooleanField(default=False)
     ativa = models.BooleanField(default=True)
 

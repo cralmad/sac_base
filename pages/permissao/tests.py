@@ -6,6 +6,7 @@ from django.core.exceptions import PermissionDenied
 from django.test import RequestFactory, TestCase
 
 from pages.auditoria.models import AuditEvent
+from pages.filial.models import Filial, UsuarioFilial
 from .views import (
 	cadastro_grupo_cons_view,
 	cadastro_grupo_view,
@@ -240,6 +241,8 @@ class PermissaoUsuarioViewTests(TestCase):
 		)
 		self.grupo_a.permissions.set([self.perm_view_group])
 		self.grupo_b.permissions.set([self.perm_change_group])
+		self.filial_matriz = Filial.objects.create(codigo="MAT", nome="MATRIZ", is_matriz=True, ativa=True)
+		self.filial_a = Filial.objects.create(codigo="FIL01", nome="FILIAL A", is_matriz=False, ativa=True)
 		self.operador.user_permissions.set([
 			self.perm_view_group,
 			self.perm_view_usuario,
@@ -268,11 +271,13 @@ class PermissaoUsuarioViewTests(TestCase):
 		self.assertEqual(len(others["usuarios_ativos"]), 1)
 		self.assertEqual(others["usuarios_ativos"][0]["id"], self.usuario_alvo.id)
 		self.assertEqual(len(others["grupos_cadastrados"]), 2)
+		self.assertEqual(len(others["filiais_cadastradas"]), 2)
 		self.assertEqual(others["grupos_gerenciaveis_ids"], [self.grupo_a.id])
 		self.assertEqual(
 			sorted(others["permissoes_gerenciaveis"]),
 			["auth.view_group", "usuario.change_usuarios", "usuario.view_usuarios"],
 		)
+		self.assertEqual(request.sisvar_extra["form"]["cadPermissaoUsuario"]["campos"]["filiais"], [])
 		self.assertEqual(others["permissoes"]["permissao_usuario"], {
 			"acessar": True,
 			"consultar": True,
@@ -296,6 +301,7 @@ class PermissaoUsuarioViewTests(TestCase):
 						"usuario_id": self.usuario_alvo.id,
 						"grupos": [self.grupo_b.id],
 						"permissoes": ["auth.change_group"],
+						"filiais": [],
 					}
 				}
 			}
@@ -318,6 +324,7 @@ class PermissaoUsuarioViewTests(TestCase):
 						"usuario_id": self.usuario_alvo.id,
 						"grupos": [self.grupo_a.id],
 						"permissoes": ["auth.view_group"],
+						"filiais": [],
 					}
 				}
 			}
@@ -342,6 +349,20 @@ class PermissaoUsuarioViewTests(TestCase):
 						"usuario_id": self.usuario_alvo.id,
 						"grupos": [self.grupo_a.id],
 						"permissoes": ["auth.view_group"],
+						"filiais": [
+							{
+								"filial_id": self.filial_matriz.id,
+								"ativo": True,
+								"pode_consultar": True,
+								"pode_escrever": False,
+							},
+							{
+								"filial_id": self.filial_a.id,
+								"ativo": True,
+								"pode_consultar": True,
+								"pode_escrever": True,
+							},
+						],
 					}
 				}
 			}
@@ -368,6 +389,63 @@ class PermissaoUsuarioViewTests(TestCase):
 			sorted(data["form"]["cadPermissaoUsuario"]["campos"]["permissoes"]),
 			["auth.change_group", "auth.view_group"],
 		)
+		self.assertEqual(
+			list(
+				UsuarioFilial.objects.filter(usuario=self.usuario_alvo)
+				.order_by("filial__nome")
+				.values_list("filial_id", "ativo", "pode_consultar", "pode_escrever")
+			),
+			[
+				(self.filial_a.id, True, True, True),
+				(self.filial_matriz.id, True, True, False),
+			],
+		)
+		self.assertEqual(
+			data["form"]["cadPermissaoUsuario"]["campos"]["filiais"],
+			[
+				{
+					"filial_id": self.filial_a.id,
+					"ativo": True,
+					"pode_consultar": True,
+					"pode_escrever": True,
+				},
+				{
+					"filial_id": self.filial_matriz.id,
+					"ativo": True,
+					"pode_consultar": True,
+					"pode_escrever": False,
+				},
+			],
+		)
+
+	def test_post_rejeita_filial_invalida(self):
+		payload = {
+			"form": {
+				"cadPermissaoUsuario": {
+					"estado": "editar",
+					"campos": {
+						"usuario_id": self.usuario_alvo.id,
+						"grupos": [self.grupo_a.id],
+						"permissoes": ["auth.view_group"],
+						"filiais": [
+							{
+								"filial_id": 999999,
+								"ativo": True,
+								"pode_consultar": True,
+								"pode_escrever": False,
+							}
+						],
+					}
+				}
+			}
+		}
+
+		request = self.build_request("/app/permissao/usuario/", payload)
+		response = permissao_usuario_view(request)
+		data = json.loads(response.content)
+
+		self.assertEqual(response.status_code, 422)
+		self.assertIn("Matriz e Filiais - Matriz/filial inválida: 999999", data["mensagens"]["erro"]["conteudo"])
 
 	def test_post_rejeita_autoatribuicao_por_payload(self):
 		payload = {
@@ -378,6 +456,7 @@ class PermissaoUsuarioViewTests(TestCase):
 						"usuario_id": self.operador.id,
 						"grupos": [self.grupo_a.id],
 						"permissoes": ["auth.view_group"],
+						"filiais": [],
 					}
 				}
 			}
@@ -435,6 +514,13 @@ class PermissaoUsuarioViewTests(TestCase):
 	def test_consulta_carrega_grupos_e_permissoes_do_usuario(self):
 		self.usuario_alvo.groups.set([self.grupo_b])
 		self.usuario_alvo.user_permissions.set([self.perm_change_group, self.perm_view_group])
+		UsuarioFilial.objects.create(
+			usuario=self.usuario_alvo,
+			filial=self.filial_a,
+			ativo=True,
+			pode_consultar=True,
+			pode_escrever=True,
+		)
 
 		payload_cons = {
 			"form": {
@@ -458,6 +544,17 @@ class PermissaoUsuarioViewTests(TestCase):
 		self.assertEqual(
 			sorted(data["form"]["cadPermissaoUsuario"]["campos"]["permissoes"]),
 			["auth.change_group", "auth.view_group"],
+		)
+		self.assertEqual(
+			data["form"]["cadPermissaoUsuario"]["campos"]["filiais"],
+			[
+				{
+					"filial_id": self.filial_a.id,
+					"ativo": True,
+					"pode_consultar": True,
+					"pode_escrever": True,
+				}
+			],
 		)
 
 	def test_consulta_nao_carrega_superusuario_como_alvo(self):

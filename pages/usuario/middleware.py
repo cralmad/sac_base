@@ -1,5 +1,6 @@
 import json
 import logging
+from django.conf import settings
 from django.shortcuts import redirect
 from django.http import JsonResponse
 from django.middleware.csrf import get_token
@@ -220,9 +221,9 @@ class JWTAuthMiddleware:
             response.set_cookie(
                 "access_token",
                 request._new_access_token,
-                httponly=True,
-                samesite="Lax",
-                secure=True,
+                httponly=settings.AUTH_COOKIE_HTTPONLY,
+                samesite=settings.AUTH_COOKIE_SAMESITE,
+                secure=settings.AUTH_COOKIE_SECURE,
                 max_age=15 * 60
             )
 
@@ -253,7 +254,13 @@ class JWTAuthMiddleware:
         filial_unica = obter_filial_unica_se_existir(request.user)
         if filial_unica is not None:
             response = redirect(request.get_full_path())
-            response.set_cookie(ACTIVE_FILIAL_COOKIE, str(filial_unica.id), httponly=True, samesite="Lax")
+            response.set_cookie(
+                ACTIVE_FILIAL_COOKIE,
+                str(filial_unica.id),
+                httponly=settings.ACTIVE_FILIAL_COOKIE_HTTPONLY,
+                samesite=settings.ACTIVE_FILIAL_COOKIE_SAMESITE,
+                secure=settings.ACTIVE_FILIAL_COOKIE_SECURE,
+            )
             return self._finalize_response(request, response)
 
         response = redirect(FILIAL_SELECT_PATH)

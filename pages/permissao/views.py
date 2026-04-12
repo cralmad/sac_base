@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from pages.auditoria.models import AuditEvent
 from pages.auditoria.utils import diff_snapshots, registrar_auditoria
+from pages.filial.models import Filial, UsuarioFilial
 from sac_base.form_validador import SchemaValidator
 from sac_base.sisvar_builders import build_error_payload, build_form_response, build_form_state, build_forms_response, build_records_response, build_sisvar_payload
 
@@ -27,6 +28,7 @@ def snapshot_usuario_permissoes(usuario):
     return {
         "grupos": list(usuario.groups.order_by("name").values_list("id", flat=True)),
         "permissoes": sorted(serializar_permissoes_usuario(usuario)),
+        "filiais": serializar_vinculos_filial_usuario(usuario),
     }
 
 
@@ -100,6 +102,20 @@ def listar_grupos_cadastrados():
     return [{"id": grupo.id, "nome": grupo.name} for grupo in grupos]
 
 
+def listar_filiais_cadastradas():
+    filiais = Filial.objects.order_by("nome")
+    return [
+        {
+            "id": filial.id,
+            "codigo": filial.codigo,
+            "nome": filial.nome,
+            "is_matriz": filial.is_matriz,
+            "ativa": filial.ativa,
+        }
+        for filial in filiais
+    ]
+
+
 def listar_todas_permissoes_disponiveis():
     return {
         f"{app_label}.{codename}"
@@ -162,6 +178,19 @@ def serializar_permissoes_usuario(usuario):
     return [f"{app_label}.{codename}" for app_label, codename in permissoes]
 
 
+def serializar_vinculos_filial_usuario(usuario):
+    vinculos = UsuarioFilial.objects.filter(usuario=usuario).select_related("filial").order_by("filial__nome")
+    return [
+        {
+            "filial_id": vinculo.filial_id,
+            "ativo": vinculo.ativo,
+            "pode_consultar": bool(vinculo.pode_consultar or vinculo.pode_escrever),
+            "pode_escrever": vinculo.pode_escrever,
+        }
+        for vinculo in vinculos
+    ]
+
+
 def serializar_form_permissao_usuario(usuario):
     return {
         "estado": "visualizar",
@@ -170,6 +199,7 @@ def serializar_form_permissao_usuario(usuario):
             "usuario_id": usuario.id,
             "grupos": list(usuario.groups.order_by("name").values_list("id", flat=True)),
             "permissoes": serializar_permissoes_usuario(usuario),
+            "filiais": serializar_vinculos_filial_usuario(usuario),
         }
     }
 
@@ -194,6 +224,47 @@ def resolver_grupos(grupo_ids):
 
     grupos_ordenados = [grupos_por_id[grupo_id] for grupo_id in ids_unicos if grupo_id in grupos_por_id]
     return grupos_ordenados, grupos_invalidos
+
+
+def resolver_vinculos_filial(vinculos_payload):
+    if not isinstance(vinculos_payload, list):
+        return None, ["Lista de matriz/filial inválida"]
+
+    vinculos_normalizados = []
+    filiais_invalidas = []
+    ids_vistos = set()
+
+    for item in vinculos_payload:
+        if not isinstance(item, dict):
+            filiais_invalidas.append("Formato inválido em matriz/filial")
+            continue
+
+        filial_id = item.get("filial_id")
+        try:
+            filial_id = int(filial_id)
+        except (TypeError, ValueError):
+            filiais_invalidas.append(f"Matriz/filial inválida: {filial_id}")
+            continue
+
+        if filial_id in ids_vistos:
+            filiais_invalidas.append(f"Matriz/filial duplicada: {filial_id}")
+            continue
+
+        ids_vistos.add(filial_id)
+        vinculos_normalizados.append({
+            "filial_id": filial_id,
+            "ativo": bool(item.get("ativo")),
+            "pode_consultar": bool(item.get("pode_consultar")),
+            "pode_escrever": bool(item.get("pode_escrever")),
+        })
+
+    filiais = Filial.objects.filter(id__in=ids_vistos)
+    filiais_por_id = {filial.id: filial for filial in filiais}
+    for filial_id in ids_vistos:
+        if filial_id not in filiais_por_id:
+            filiais_invalidas.append(f"Matriz/filial inválida: {filial_id}")
+
+    return vinculos_normalizados, filiais_invalidas
 
 
 @permission_required(PERMISSOES_GRUPO["acessar"], raise_exception=True)
@@ -431,6 +502,7 @@ def permissao_usuario_view(request):
                         "usuario_id": None,
                         "grupos": [],
                         "permissoes": [],
+                        "filiais": [],
                     },
                 ),
                 nomeFormCons: build_form_state(
@@ -447,6 +519,7 @@ def permissao_usuario_view(request):
             datasets={
                 "usuarios_ativos": listar_usuarios_ativos(operador),
                 "grupos_cadastrados": listar_grupos_cadastrados(),
+                "filiais_cadastradas": listar_filiais_cadastradas(),
                 "grupos_gerenciaveis_ids": listar_ids_grupos_gerenciaveis(operador),
                 "permissoes_gerenciaveis": sorted(obter_permissoes_gerenciaveis(operador)),
             },
@@ -476,12 +549,16 @@ def permissao_usuario_view(request):
 
     grupos = campos.get("grupos", [])
     permissoes = campos.get("permissoes", [])
+    filiais = campos.get("filiais", [])
 
     if not isinstance(grupos, list):
         return JsonResponse(build_error_payload("Lista de grupos inválida"), status=400)
 
     if not isinstance(permissoes, list):
         return JsonResponse(build_error_payload("Lista de permissões inválida"), status=400)
+
+    if not isinstance(filiais, list):
+        return JsonResponse(build_error_payload("Lista de matriz/filial inválida"), status=400)
 
     operador = getattr(request, "user", None)
     permissoes_gerenciaveis = obter_permissoes_gerenciaveis(operador)
@@ -503,6 +580,13 @@ def permissao_usuario_view(request):
     if permissoes_invalidas:
         return JsonResponse(
             build_error_payload(f"Permissões inválidas: {', '.join(sorted(permissoes_invalidas))}"),
+            status=422,
+        )
+
+    vinculos_filial, filiais_invalidas = resolver_vinculos_filial(filiais)
+    if filiais_invalidas:
+        return JsonResponse(
+            build_error_payload([f"Matriz e Filiais - {mensagem}" for mensagem in filiais_invalidas]),
             status=422,
         )
 
@@ -544,6 +628,17 @@ def permissao_usuario_view(request):
 
             usuario.groups.set([*grupos_preservados, *grupos_obj])
             usuario.user_permissions.set([*permissoes_preservadas, *permissoes_obj])
+            UsuarioFilial.objects.filter(usuario=usuario).delete()
+            UsuarioFilial.objects.bulk_create([
+                UsuarioFilial(
+                    usuario=usuario,
+                    filial_id=vinculo["filial_id"],
+                    ativo=vinculo["ativo"],
+                    pode_consultar=bool(vinculo["ativo"] and (vinculo["pode_consultar"] or vinculo["pode_escrever"])),
+                    pode_escrever=bool(vinculo["ativo"] and vinculo["pode_escrever"]),
+                )
+                for vinculo in vinculos_filial
+            ])
             after = snapshot_usuario_permissoes(usuario)
             registrar_auditoria(
                 actor=request.user,

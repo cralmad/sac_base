@@ -49,8 +49,27 @@
                 <div class="container-md-3 my-3 mx-auto">
                     <div class="row g-3">
 
+                        {# Código #}
+                        <div class="col-12 col-sm-3">
+                            <label for="codigo" class="form-label mb-0 d-flex align-items-center gap-1">
+                                <span>Código</span>
+                                <span
+                                    class="text-primary"
+                                    role="button"
+                                    tabindex="0"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="top"
+                                    data-bs-title="Identificador curto da entidade (ex.: CLI001, MOT-PT01). Use um código único no cadastro. Também é a fonte de pesquisa na importação de pedidos, pois o ID interno é diferente.">
+                                    <i class="bi bi-question-circle"></i>
+                                </span>
+                            </label>
+                            <input type="text" id="codigo" name="codigo"
+                                   class="form-control smart-input"
+                                   data-textcase="upper" maxlength="20">
+                        </div>
+
                         {# Grupo #}
-                        <div class="col-12 col-sm-4">
+                        <div class="col-12 col-sm-3">
                             <label for="grupo" class="form-label mb-0">Grupo *</label>
                             <select id="grupo" name="grupo" class="form-select smart-input" required>
                                 <option value="">Selecione</option>
@@ -58,7 +77,7 @@
                         </div>
 
                         {# Nome #}
-                        <div class="col-12 col-sm-8">
+                        <div class="col-12 col-sm-6">
                             <label for="nome" class="form-label mb-0">Nome *</label>
                             <input type="text" id="nome" name="nome"
                                    class="form-control smart-input"
@@ -208,13 +227,19 @@
             <form id="consCliente" method="POST">
                 <div class="container-md-3 my-2 mx-auto">
                     <div class="row g-3">
+                        <div class="col-12 col-sm-4">
+                            <label class="form-label mb-0">Código</label>
+                            <input type="text" name="codigo_cons"
+                                   class="form-control smart-input"
+                                   data-textcase="upper" maxlength="20">
+                        </div>
                         <div class="col-12 col-sm-8">
                             <label class="form-label mb-0">Nome</label>
                             <input type="text" name="nome_cons"
                                    class="form-control smart-input"
                                    data-textcase="upper" maxlength="100">
                         </div>
-                        <div class="col-12 col-sm-4 d-grid gap-2 d-sm-flex align-items-end">
+                        <div class="col-12 d-grid gap-2 d-sm-flex align-items-end">
                             <button type="submit" class="btn btn-success">
                                 <i class="bi bi-search"></i> Filtrar
                             </button>
@@ -231,6 +256,7 @@
                     <thead class="table-dark">
                         <tr>
                             <th>ID</th>
+                            <th>Código</th>
                             <th>Nome</th>
                             <th>Razão Social</th>
                             <th>Grupo</th>

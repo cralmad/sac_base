@@ -42,6 +42,7 @@ def cad_cliente_view(request):
 
     schema = {
         nomeForm: {
+            "codigo":        {'type': 'string',  'maxlength': 20,  'required': False, 'value': ''},
             "grupo":         {'type': 'integer', 'required': True},
             "nome":          {'type': 'string',  'maxlength': 100, 'minlength': 3, 'required': True,  'value': ''},
             "rsocial":       {'type': 'string',  'maxlength': 100, 'minlength': 3, 'required': True,  'value': ''},
@@ -58,6 +59,7 @@ def cad_cliente_view(request):
             "observacao":    {'type': 'string',  'maxlength': 500, 'required': False, 'value': ''},
         },
         nomeFormCons: {
+            "codigo_cons":    {'type': 'string',  'maxlength': 20},
             "nome_cons":      {'type': 'string',  'maxlength': 100},
             "id_selecionado": {'type': 'integer'},
         }
@@ -78,6 +80,7 @@ def cad_cliente_view(request):
                     estado=estado_inicial,
                     campos={
                         "id": None,
+                        "codigo": "",
                         "grupo": None,
                         "nome": "",
                         "rsocial": "",
@@ -96,6 +99,7 @@ def cad_cliente_view(request):
                 ),
                 nomeFormCons: build_form_state(
                     campos={
+                        "codigo_cons": "",
                         "nome_cons": "",
                         "id_selecionado": None,
                     },
@@ -139,6 +143,7 @@ def cad_cliente_view(request):
     ###########################################################################
 
     id_cliente    = campos.get("id")
+    codigo        = campos.get("codigo", "")
     grupo_id      = campos.get("grupo")
     nome          = campos.get("nome")
     rsocial       = campos.get("rsocial")
@@ -157,6 +162,7 @@ def cad_cliente_view(request):
     match estado:
         case "novo":
             cliente = Cliente(
+                codigo        = codigo,
                 grupo_id      = grupo_id,
                 nome          = nome,
                 rsocial       = rsocial,
@@ -191,6 +197,7 @@ def cad_cliente_view(request):
             before = snapshot_instance(cliente)
 
             cliente.grupo_id      = grupo_id
+            cliente.codigo        = codigo
             cliente.nome          = nome
             cliente.rsocial       = rsocial
             cliente.logradouro    = logradouro
@@ -237,7 +244,7 @@ def cad_cliente_view(request):
                 estado="novo",
                 update=None,
                 campos={
-                    "id": None, "grupo": None, "nome": "", "rsocial": "",
+                    "id": None, "codigo": "", "grupo": None, "nome": "", "rsocial": "",
                     "logradouro": "", "endereco": "", "numero": "",
                     "complemento": "", "bairro": "", "pais": None,
                     "regiao": None, "cidade": None,
@@ -256,6 +263,7 @@ def cad_cliente_view(request):
         update=cliente.atualizacao,
         campos={
             "id": cliente.id,
+            "codigo": cliente.codigo,
             "grupo": cliente.grupo_id,
             "nome": cliente.nome,
             "rsocial": cliente.rsocial,
@@ -310,6 +318,7 @@ def cad_cliente_cons_view(request):
             update=cli.atualizacao,
             campos={
                 "id": cli.id,
+                "codigo": cli.codigo,
                 "grupo": cli.grupo_id,
                 "nome": cli.nome,
                 "rsocial": cli.rsocial,
@@ -328,8 +337,12 @@ def cad_cliente_cons_view(request):
         ))
 
     # ── Pesquisa por filtro ───────────────────────────────────────────────────
+    codigo_cons = campos.get("codigo_cons", "").strip()
     nome_cons = campos.get("nome_cons", "").strip()
     qs = Cliente.objects.select_related('grupo', 'pais', 'regiao', 'cidade')
+
+    if codigo_cons:
+        qs = qs.filter(codigo__icontains=codigo_cons)
 
     if nome_cons:
         qs = qs.filter(nome__icontains=nome_cons)
@@ -337,6 +350,7 @@ def cad_cliente_cons_view(request):
     registros = [
         {
             "id":          c.id,
+            "codigo":      c.codigo,
             "nome":        c.nome,
             "rsocial":     c.rsocial,
             "grupo":       c.grupo.descricao if c.grupo else "",

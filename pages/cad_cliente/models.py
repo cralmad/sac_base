@@ -9,6 +9,8 @@ from pages.auditoria.models import AuditFieldsMixin, SoftDeleteMixin
 class Cliente(AuditFieldsMixin, SoftDeleteMixin, models.Model):
     id = models.BigAutoField(primary_key=True)
 
+    codigo = models.CharField(max_length=20, null=True, blank=True)
+
     grupo = models.ForeignKey(
         GrupoCli,
         on_delete=models.PROTECT,
@@ -68,6 +70,7 @@ class Cliente(AuditFieldsMixin, SoftDeleteMixin, models.Model):
     atualizacao = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
+        self.codigo  = (self.codigo or '').strip().upper()
         self.nome    = self.nome.upper()
         self.rsocial = self.rsocial.upper()
         super().save(*args, **kwargs)

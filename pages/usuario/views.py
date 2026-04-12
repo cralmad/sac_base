@@ -1,4 +1,5 @@
 import json
+from django.conf import settings
 from django.http import JsonResponse
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import authenticate, get_user_model, update_session_auth_hash
@@ -99,14 +100,16 @@ def login_view(request):
     response.set_cookie(
         "access_token",
         str(refresh.access_token),
-        httponly=True,
-        samesite="Lax"
+        httponly=settings.AUTH_COOKIE_HTTPONLY,
+        samesite=settings.AUTH_COOKIE_SAMESITE,
+        secure=settings.AUTH_COOKIE_SECURE,
     )
     response.set_cookie(
         "refresh_token",
         str(refresh),
-        httponly=True,
-        samesite="Lax",
+        httponly=settings.AUTH_COOKIE_HTTPONLY,
+        samesite=settings.AUTH_COOKIE_SAMESITE,
+        secure=settings.AUTH_COOKIE_SECURE,
         max_age=60 * 60 * 24 * 7
     )
 
@@ -114,8 +117,9 @@ def login_view(request):
         response.set_cookie(
             ACTIVE_FILIAL_COOKIE,
             str(filial_automatica.id),
-            httponly=True,
-            samesite="Lax"
+            httponly=settings.ACTIVE_FILIAL_COOKIE_HTTPONLY,
+            samesite=settings.ACTIVE_FILIAL_COOKIE_SAMESITE,
+            secure=settings.ACTIVE_FILIAL_COOKIE_SECURE,
         )
 
     return response

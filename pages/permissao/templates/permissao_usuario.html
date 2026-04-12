@@ -28,7 +28,7 @@
             Selecione um usuário para visualizar e editar as permissões já concedidas.
         </div>
 
-        <div id="secao-permissoes-usuario" class="mt-4 d-none">
+        <div id="secao-permissoes-usuario" class="mt-4">
             <label class="form-label fw-semibold">Permissões Diretas do Usuário</label>
             <ul class="nav nav-tabs" id="tabsPermissaoUsuario" role="tablist">
                 <li class="nav-item" role="presentation">
@@ -51,6 +51,10 @@
                     <button class="nav-link" id="tab-usuario-admin" data-bs-toggle="tab"
                         data-bs-target="#pane-usuario-admin" type="button" role="tab">ADMIN</button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tab-usuario-filiais" data-bs-toggle="tab"
+                        data-bs-target="#pane-usuario-filiais" type="button" role="tab">Matriz e Filiais</button>
+                </li>
             </ul>
 
             <div class="tab-content border border-top-0 rounded-bottom p-3" id="tabsPermissaoUsuarioContent">
@@ -70,6 +74,25 @@
                 </div>
                 <div class="tab-pane fade" id="pane-usuario-admin" role="tabpanel">
                     <div id="perms-ADMIN" class="row g-2"></div>
+                </div>
+                <div class="tab-pane fade" id="pane-usuario-filiais" role="tabpanel">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm border align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Nome</th>
+                                    <th>Tipo</th>
+                                    <th>Status</th>
+                                    <th class="text-center">Vinculado</th>
+                                    <th class="text-center">Consulta</th>
+                                    <th class="text-center">Escrita</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-filiais-usuario"></tbody>
+                        </table>
+                    </div>
+                    <p class="form-text mb-0 mt-2">Configure os vínculos do usuário com matriz e filiais e o nível de acesso local.</p>
                 </div>
             </div>
             <p class="form-text mb-0">Permissões desabilitadas podem ser apenas visualizadas.</p>

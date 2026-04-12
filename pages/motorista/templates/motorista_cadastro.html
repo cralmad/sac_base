@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}SacBase - Motoristas{% endblock %}
+
+{% block page_title %}Cadastro de Motoristas{% endblock %}
+
+{% block content %}
+  <form id="cadMotorista" data-form-lock="cadMotorista" method="POST">
+    {% csrf_token %}
+    <div class="container-md-3 my-3 mx-auto">
+      <div class="row g-3">
+        <div class="col-12 col-md-5">
+          <label class="form-label mb-0" for="filial_id">Matriz/Filial</label>
+          <select name="filial_id" id="filial_id" class="form-select" required>
+            <option value="">Selecione</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label mb-0 d-flex align-items-center gap-1" for="codigo">
+            <span>Código</span>
+            <span
+              class="text-primary"
+              role="button"
+              tabindex="0"
+              data-bs-toggle="tooltip"
+              data-bs-placement="top"
+              data-bs-title="Identificador curto da entidade (ex.: CLI001, MOT-PT01). Use um código único no cadastro. Também é a fonte de pesquisa na importação de pedidos, pois o ID interno é diferente.">
+              <i class="bi bi-question-circle"></i>
+            </span>
+          </label>
+          <input type="text" id="codigo" name="codigo" class="form-control smart-input" data-textcase="upper" maxlength="20">
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label mb-0">Nome</label>
+          <input type="text" name="nome" class="form-control smart-input" data-textcase="upper" maxlength="100" minlength="3" required>
+        </div>
+        <div class="col-12 col-md-2 d-flex align-items-end">
+          <div class="form-check mb-2">
+            <input id="ativa" type="checkbox" name="ativa" class="form-check-input">
+            <label for="ativa" class="form-check-label">Ativa</label>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label mb-0">Telefone</label>
+          <input type="text" name="telefone" class="form-control smart-input" maxlength="20" minlength="8" required>
+        </div>
+      </div>
+    </div>
+
+    <button id="btn-salvar" class="btn btn-primary d-none" data-show-on="novo,editar" type="submit">
+      <i class="bi bi-save"></i> Salvar
+    </button>
+    <button id="btn-editar" type="button" data-show-on="visualizar" class="btn btn-warning d-none">
+      <i class="bi bi-pencil"></i> Editar
+    </button>
+    <button id="btn-novo" type="button" data-show-on="visualizar" class="btn btn-success d-none">
+      <i class="bi bi-plus-circle"></i> Novo
+    </button>
+    <button id="btn-excluir" type="button" data-show-on="visualizar" class="btn btn-danger d-none">
+      <i class="bi bi-trash"></i> Excluir
+    </button>
+    <button id="btn-cancelar" type="button" data-show-on="novo,editar" class="btn btn-outline-secondary d-none">
+      <i class="bi bi-x-circle"></i> Cancelar
+    </button>
+    <button type="button" id="btn-abrir-pesquisa" class="btn btn-secondary d-none">
+      <i class="bi bi-search"></i> Pesquisar
+    </button>
+  </form>
+
+  <div id="div-pesquisa" class="container d-none">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <span>Consultar Motoristas</span>
+        <button type="button" id="btn-fechar" class="btn-close btn-close-white"></button>
+      </div>
+      <div class="card-body">
+        <form id="consMotorista" method="POST">
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0">Matriz/Filial</label>
+              <select name="filial_cons" id="filial_cons" class="form-select">
+                <option value="">Todas</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0">Código</label>
+              <input type="text" name="codigo_cons" class="form-control smart-input" data-textcase="upper" maxlength="20">
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0">Nome</label>
+              <input type="text" name="nome_cons" class="form-control smart-input" data-textcase="upper" maxlength="100">
+            </div>
+            <div class="col-12 col-md-2">
+              <label class="form-label mb-0">Telefone</label>
+              <input type="text" name="telefone_cons" class="form-control smart-input" maxlength="20">
+            </div>
+            <div class="col-12 col-md-3 d-grid gap-2 d-md-flex align-items-end">
+              <button type="submit" class="btn btn-success">Filtrar</button>
+              <button type="button" class="btn btn-outline-danger" id="btn-voltar">Voltar</button>
+            </div>
+          </div>
+        </form>
+
+        <div class="table-responsive mt-4">
+          <table class="table table-hover table-sm border">
+            <thead class="table-dark">
+              <tr>
+                <th>ID</th>
+                <th>Filial</th>
+                <th>Código</th>
+                <th>Nome</th>
+                <th>Telefone</th>
+                <th>Ativa</th>
+                <th class="text-center">Ação</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-motorista-corpo"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="{% static 'motorista/js/cadastro.js' %}"></script>
+{% endblock %}

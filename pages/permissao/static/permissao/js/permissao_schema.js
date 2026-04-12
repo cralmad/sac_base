@@ -34,6 +34,21 @@ export const PERMISSOES_SCHEMA = {
   ],
 
   LOGISTICA: [
+    // --- Importação de Pedidos ---
+    { codename: "pedidos.view_pedido", label: "Acessar Importação de Pedidos" },
+    { codename: "pedidos.add_pedido",  label: "Importar Pedidos (CSV)" },
+    { codename: "pedidos.change_pedido", label: "Editar Pedido" },
+    { codename: "pedidos.delete_pedido", label: "Excluir Pedido" },
+    // --- Motoristas ---
+    { codename: "motorista.view_motorista",   label: "Visualizar Motorista" },
+    { codename: "motorista.add_motorista",    label: "Incluir Motorista" },
+    { codename: "motorista.change_motorista", label: "Editar Motorista" },
+    { codename: "motorista.delete_motorista", label: "Excluir Motorista" },
+    // --- Zonas de Entrega ---
+    { codename: "zona_entrega.view_zonaentrega",   label: "Visualizar Zona de Entrega" },
+    { codename: "zona_entrega.add_zonaentrega",    label: "Incluir Zona de Entrega" },
+    { codename: "zona_entrega.change_zonaentrega", label: "Editar Zona de Entrega" },
+    { codename: "zona_entrega.delete_zonaentrega", label: "Excluir Zona de Entrega" },
     // --- Cadastro de Clientes ---
     { codename: "cad_cliente.view_cliente",   label: "Visualizar Cliente" },
     { codename: "cad_cliente.add_cliente",    label: "Incluir Cliente" },
@@ -64,6 +79,21 @@ export const PERMISSOES_SCHEMA = {
   ],
 
   ADMIN: [
+    // --- Importação de Pedidos ---
+    { codename: "pedidos.view_pedido", label: "Acessar Importação de Pedidos" },
+    { codename: "pedidos.add_pedido",  label: "Importar Pedidos (CSV)" },
+    { codename: "pedidos.change_pedido", label: "Editar Pedido" },
+    { codename: "pedidos.delete_pedido", label: "Excluir Pedido" },
+    // --- Motoristas ---
+    { codename: "motorista.view_motorista",   label: "Visualizar Motorista" },
+    { codename: "motorista.add_motorista",    label: "Incluir Motorista" },
+    { codename: "motorista.change_motorista", label: "Editar Motorista" },
+    { codename: "motorista.delete_motorista", label: "Excluir Motorista" },
+    // --- Matriz e Filiais ---
+    { codename: "filial.view_filial",   label: "Visualizar Matriz/Filial" },
+    { codename: "filial.add_filial",    label: "Incluir Matriz/Filial" },
+    { codename: "filial.change_filial", label: "Editar Matriz/Filial" },
+    { codename: "filial.delete_filial", label: "Excluir Matriz/Filial" },
     // --- Usuários ---
     { codename: "usuario.view_usuarios",   label: "Visualizar Usuário" },
     { codename: "usuario.add_usuarios",    label: "Incluir Usuário" },
