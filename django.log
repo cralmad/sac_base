@@ -22,3 +22,9 @@ WARNING 2026-04-11 23:01:51,617 middleware Erro ao processar refresh token: Toke
 WARNING 2026-04-11 23:01:52,618 middleware Erro ao processar refresh token: Token is invalid
 WARNING 2026-04-11 23:01:52,802 middleware Erro ao processar refresh token: Token is invalid
 DEBUG 2026-04-11 23:25:53,566 middleware Access token inválido: {'detail': ErrorDetail(string='Given token not valid for any token type', code='token_not_valid'), 'code': ErrorDetail(string='token_not_valid', code='token_not_valid'), 'messages': [{'token_class': ErrorDetail(string='AccessToken', code='token_not_valid'), 'token_type': ErrorDetail(string='access', code='token_not_valid'), 'message': ErrorDetail(string='Token is expired', code='token_not_valid')}]}
+ERROR 2026-04-14 23:21:48,543 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-14 23:34:58,977 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-14 23:35:10,044 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+

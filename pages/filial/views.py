@@ -8,6 +8,7 @@ from pages.auditoria.models import AuditEvent
 from pages.auditoria.utils import diff_snapshots, registrar_auditoria, snapshot_instance
 from pages.core.models import Pais
 from sac_base.form_validador import SchemaValidator
+from sac_base.permissions_utils import build_action_permissions, extract_validation_messages, permission_denied_response
 from sac_base.sisvar_builders import build_error_payload, build_form_response, build_form_state, build_records_response, build_sisvar_payload, build_success_payload
 
 from .services import (
@@ -28,31 +29,6 @@ PERMISSOES_FILIAL = {
     "editar": "filial.change_filial",
     "excluir": "filial.delete_filial",
 }
-
-
-def obter_acoes_permitidas_filial(usuario):
-    if not usuario or not getattr(usuario, "is_authenticated", False):
-        return {acao: False for acao in PERMISSOES_FILIAL}
-
-    return {
-        acao: usuario.has_perm(codename)
-        for acao, codename in PERMISSOES_FILIAL.items()
-    }
-
-
-def resposta_sem_permissao(mensagem, status=403):
-    return JsonResponse(build_error_payload(mensagem), status=status)
-
-
-def extrair_mensagens_validacao(exc):
-    if hasattr(exc, "message_dict"):
-        return [
-            f"{campo} - {mensagem}"
-            for campo, mensagens in exc.message_dict.items()
-            for mensagem in mensagens
-        ]
-
-    return list(getattr(exc, "messages", [])) or [str(exc)]
 
 
 def build_filial_campos_iniciais():
@@ -96,7 +72,7 @@ def cadastro_filial_view(request):
     template = "filial_cadastro.html"
     nome_form = "cadFilial"
     nome_form_cons = "consFilial"
-    acoes_permitidas = obter_acoes_permitidas_filial(getattr(request, "user", None))
+    acoes_permitidas = build_action_permissions(getattr(request, "user", None), PERMISSOES_FILIAL)
     primeira_unidade = not Filial.objects.exists()
 
     schema = {
@@ -150,10 +126,10 @@ def cadastro_filial_view(request):
     estado = form.get("estado", "")
 
     if estado == "novo" and not acoes_permitidas["incluir"]:
-        return resposta_sem_permissao("Você não possui permissão para incluir matriz/filial.")
+        return permission_denied_response("Você não possui permissão para incluir matriz/filial.")
 
     if estado == "editar" and not acoes_permitidas["editar"]:
-        return resposta_sem_permissao("Você não possui permissão para editar matriz/filial.")
+        return permission_denied_response("Você não possui permissão para editar matriz/filial.")
 
     validator = SchemaValidator(schema[nome_form])
     if not validator.validate(campos):
@@ -198,7 +174,7 @@ def cadastro_filial_view(request):
                     ativa=ativa,
                 )
             except ValidationError as exc:
-                return JsonResponse(build_error_payload(extrair_mensagens_validacao(exc)), status=422)
+                return JsonResponse(build_error_payload(extract_validation_messages(exc)), status=422)
             registrar_auditoria(
                 actor=request.user,
                 action=AuditEvent.ACTION_CREATE,
@@ -228,7 +204,7 @@ def cadastro_filial_view(request):
             try:
                 filial.save()
             except ValidationError as exc:
-                return JsonResponse(build_error_payload(extrair_mensagens_validacao(exc)), status=422)
+                return JsonResponse(build_error_payload(extract_validation_messages(exc)), status=422)
 
             changed_fields = diff_snapshots(before, snapshot_instance(filial))
             if changed_fields:
@@ -318,7 +294,7 @@ def cadastro_filial_del_view(request):
     usuario = getattr(request, "user", None)
 
     if not usuario or not usuario.has_perm(PERMISSOES_FILIAL["excluir"]):
-        return resposta_sem_permissao("Você não possui permissão para excluir matriz/filial.")
+        return permission_denied_response("Você não possui permissão para excluir matriz/filial.")
 
     data_front = request.sisvar_front
     campos = data_front.get("form", {}).get(nome_form, {}).get("campos", {})

@@ -7,6 +7,7 @@ import { fazerRequisicao } from '/static/js/base.js';
 import { initSmartInputs } from '/static/js/input_rules.js';
 import { criarAtualizadorForm } from '/static/js/refresh_varSis.js';
 import { AppLoader } from '/static/js/loader.js';
+import { buttonVisibleByState, buttonAllowedByPermission, createActionChecker } from '/static/js/screen_permissions.js';
 
 const nomeForm = 'cadMotorista';
 const nomeFormCons = 'consMotorista';
@@ -15,37 +16,34 @@ const form2 = document.getElementById(nomeFormCons);
 
 getDataBackEnd();
 
-function obterPermissoes() {
-  return getScreenPermissions('motorista', {
+const podeExecutarAcao = createActionChecker({
+  screenKey: 'motorista',
+  getScreenPermissions,
+  fallback: {
     acessar: false,
     consultar: false,
     incluir: false,
     editar: false,
     excluir: false,
-  });
-}
-
-function podeExecutarAcao(acao) {
-  return Boolean(obterPermissoes()?.[acao]);
-}
+  },
+});
 
 function botaoDeveFicarVisivel(botao, estado) {
-  return (botao.dataset.showOn || '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .includes(estado);
+  return buttonVisibleByState(botao, estado);
 }
 
 function podeExibirBotaoPorPermissao(botaoId, estado) {
-  if (botaoId === 'btn-novo') return podeExecutarAcao('incluir');
-  if (botaoId === 'btn-editar') return podeExecutarAcao('editar');
-  if (botaoId === 'btn-excluir') return podeExecutarAcao('excluir');
-  if (botaoId === 'btn-salvar' || botaoId === 'btn-cancelar') {
-    if (estado === 'novo') return podeExecutarAcao('incluir');
-    if (estado === 'editar') return podeExecutarAcao('editar');
-  }
-  return true;
+  return buttonAllowedByPermission({ buttonId: botaoId, state: estado, canExecute: podeExecutarAcao });
+}
+
+function obterPermissoes() {
+  return {
+    acessar: podeExecutarAcao('acessar'),
+    consultar: podeExecutarAcao('consultar'),
+    incluir: podeExecutarAcao('incluir'),
+    editar: podeExecutarAcao('editar'),
+    excluir: podeExecutarAcao('excluir'),
+  };
 }
 
 function getFiliaisEscrita() {
@@ -60,7 +58,11 @@ function renderizarFiliais() {
   const valorPesquisa = String(getForm(nomeFormCons)?.campos?.filial_cons ?? '');
 
   if (selectPrincipal) {
-    selectPrincipal.innerHTML = '<option value="">Selecione</option>';
+    selectPrincipal.innerHTML = '';
+    const optPrincipal = document.createElement('option');
+    optPrincipal.value = '';
+    optPrincipal.textContent = 'Selecione';
+    selectPrincipal.appendChild(optPrincipal);
     filiais.forEach((filial) => {
       const option = document.createElement('option');
       option.value = String(filial.id);
@@ -71,7 +73,11 @@ function renderizarFiliais() {
   }
 
   if (selectPesquisa) {
-    selectPesquisa.innerHTML = '<option value="">Todas</option>';
+    selectPesquisa.innerHTML = '';
+    const optPesquisa = document.createElement('option');
+    optPesquisa.value = '';
+    optPesquisa.textContent = 'Todas';
+    selectPesquisa.appendChild(optPesquisa);
     filiais.forEach((filial) => {
       const option = document.createElement('option');
       option.value = String(filial.id);
@@ -159,17 +165,35 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderizarTabela(registros) {
-    tabelaCorpo.innerHTML = registros.map((registro) => `
-      <tr>
-        <td>${registro.id}</td>
-        <td>${registro.filial}</td>
-        <td>${registro.codigo || ''}</td>
-        <td>${registro.nome}</td>
-        <td>${registro.telefone}</td>
-        <td>${registro.ativa ? 'Sim' : 'Não'}</td>
-        <td class="text-center"><button type="button" class="btn btn-sm btn-primary btn-selecionar" data-id="${registro.id}">Selecionar</button></td>
-      </tr>
-    `).join('');
+    tabelaCorpo.innerHTML = '';
+    registros.forEach((registro) => {
+      const tr = document.createElement('tr');
+
+      [
+        registro.id,
+        registro.filial,
+        registro.codigo || '',
+        registro.nome,
+        registro.telefone,
+        registro.ativa ? 'Sim' : 'Não',
+      ].forEach((valor) => {
+        const td = document.createElement('td');
+        td.textContent = String(valor ?? '');
+        tr.appendChild(td);
+      });
+
+      const tdAcao = document.createElement('td');
+      tdAcao.className = 'text-center';
+      const btnSelecionar = document.createElement('button');
+      btnSelecionar.type = 'button';
+      btnSelecionar.className = 'btn btn-sm btn-primary btn-selecionar';
+      btnSelecionar.dataset.id = String(registro.id ?? '');
+      btnSelecionar.textContent = 'Selecionar';
+      tdAcao.appendChild(btnSelecionar);
+      tr.appendChild(tdAcao);
+
+      tabelaCorpo.appendChild(tr);
+    });
   }
 
   btnAbrirPesquisa.addEventListener('click', alternarTelas);

@@ -4,6 +4,7 @@ from django.http import JsonResponse
 from pages.auditoria.models import AuditEvent
 from pages.auditoria.utils import diff_snapshots, registrar_auditoria, snapshot_instance
 from sac_base.form_validador import SchemaValidator
+from sac_base.permissions_utils import build_action_permissions, permission_denied_response
 from sac_base.sisvar_builders import build_error_payload, build_form_response, build_form_state, build_records_response, build_sisvar_payload
 from pages.cad_grupo_cli.models import GrupoCli
 from pages.core.models import Pais, Regiao, Cidade
@@ -19,26 +20,12 @@ PERMISSOES_CLIENTE = {
 }
 
 
-def obter_acoes_permitidas_cliente(usuario):
-    if not usuario or not getattr(usuario, "is_authenticated", False):
-        return {acao: False for acao in PERMISSOES_CLIENTE}
-
-    return {
-        acao: usuario.has_perm(codename)
-        for acao, codename in PERMISSOES_CLIENTE.items()
-    }
-
-
-def resposta_sem_permissao(mensagem, status=403):
-    return JsonResponse(build_error_payload(mensagem), status=status)
-
-
 @permission_required(PERMISSOES_CLIENTE["acessar"], raise_exception=True)
 def cad_cliente_view(request):
     template     = 'cadcliente.html'
     nomeForm     = 'cadCliente'
     nomeFormCons = 'consCliente'
-    acoes_permitidas = obter_acoes_permitidas_cliente(getattr(request, 'user', None))
+    acoes_permitidas = build_action_permissions(getattr(request, 'user', None), PERMISSOES_CLIENTE)
 
     schema = {
         nomeForm: {
@@ -124,13 +111,13 @@ def cad_cliente_view(request):
     estado    = form.get("estado", "")
 
     if estado == 'novo' and not acoes_permitidas['incluir']:
-        return resposta_sem_permissao('Você não possui permissão para incluir clientes.')
+        return permission_denied_response('Você não possui permissão para incluir clientes.')
 
     if estado == 'editar' and not acoes_permitidas['editar']:
-        return resposta_sem_permissao('Você não possui permissão para editar clientes.')
+        return permission_denied_response('Você não possui permissão para editar clientes.')
 
     if estado == 'excluir' and not acoes_permitidas['excluir']:
-        return resposta_sem_permissao('Você não possui permissão para excluir clientes.')
+        return permission_denied_response('Você não possui permissão para excluir clientes.')
 
     # Validação de schema #####################################################
     validator = SchemaValidator(schema[nomeForm])

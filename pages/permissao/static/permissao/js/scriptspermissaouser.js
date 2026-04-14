@@ -16,6 +16,7 @@ import { initSmartInputs } from "/static/js/input_rules.js";
 import { criarAtualizadorForm } from "/static/js/refresh_varSis.js";
 import { AppLoader } from "/static/js/loader.js";
 import { PERMISSOES_SCHEMA } from "./permissao_schema.js";
+import { buttonVisibleByState, createActionChecker } from '/static/js/screen_permissions.js';
 
 const nomeForm = "cadPermissaoUsuario";
 const nomeFormCons = "consPermissaoUsuario";
@@ -24,29 +25,34 @@ const form2 = document.getElementById(nomeFormCons);
 
 getDataBackEnd();
 
-function obterPermissoesTela() {
-  return getScreenPermissions('permissao_usuario', {
+const podeExecutarAcao = createActionChecker({
+  screenKey: 'permissao_usuario',
+  getScreenPermissions,
+  fallback: {
     acessar: false,
     consultar: false,
     editar: false,
-  });
+  },
+});
+
+function obterPermissoesTela() {
+  return {
+    acessar: podeExecutarAcao('acessar'),
+    consultar: podeExecutarAcao('consultar'),
+    editar: podeExecutarAcao('editar'),
+  };
 }
 
 function podeConsultar() {
-  return Boolean(obterPermissoesTela().consultar);
+  return podeExecutarAcao('consultar');
 }
 
 function podeEditar() {
-  return Boolean(obterPermissoesTela().editar);
+  return podeExecutarAcao('editar');
 }
 
 function botaoDeveFicarVisivel(botao, estado) {
-  const estadosPermitidos = (botao.dataset.showOn || '')
-    .split(',')
-    .map(item => item.trim())
-    .filter(Boolean);
-
-  return estadosPermitidos.includes(estado);
+  return buttonVisibleByState(botao, estado);
 }
 
 function getPermissoesGerenciaveis() {
@@ -86,7 +92,11 @@ function renderizarUsuariosSelect() {
   const usuarioSelecionado = String(getForm(nomeForm)?.campos?.usuario_id ?? "");
   const usuarios = getDataset('usuarios_ativos', []);
 
-  select.innerHTML = '<option value="">Selecione um usuário</option>';
+  select.innerHTML = '';
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "Selecione um usuário";
+  select.appendChild(defaultOption);
   usuarios.forEach(usuario => {
     const option = document.createElement("option");
     option.value = String(usuario.id);
@@ -105,7 +115,10 @@ function renderizarGrupos() {
   container.innerHTML = "";
 
   if (grupos.length === 0) {
-    container.innerHTML = '<p class="text-muted fst-italic mb-0">Nenhum grupo cadastrado.</p>';
+    const vazio = document.createElement("p");
+    vazio.className = "text-muted fst-italic mb-0";
+    vazio.textContent = "Nenhum grupo cadastrado.";
+    container.appendChild(vazio);
     return;
   }
 
@@ -115,16 +128,27 @@ function renderizarGrupos() {
 
     const id = `chk-grupo-${grupo.id}`;
     const gerenciavel = getGruposGerenciaveis().has(String(grupo.id));
-    col.innerHTML = `
-      <div class="form-check">
-        <input class="form-check-input grupo-checkbox" type="checkbox"
-          id="${id}"
-          data-group-id="${grupo.id}"
-          data-gerenciavel="${gerenciavel ? "true" : "false"}"
-          title="${gerenciavel ? "" : "Grupo fora do seu escopo de atribuição"}"
-          disabled>
-        <label class="form-check-label" for="${id}">${grupo.nome}</label>
-      </div>`;
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "form-check";
+
+    const input = document.createElement("input");
+    input.className = "form-check-input grupo-checkbox";
+    input.type = "checkbox";
+    input.id = id;
+    input.dataset.groupId = String(grupo.id ?? "");
+    input.dataset.gerenciavel = gerenciavel ? "true" : "false";
+    input.title = gerenciavel ? "" : "Grupo fora do seu escopo de atribuição";
+    input.disabled = true;
+
+    const label = document.createElement("label");
+    label.className = "form-check-label";
+    label.setAttribute("for", id);
+    label.textContent = String(grupo.nome ?? "");
+
+    wrapper.appendChild(input);
+    wrapper.appendChild(label);
+    col.appendChild(wrapper);
     container.appendChild(col);
   });
 
@@ -151,16 +175,27 @@ function renderizarAbas() {
 
       const id = `chk-${modulo}-${codename.replace(/\./g, "-")}`;
       const gerenciavel = getPermissoesGerenciaveis().has(codename);
-      col.innerHTML = `
-        <div class="form-check">
-          <input class="form-check-input perm-checkbox" type="checkbox"
-            id="${id}"
-            data-codename="${codename}"
-            data-gerenciavel="${gerenciavel ? "true" : "false"}"
-            title="${gerenciavel ? "" : "Permissão fora do seu escopo de atribuição"}"
-            disabled>
-          <label class="form-check-label" for="${id}">${label}</label>
-        </div>`;
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "form-check";
+
+      const input = document.createElement("input");
+      input.className = "form-check-input perm-checkbox";
+      input.type = "checkbox";
+      input.id = id;
+      input.dataset.codename = String(codename ?? "");
+      input.dataset.gerenciavel = gerenciavel ? "true" : "false";
+      input.title = gerenciavel ? "" : "Permissão fora do seu escopo de atribuição";
+      input.disabled = true;
+
+      const labelEl = document.createElement("label");
+      labelEl.className = "form-check-label";
+      labelEl.setAttribute("for", id);
+      labelEl.textContent = String(label ?? "");
+
+      wrapper.appendChild(input);
+      wrapper.appendChild(labelEl);
+      col.appendChild(wrapper);
       container.appendChild(col);
     });
   });
@@ -251,22 +286,50 @@ function renderizarFiliais() {
   tabela.innerHTML = '';
 
   if (!filiais.length) {
-    tabela.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Nenhuma matriz/filial cadastrada.</td></tr>';
+    const linhaVazia = document.createElement('tr');
+    const celulaVazia = document.createElement('td');
+    celulaVazia.colSpan = 7;
+    celulaVazia.className = 'text-center text-muted';
+    celulaVazia.textContent = 'Nenhuma matriz/filial cadastrada.';
+    linhaVazia.appendChild(celulaVazia);
+    tabela.appendChild(linhaVazia);
     return;
   }
 
   filiais.forEach((filial) => {
     const linha = document.createElement('tr');
     linha.dataset.filialId = String(filial.id);
-    linha.innerHTML = `
-      <td>${filial.codigo}</td>
-      <td>${filial.nome}</td>
-      <td>${filial.is_matriz ? 'Matriz' : 'Filial'}</td>
-      <td>${filial.ativa ? 'Ativa' : 'Inativa'}</td>
-      <td class="text-center"><input type="checkbox" class="form-check-input filial-vinculo"></td>
-      <td class="text-center"><input type="checkbox" class="form-check-input filial-consultar"></td>
-      <td class="text-center"><input type="checkbox" class="form-check-input filial-escrever"></td>
-    `;
+
+    const tdCodigo = document.createElement('td');
+    tdCodigo.textContent = String(filial.codigo ?? '');
+    linha.appendChild(tdCodigo);
+
+    const tdNome = document.createElement('td');
+    tdNome.textContent = String(filial.nome ?? '');
+    linha.appendChild(tdNome);
+
+    const tdTipo = document.createElement('td');
+    tdTipo.textContent = filial.is_matriz ? 'Matriz' : 'Filial';
+    linha.appendChild(tdTipo);
+
+    const tdStatus = document.createElement('td');
+    tdStatus.textContent = filial.ativa ? 'Ativa' : 'Inativa';
+    linha.appendChild(tdStatus);
+
+    const criarCheckboxCell = (classe) => {
+      const td = document.createElement('td');
+      td.className = 'text-center';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = `form-check-input ${classe}`;
+      td.appendChild(checkbox);
+      return td;
+    };
+
+    linha.appendChild(criarCheckboxCell('filial-vinculo'));
+    linha.appendChild(criarCheckboxCell('filial-consultar'));
+    linha.appendChild(criarCheckboxCell('filial-escrever'));
+
     tabela.appendChild(linha);
   });
 
@@ -581,21 +644,40 @@ document.addEventListener("DOMContentLoaded", () => {
     tabelaCorpo.innerHTML = "";
 
     if (!Array.isArray(registros) || registros.length === 0) {
-      tabelaCorpo.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum registro encontrado</td></tr>';
+      const linhaSemDados = document.createElement("tr");
+      const celulaSemDados = document.createElement("td");
+      celulaSemDados.colSpan = 4;
+      celulaSemDados.className = "text-center";
+      celulaSemDados.textContent = "Nenhum registro encontrado";
+      linhaSemDados.appendChild(celulaSemDados);
+      tabelaCorpo.appendChild(linhaSemDados);
       return;
     }
 
     registros.forEach(reg => {
       const linha = document.createElement("tr");
-      linha.innerHTML = `
-        <td>${reg.id || ""}</td>
-        <td>${reg.first_name || ""}</td>
-        <td>${reg.username || ""}</td>
-        <td class="text-center">
-          <button class="btn btn-sm btn-primary btn-selecionar" data-id="${reg.id}">
-            Selecionar
-          </button>
-        </td>`;
+
+      const tdId = document.createElement("td");
+      tdId.textContent = String(reg.id ?? "");
+
+      const tdNome = document.createElement("td");
+      tdNome.textContent = String(reg.first_name ?? "");
+
+      const tdLogin = document.createElement("td");
+      tdLogin.textContent = String(reg.username ?? "");
+
+      const tdAcao = document.createElement("td");
+      tdAcao.className = "text-center";
+      const btnSelecionar = document.createElement("button");
+      btnSelecionar.className = "btn btn-sm btn-primary btn-selecionar";
+      btnSelecionar.dataset.id = String(reg.id ?? "");
+      btnSelecionar.textContent = "Selecionar";
+
+      tdAcao.appendChild(btnSelecionar);
+      linha.appendChild(tdId);
+      linha.appendChild(tdNome);
+      linha.appendChild(tdLogin);
+      linha.appendChild(tdAcao);
       tabelaCorpo.appendChild(linha);
     });
   }

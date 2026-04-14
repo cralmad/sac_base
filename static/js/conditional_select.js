@@ -77,7 +77,11 @@ function resolvePath(hierarchy, path) {
 }
 
 function resetSelect(select) {
-    select.innerHTML = '<option value="">Selecione</option>';
+    select.innerHTML = '';
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Selecione';
+    select.appendChild(defaultOption);
     select.disabled = true;
     select.dispatchEvent(new Event('change', { bubbles: true }));
 }

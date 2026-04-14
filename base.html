@@ -19,6 +19,7 @@
 
         <!-- CSS global -->
         <link rel="stylesheet" href="{% static '/css/styles.css' %}">
+        {% block estilo %}{% endblock %}
 
         {{ sisVar|json_script:"sisDados" }}
     </head>
@@ -365,6 +366,11 @@
                                                 <div class="collapse" id="submenu-logistica-relatorio">
                                                     <ul class="nav flex-column ms-3">
                                                         <li class="nav-item">
+                                                            <a class="nav-link sidebar-sublink" href="/app/logistica/relatorio_conferencia/" data-required-permission="pedidos.view_tentativaentrega">
+                                                                <i class="bi bi-clipboard-check me-1"></i>Conferência de Volumes
+                                                            </a>
+                                                        </li>
+                                                        <li class="nav-item">
                                                             <a class="nav-link sidebar-sublink" href="/logistica/relatorio/rastreamento/">
                                                                 <i class="bi bi-dot me-1"></i>Rastreamento
                                                             </a>
@@ -639,7 +645,7 @@
 
         <!-- Loader Global -->
         <div id="global-loader">
-            <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+            <div class="spinner-border text-light" role="status">
                 <span class="visually-hidden">Carregando...</span>
             </div>
         </div>

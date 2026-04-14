@@ -39,6 +39,9 @@ export const PERMISSOES_SCHEMA = {
     { codename: "pedidos.add_pedido",  label: "Importar Pedidos (CSV)" },
     { codename: "pedidos.change_pedido", label: "Editar Pedido" },
     { codename: "pedidos.delete_pedido", label: "Excluir Pedido" },
+    // --- Conferência de Volumes ---
+    { codename: "pedidos.view_tentativaentrega",   label: "Acessar Conferência de Volumes" },
+    { codename: "pedidos.change_tentativaentrega", label: "Editar Conferência de Volumes" },
     // --- Motoristas ---
     { codename: "motorista.view_motorista",   label: "Visualizar Motorista" },
     { codename: "motorista.add_motorista",    label: "Incluir Motorista" },
@@ -84,6 +87,9 @@ export const PERMISSOES_SCHEMA = {
     { codename: "pedidos.add_pedido",  label: "Importar Pedidos (CSV)" },
     { codename: "pedidos.change_pedido", label: "Editar Pedido" },
     { codename: "pedidos.delete_pedido", label: "Excluir Pedido" },
+    // --- Conferência de Volumes ---
+    { codename: "pedidos.view_tentativaentrega",   label: "Acessar Conferência de Volumes" },
+    { codename: "pedidos.change_tentativaentrega", label: "Editar Conferência de Volumes" },
     // --- Motoristas ---
     { codename: "motorista.view_motorista",   label: "Visualizar Motorista" },
     { codename: "motorista.add_motorista",    label: "Incluir Motorista" },

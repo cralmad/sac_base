@@ -3,3 +3,117 @@
   font-weight: 500;
   white-space: nowrap;
 }
+
+/* Conferência de Volumes */
+.mov-card {
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 1rem;
+  background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.mov-card.unsaved {
+  border-color: #ffc107;
+  box-shadow: 0 0 0 2px #ffe082;
+}
+.mov-editable {
+  background: #f8f9fa;
+}
+.mov-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 1.5rem;
+}
+/* Input numérico compacto (carro / volume_conf) — somente leitura via botões */
+.input-num-xs {
+  max-width: 60px;
+  text-align: center;
+  cursor: default;
+  user-select: none;
+  caret-color: transparent;
+}
+/* Botões +/- coloridos */
+.btn-campo-menor {
+  background-color: #ffe0e0;
+  border-color: #f5c6c6;
+  color: #c0392b;
+}
+.btn-campo-menor:hover {
+  background-color: #f5b8b8;
+  border-color: #e09090;
+  color: #922b21;
+}
+.btn-campo-maior {
+  background-color: #d4edda;
+  border-color: #b8dfc4;
+  color: #1e7e34;
+}
+.btn-campo-maior:hover {
+  background-color: #b8dfc4;
+  border-color: #8fbd9f;
+  color: #155724;
+}
+/* Campo de obs. rota ocupa toda a largura */
+.mov-obs-wrapper {
+  grid-column: 1 / -1;
+}
+/* Botão salvar centralizado em 60% */
+.btn-salvar-wrapper {
+  display: flex;
+  justify-content: center;
+}
+.btn-salvar-mov {
+  width: 60%;
+}
+/* Labels de campos somente leitura */
+.mov-field-label {
+  font-size: 0.75rem;
+  color: #6c757d;
+  margin-bottom: 1px;
+  display: block;
+}
+/* Visualização do carro salvo no topo do card */
+.mov-carro-display {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
+  border-bottom: 1px solid #eee;
+}
+/* Volume Conf. centrado a 60% do card */
+.mov-vol-section {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+.mov-vol-section > div {
+  width: 60%;
+}
+/* Botão toggle sanfona */
+.mov-sanfona-toggle {
+  color: #6c757d;
+  text-decoration: none;
+  border: none;
+  padding: 0.2rem 0;
+}
+.mov-sanfona-toggle:hover {
+  color: #343a40;
+  text-decoration: none;
+}
+.mov-sanfona-icon {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+.mov-sanfona-toggle[aria-expanded="true"] .mov-sanfona-icon {
+  transform: rotate(180deg);
+}
+@media (max-width: 600px) {
+  .mov-card {
+    padding: 0.5rem;
+    font-size: 0.98em;
+  }
+  .mov-fields {
+    grid-template-columns: 1fr;
+  }
+}

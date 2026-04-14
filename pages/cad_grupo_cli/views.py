@@ -6,6 +6,7 @@ from django.shortcuts import render
 from pages.auditoria.models import AuditEvent
 from pages.auditoria.utils import diff_snapshots, registrar_auditoria, snapshot_instance
 from sac_base.form_validador import SchemaValidator
+from sac_base.permissions_utils import build_action_permissions, permission_denied_response
 from sac_base.sisvar_builders import build_error_payload, build_form_response, build_form_state, build_records_response, build_sisvar_payload, build_success_payload
 from .models import GrupoCli
 
@@ -19,26 +20,12 @@ PERMISSOES_GRUPO_CLI = {
 }
 
 
-def obter_acoes_permitidas_grupo_cli(usuario):
-    if not usuario or not getattr(usuario, 'is_authenticated', False):
-        return {acao: False for acao in PERMISSOES_GRUPO_CLI}
-
-    return {
-        acao: usuario.has_perm(codename)
-        for acao, codename in PERMISSOES_GRUPO_CLI.items()
-    }
-
-
-def resposta_sem_permissao(mensagem, status=403):
-    return JsonResponse(build_error_payload(mensagem), status=status)
-
-
 @permission_required(PERMISSOES_GRUPO_CLI['acessar'], raise_exception=True)
 def cad_grupo_cli_view(request):
     template     = 'cadgrupocli.html'
     nomeForm     = 'cadGrupoCli'
     nomeFormCons = 'consGrupoCli'
-    acoes_permitidas = obter_acoes_permitidas_grupo_cli(getattr(request, 'user', None))
+    acoes_permitidas = build_action_permissions(getattr(request, 'user', None), PERMISSOES_GRUPO_CLI)
 
     schema = {
         nomeForm: {
@@ -81,10 +68,10 @@ def cad_grupo_cli_view(request):
     estado    = form.get('estado', '')
 
     if estado == 'novo' and not acoes_permitidas['incluir']:
-        return resposta_sem_permissao('Você não possui permissão para incluir grupos de cliente.')
+        return permission_denied_response('Você não possui permissão para incluir grupos de cliente.')
 
     if estado == 'editar' and not acoes_permitidas['editar']:
-        return resposta_sem_permissao('Você não possui permissão para editar grupos de cliente.')
+        return permission_denied_response('Você não possui permissão para editar grupos de cliente.')
 
     validator = SchemaValidator(schema[nomeForm])
     if not validator.validate(campos):
@@ -197,7 +184,7 @@ def cad_grupo_cli_del_view(request):
     usuario = getattr(request, 'user', None)
 
     if not usuario or not usuario.has_perm(PERMISSOES_GRUPO_CLI['excluir']):
-        return resposta_sem_permissao('Você não possui permissão para excluir grupos de cliente.')
+        return permission_denied_response('Você não possui permissão para excluir grupos de cliente.')
 
     dataFront = request.sisvar_front
     form      = dataFront.get('form', {}).get(nomeForm, {})

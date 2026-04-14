@@ -8,7 +8,7 @@
 {% block content %}
   <form id="cadZonaEntrega" data-form-lock="cadZonaEntrega" method="POST">
     {% csrf_token %}
-    <div class="container-md-3 my-3 mx-auto">
+    <div class="container-xl my-3 mx-auto">
       <div class="row g-3">
         <div class="col-12 col-md-5">
           <label class="form-label mb-0" for="filial_id">Matriz/Filial</label>
@@ -25,8 +25,7 @@
             <span>Código</span>
             <button
               type="button"
-              class="btn btn-sm btn-outline-secondary rounded-circle p-0"
-              style="width: 1.25rem; height: 1.25rem; line-height: 1.1rem;"
+              class="btn btn-sm btn-outline-secondary rounded-circle p-0 btn-help-inline"
               data-bs-toggle="tooltip"
               data-bs-placement="top"
               data-bs-title="Identificador curto da zona de entrega (ex.: ZNPT, NORTE01). Use um código único por matriz/filial."
@@ -53,8 +52,7 @@
             <span>Prioridade</span>
             <button
               type="button"
-              class="btn btn-sm btn-outline-secondary rounded-circle p-0"
-              style="width: 1.25rem; height: 1.25rem; line-height: 1.1rem;"
+              class="btn btn-sm btn-outline-secondary rounded-circle p-0 btn-help-inline"
               data-bs-toggle="tooltip"
               data-bs-placement="top"
               data-bs-title="Usada para desempate entre zonas. Quanto menor o número, maior a prioridade da zona no atendimento."
@@ -99,8 +97,7 @@
             <span>Faixas de Código Postal</span>
             <button
               type="button"
-              class="btn btn-sm btn-outline-secondary rounded-circle p-0"
-              style="width: 1.25rem; height: 1.25rem; line-height: 1.1rem;"
+              class="btn btn-sm btn-outline-secondary rounded-circle p-0 btn-help-inline"
               data-bs-toggle="tooltip"
               data-bs-placement="top"
               data-bs-title="Define os intervalos de atendimento da zona. Exemplo em Portugal: 4000-000 até 4999-999."
@@ -135,8 +132,7 @@
             <span>Exceções de Código Postal</span>
             <button
               type="button"
-              class="btn btn-sm btn-outline-secondary rounded-circle p-0"
-              style="width: 1.25rem; height: 1.25rem; line-height: 1.1rem;"
+              class="btn btn-sm btn-outline-secondary rounded-circle p-0 btn-help-inline"
               data-bs-toggle="tooltip"
               data-bs-placement="top"
               data-bs-title="Permite incluir ou excluir códigos específicos da zona, mesmo quando a faixa geral atender o endereço."
@@ -167,27 +163,29 @@
       <p class="form-text mt-2 mb-0">Para Portugal, utilize sempre o formato XXXX-XXX nas faixas e exceções.</p>
     </div>
 
-    <button id="btn-salvar" class="btn btn-primary d-none" data-show-on="novo,editar" type="submit">
-      <i class="bi bi-save"></i> Salvar
-    </button>
-    <button id="btn-editar" type="button" data-show-on="visualizar" class="btn btn-warning d-none">
-      <i class="bi bi-pencil"></i> Editar
-    </button>
-    <button id="btn-novo" type="button" data-show-on="visualizar" class="btn btn-success d-none">
-      <i class="bi bi-plus-circle"></i> Novo
-    </button>
-    <button id="btn-excluir" type="button" data-show-on="visualizar" class="btn btn-danger d-none">
-      <i class="bi bi-trash"></i> Excluir
-    </button>
-    <button id="btn-cancelar" type="button" data-show-on="novo,editar" class="btn btn-outline-secondary d-none">
-      <i class="bi bi-x-circle"></i> Cancelar
-    </button>
-    <button type="button" id="btn-abrir-pesquisa" class="btn btn-secondary d-none">
-      <i class="bi bi-search"></i> Pesquisar
-    </button>
+    <div class="btn-actions">
+      <button id="btn-salvar" class="btn btn-primary d-none" data-show-on="novo,editar" type="submit">
+        <i class="bi bi-save"></i> Salvar
+      </button>
+      <button id="btn-editar" type="button" data-show-on="visualizar" class="btn btn-warning d-none">
+        <i class="bi bi-pencil"></i> Editar
+      </button>
+      <button id="btn-novo" type="button" data-show-on="visualizar" class="btn btn-success d-none">
+        <i class="bi bi-plus-circle"></i> Novo
+      </button>
+      <button id="btn-excluir" type="button" data-show-on="visualizar" class="btn btn-danger d-none">
+        <i class="bi bi-trash"></i> Excluir
+      </button>
+      <button id="btn-cancelar" type="button" data-show-on="novo,editar" class="btn btn-outline-secondary d-none">
+        <i class="bi bi-x-circle"></i> Cancelar
+      </button>
+      <button type="button" id="btn-abrir-pesquisa" class="btn btn-secondary d-none">
+        <i class="bi bi-search"></i> Pesquisar
+      </button>
+    </div>
   </form>
 
-  <div id="div-pesquisa" class="container d-none">
+  <div id="div-pesquisa" class="container-xl d-none mt-3">
     <div class="card shadow-sm">
       <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
         <span>Consultar Zonas de Entrega</span>
@@ -210,9 +208,9 @@
               <label class="form-label mb-0">Descrição</label>
               <input type="text" name="descricao_cons" class="form-control smart-input" data-textcase="upper" maxlength="100">
             </div>
-            <div class="col-12 col-md-2 d-grid gap-2 d-md-flex align-items-end">
-              <button type="submit" class="btn btn-success">Filtrar</button>
-              <button type="button" class="btn btn-outline-danger" id="btn-voltar">Voltar</button>
+            <div class="col-12 col-lg-2 d-grid gap-2 align-items-end">
+              <button type="submit" class="btn btn-success text-center">Filtrar</button>
+              <button type="button" class="btn btn-outline-danger text-center" id="btn-voltar">Voltar</button>
             </div>
           </div>
         </form>

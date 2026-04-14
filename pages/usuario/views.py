@@ -13,6 +13,7 @@ from pages.auditoria.utils import diff_snapshots, registrar_auditoria, snapshot_
 from pages.filial.services import ACTIVE_FILIAL_COOKIE, FILIAL_NO_ACCESS_PATH, FILIAL_SELECT_PATH, listar_filiais_permitidas
 from pages.usuario.models import Usuarios
 from sac_base.form_validador import SchemaValidator
+from sac_base.permissions_utils import build_action_permissions, permission_denied_response
 from sac_base.sisvar_builders import build_error_payload, build_form_response, build_form_state, build_records_response, build_sisvar_payload
 
 User = get_user_model()
@@ -26,19 +27,6 @@ PERMISSOES_USUARIO = {
     "excluir": "usuario.delete_usuarios",
 }
 
-
-def obter_acoes_permitidas_usuario(usuario):
-    if not usuario or not getattr(usuario, "is_authenticated", False):
-        return {acao: False for acao in PERMISSOES_USUARIO}
-
-    return {
-        acao: usuario.has_perm(codename)
-        for acao, codename in PERMISSOES_USUARIO.items()
-    }
-
-
-def resposta_sem_permissao(mensagem, status=403):
-    return JsonResponse(build_error_payload(mensagem), status=status)
 
 def login_view(request):
     
@@ -137,7 +125,7 @@ def cadastro_view(request):
     template = "usuario.html"
     nomeForm = "cadUsuario"
     nomeFormCons = "consUsuario"
-    acoes_permitidas = obter_acoes_permitidas_usuario(getattr(request, "user", None))
+    acoes_permitidas = build_action_permissions(getattr(request, "user", None), PERMISSOES_USUARIO)
 
     schema = {
         nomeForm: {
@@ -197,10 +185,10 @@ def cadastro_view(request):
     estado    = form.get("estado", "")
 
     if estado == "novo" and not acoes_permitidas["incluir"]:
-        return resposta_sem_permissao("Você não possui permissão para incluir usuários.")
+        return permission_denied_response("Você não possui permissão para incluir usuários.")
 
     if estado == "editar" and not acoes_permitidas["editar"]:
-        return resposta_sem_permissao("Você não possui permissão para editar usuários.")
+        return permission_denied_response("Você não possui permissão para editar usuários.")
 
     # Validação de schema #####################################################
     validator = SchemaValidator(schema[nomeForm])

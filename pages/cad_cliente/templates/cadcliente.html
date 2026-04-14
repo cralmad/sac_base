@@ -46,7 +46,7 @@
 
             {# ── Aba CADASTRO ── #}
             <div class="tab-pane fade show active" id="cadastro" role="tabpanel">
-                <div class="container-md-3 my-3 mx-auto">
+                <div class="container-xl my-3 mx-auto">
                     <div class="row g-3">
 
                         {# Código #}
@@ -96,7 +96,7 @@
                         <div class="col-12">
                             <label for="endereco" class="form-label mb-0">Logradouro / Endereço</label>
                             <div class="input-group">
-                                <select id="logradouro" name="logradouro" class="form-select smart-input" style="max-width:160px">
+                                <select id="logradouro" name="logradouro" class="form-select smart-input select-logradouro">
                                     <option value="">Tipo</option>
                                     <option value="Rua">Rua</option>
                                     <option value="Avenida">Avenida</option>
@@ -135,7 +135,7 @@
                         {# País #}
                         <div class="col-12 col-sm-4">
                             <label for="pais" class="form-label mb-0">País *</label>
-                            <select id="pais" name="pais" class="form-select smart-input" required>
+                            <select id="pais" name="pais" class="form-select smart-input" data-hierarchy="cad_cliente_geo" data-hierarchy-root required>
                                 <option value="">Selecione</option>
                             </select>
                         </div>
@@ -143,7 +143,7 @@
                         {# UF / Região #}
                         <div class="col-12 col-sm-3">
                             <label for="regiao" class="form-label mb-0">UF</label>
-                            <select id="regiao" name="regiao" class="form-select smart-input" disabled>
+                            <select id="regiao" name="regiao" class="form-select smart-input" data-hierarchy="cad_cliente_geo" data-select-depends="pais" disabled>
                                 <option value="">Selecione</option>
                             </select>
                         </div>
@@ -151,7 +151,7 @@
                         {# Cidade #}
                         <div class="col-12 col-sm-5">
                             <label for="cidade" class="form-label mb-0">Cidade</label>
-                            <select id="cidade" name="cidade" class="form-select smart-input" disabled>
+                            <select id="cidade" name="cidade" class="form-select smart-input" data-hierarchy="cad_cliente_geo" data-select-depends="pais,regiao" disabled>
                                 <option value="">Selecione</option>
                             </select>
                         </div>
@@ -177,7 +177,7 @@
 
             {# ── Aba OBSERVAÇÃO ── #}
             <div class="tab-pane fade" id="observacao" role="tabpanel">
-                <div class="container-md-3 my-3 mx-auto">
+                <div class="container-xl my-3 mx-auto">
                     <div class="row g-3">
                         <div class="col-12">
                             <label for="observacao" class="form-label mb-0">Observação</label>
@@ -191,7 +191,7 @@
         </div>
 
         {# ── Botões controlados pelo estado via data-show-on ── #}
-        <div class="d-grid gap-2 d-md-flex mt-3">
+        <div class="btn-actions">
             <button id="btn-salvar"   class="btn btn-primary d-none"           data-show-on="novo,editar"  type="submit">
                 <i class="bi bi-save"></i> Salvar
             </button>
@@ -217,7 +217,7 @@
 </div>{# ── /area-cadastro ── #}
 
 {# ── Tela de pesquisa ── #}
-<div id="div-pesquisa" class="container-md-3 d-none mt-3">
+<div id="div-pesquisa" class="container-xl d-none mt-3">
     <div class="card shadow-sm">
         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
             <span>Consultar Clientes</span>
@@ -225,7 +225,7 @@
         </div>
         <div class="card-body">
             <form id="consCliente" method="POST">
-                <div class="container-md-3 my-2 mx-auto">
+                <div class="container-xl my-2 mx-auto">
                     <div class="row g-3">
                         <div class="col-12 col-sm-4">
                             <label class="form-label mb-0">Código</label>

@@ -48,10 +48,18 @@ function pode(acao) {
   return Boolean(permissoes()?.[acao]);
 }
 
+function podeAplicarEstiloSomenteLeitura(elemento) {
+  return elemento && !['checkbox', 'radio'].includes(elemento.type);
+}
+
 function preencherSelect(id, lista, optLabel = 'Selecione', map = x => ({ value: x.value, label: x.label })) {
   const sel = document.getElementById(id);
   if (!sel) return;
-  sel.innerHTML = `<option value="">${optLabel}</option>`;
+  sel.innerHTML = '';
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = optLabel;
+  sel.appendChild(defaultOption);
   lista.forEach(item => {
     const { value, label } = map(item);
     const opt = document.createElement('option');
@@ -125,7 +133,11 @@ function preencherMotoristasFilial(filialId) {
 
   [selectPedido, selectMov].forEach(select => {
     if (select) {
-      select.innerHTML = '<option value="">Selecione</option>';
+      select.innerHTML = '';
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'Selecione';
+      select.appendChild(opt);
     }
   });
 
@@ -176,7 +188,11 @@ function aplicarTravasImportados() {
       return;
     }
     el.disabled = bloquearTudo;
-    el.classList.toggle('bg-light-subtle', bloquearTudo);
+    if (podeAplicarEstiloSomenteLeitura(el)) {
+      el.classList.toggle('bg-light-subtle', bloquearTudo);
+    } else {
+      el.classList.remove('bg-light-subtle');
+    }
   });
 
   if (bloquearTudo) {
@@ -188,7 +204,11 @@ function aplicarTravasImportados() {
     const el = form.querySelector(`[name="${nome}"]`);
     if (el) {
       el.disabled = travar;
-      el.classList.toggle('bg-light-subtle', travar);
+      if (podeAplicarEstiloSomenteLeitura(el)) {
+        el.classList.toggle('bg-light-subtle', travar);
+      } else {
+        el.classList.remove('bg-light-subtle');
+      }
     }
   });
 }
@@ -196,28 +216,64 @@ function aplicarTravasImportados() {
 function renderMovimentacoes(registros = []) {
   tabelaMovCorpo.innerHTML = '';
   if (!registros.length) {
-    tabelaMovCorpo.innerHTML = '<tr><td colspan="10" class="text-center text-muted">Nenhuma movimentação</td></tr>';
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 10;
+    td.className = 'text-center text-muted';
+    td.textContent = 'Nenhuma movimentação';
+    tr.appendChild(td);
+    tabelaMovCorpo.appendChild(tr);
     aplicarTravasMovimentacoes();
     return;
   }
 
   registros.forEach(m => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${m.id}</td>
-      <td>${m.data_tentativa || ''}</td>
-      <td>${m.estado || ''}</td>
-      <td>${m.carro ?? ''}</td>
-      <td>${m.motorista_nome || ''}</td>
-      <td>${m.periodo === 'MANHA' ? 'MANHÃ' : (m.periodo || '')}</td>
-      <td>${m.dt_entrega || ''}</td>
-      <td>${m.faturado ? 'Sim' : 'Não'}</td>
-      <td>${m.interno ? 'Sim' : 'Não'}</td>
-      <td class="text-center">
-        <button type="button" class="btn btn-sm btn-outline-warning me-1 btn-mov-editar" data-id="${m.id}" data-data-tentativa="${m.data_tentativa || ''}" data-estado="${m.estado || ''}" data-carro="${m.carro ?? ''}" data-motorista-id="${m.motorista_id ?? ''}" data-periodo="${m.periodo || ''}" data-dt-entrega="${m.dt_entrega || ''}" data-faturado="${m.faturado ? '1' : '0'}" data-interno="${m.interno ? '1' : '0'}">Editar</button>
-        <button type="button" class="btn btn-sm btn-outline-danger btn-mov-excluir" data-id="${m.id}">Excluir</button>
-      </td>
-    `;
+
+    const colunas = [
+      m.id,
+      m.data_tentativa,
+      m.estado,
+      m.carro,
+      m.motorista_nome,
+      m.periodo === 'MANHA' ? 'MANHÃ' : (m.periodo || ''),
+      m.dt_entrega,
+      m.faturado ? 'Sim' : 'Não',
+      m.interno ? 'Sim' : 'Não',
+    ];
+
+    colunas.forEach(valor => {
+      const td = document.createElement('td');
+      td.textContent = String(valor ?? '');
+      tr.appendChild(td);
+    });
+
+    const tdAcoes = document.createElement('td');
+    tdAcoes.className = 'text-center';
+
+    const btnEditar = document.createElement('button');
+    btnEditar.type = 'button';
+    btnEditar.className = 'btn btn-sm btn-outline-warning me-1 btn-mov-editar';
+    btnEditar.textContent = 'Editar';
+    btnEditar.dataset.id = String(m.id ?? '');
+    btnEditar.dataset.dataTentativa = String(m.data_tentativa ?? '');
+    btnEditar.dataset.estado = String(m.estado ?? '');
+    btnEditar.dataset.carro = String(m.carro ?? '');
+    btnEditar.dataset.motoristaId = String(m.motorista_id ?? '');
+    btnEditar.dataset.periodo = String(m.periodo ?? '');
+    btnEditar.dataset.dtEntrega = String(m.dt_entrega ?? '');
+    btnEditar.dataset.faturado = m.faturado ? '1' : '0';
+    btnEditar.dataset.interno = m.interno ? '1' : '0';
+
+    const btnExcluir = document.createElement('button');
+    btnExcluir.type = 'button';
+    btnExcluir.className = 'btn btn-sm btn-outline-danger btn-mov-excluir';
+    btnExcluir.textContent = 'Excluir';
+    btnExcluir.dataset.id = String(m.id ?? '');
+
+    tdAcoes.appendChild(btnEditar);
+    tdAcoes.appendChild(btnExcluir);
+    tr.appendChild(tdAcoes);
     tabelaMovCorpo.appendChild(tr);
   });
 
@@ -307,24 +363,48 @@ async function resetarFormularioAposCancelamento() {
 function renderPesquisa(registros = []) {
   tabelaPedidoCorpo.innerHTML = '';
   if (!registros.length) {
-    tabelaPedidoCorpo.innerHTML = '<tr><td colspan="10" class="text-center text-muted">Nenhum registro</td></tr>';
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 10;
+    td.className = 'text-center text-muted';
+    td.textContent = 'Nenhum registro';
+    tr.appendChild(td);
+    tabelaPedidoCorpo.appendChild(tr);
     return;
   }
 
   registros.forEach(r => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${r.id}</td>
-      <td>${r.filial || ''}</td>
-      <td><span class="badge ${r.origem === 'IMPORTADO' ? 'text-bg-info' : 'text-bg-secondary'}">${r.origem || ''}</span></td>
-      <td>${r.id_vonzu || ''}</td>
-      <td>${r.pedido || ''}</td>
-      <td>${r.tipo || ''}</td>
-      <td>${r.estado || ''}</td>
-      <td>${r.prev_entrega || ''}</td>
-      <td>${r.nome_dest || ''}</td>
-      <td class="text-center"><button class="btn btn-primary btn-sm btn-selecionar" data-id="${r.id}">Selecionar</button></td>
-    `;
+
+    const campos = [r.id, r.filial];
+    campos.forEach(valor => {
+      const td = document.createElement('td');
+      td.textContent = String(valor ?? '');
+      tr.appendChild(td);
+    });
+
+    const tdOrigem = document.createElement('td');
+    const badge = document.createElement('span');
+    badge.className = `badge ${r.origem === 'IMPORTADO' ? 'text-bg-info' : 'text-bg-secondary'}`;
+    badge.textContent = String(r.origem ?? '');
+    tdOrigem.appendChild(badge);
+    tr.appendChild(tdOrigem);
+
+    [r.id_vonzu, r.pedido, r.tipo, r.estado, r.prev_entrega, r.nome_dest].forEach(valor => {
+      const td = document.createElement('td');
+      td.textContent = String(valor ?? '');
+      tr.appendChild(td);
+    });
+
+    const tdAcao = document.createElement('td');
+    tdAcao.className = 'text-center';
+    const btnSelecionar = document.createElement('button');
+    btnSelecionar.className = 'btn btn-primary btn-sm btn-selecionar';
+    btnSelecionar.dataset.id = String(r.id ?? '');
+    btnSelecionar.textContent = 'Selecionar';
+    tdAcao.appendChild(btnSelecionar);
+    tr.appendChild(tdAcao);
+
     tabelaPedidoCorpo.appendChild(tr);
   });
 }

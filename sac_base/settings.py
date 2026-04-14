@@ -81,12 +81,14 @@ if not DEBUG and not USANDO_SETTINGS_TESTE_LOCAL and not ALLOWED_HOSTS:
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',  # Deve ser o primeiro para sobrescrever o runserver com suporte a ASGI/WebSocket
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'channels',  # WebSocket via Django Channels
     'rest_framework', # Necessário para o app de usuário/autenticação
     'rest_framework_simplejwt', # Necessário para o app de usuário/autenticação
     'pages.cad_cliente',
@@ -126,6 +128,25 @@ SIMPLE_JWT = {# Necessário para o app de usuário/autenticação
 }
 
 ROOT_URLCONF = 'sac_base.urls'
+ASGI_APPLICATION = 'sac_base.asgi.application'
+
+# Channel Layers
+# Em desenvolvimento usa InMemoryChannelLayer (processo único).
+# Em produção multi-processo defina REDIS_URL e instale channels-redis.
+_REDIS_URL = os.environ.get('REDIS_URL')
+if _REDIS_URL:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {'hosts': [_REDIS_URL]},
+        }
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        }
+    }
 
 TEMPLATES = [
     {

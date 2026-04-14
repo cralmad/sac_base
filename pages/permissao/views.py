@@ -6,6 +6,7 @@ from django.contrib.auth.models import Group, Permission
 from pages.auditoria.models import AuditEvent
 from pages.auditoria.utils import diff_snapshots, registrar_auditoria
 from pages.filial.models import Filial, UsuarioFilial
+from sac_base.permissions_utils import build_action_permissions, permission_denied_response
 from sac_base.form_validador import SchemaValidator
 from sac_base.sisvar_builders import build_error_payload, build_form_response, build_form_state, build_forms_response, build_records_response, build_sisvar_payload
 
@@ -45,20 +46,6 @@ PERMISSOES_PERMISSAO_USUARIO = {
     "consultar": "usuario.view_usuarios",
     "editar": "usuario.change_usuarios",
 }
-
-
-def obter_acoes_permitidas(permissoes_map, usuario):
-    if not usuario or not getattr(usuario, "is_authenticated", False):
-        return {acao: False for acao in permissoes_map}
-
-    return {
-        acao: usuario.has_perm(codename)
-        for acao, codename in permissoes_map.items()
-    }
-
-
-def resposta_sem_permissao(mensagem, status=403):
-    return JsonResponse(build_error_payload(mensagem), status=status)
 
 
 def resolver_permissoes(codenames):
@@ -272,7 +259,7 @@ def cadastro_grupo_view(request):
     template    = "permissao.html"
     nomeForm    = "cadGrupo"
     nomeFormCons = "consGrupo"
-    acoes_permitidas = obter_acoes_permitidas(PERMISSOES_GRUPO, getattr(request, "user", None))
+    acoes_permitidas = build_action_permissions(getattr(request, "user", None), PERMISSOES_GRUPO)
 
     schema = {
         nomeForm: {
@@ -317,13 +304,13 @@ def cadastro_grupo_view(request):
     estado    = form.get("estado", "")
 
     if estado == 'novo' and not acoes_permitidas['incluir']:
-        return resposta_sem_permissao('Você não possui permissão para incluir grupos de permissão.')
+        return permission_denied_response('Você não possui permissão para incluir grupos de permissão.')
 
     if estado == 'editar' and not acoes_permitidas['editar']:
-        return resposta_sem_permissao('Você não possui permissão para editar grupos de permissão.')
+        return permission_denied_response('Você não possui permissão para editar grupos de permissão.')
 
     if estado == 'excluir' and not acoes_permitidas['excluir']:
-        return resposta_sem_permissao('Você não possui permissão para excluir grupos de permissão.')
+        return permission_denied_response('Você não possui permissão para excluir grupos de permissão.')
 
     # Validação de schema
     validator = SchemaValidator(schema[nomeForm])
@@ -479,7 +466,7 @@ def permissao_usuario_view(request):
     template = "permissao_usuario.html"
     nomeForm = "cadPermissaoUsuario"
     nomeFormCons = "consPermissaoUsuario"
-    acoes_permitidas = obter_acoes_permitidas(PERMISSOES_PERMISSAO_USUARIO, getattr(request, "user", None))
+    acoes_permitidas = build_action_permissions(getattr(request, "user", None), PERMISSOES_PERMISSAO_USUARIO)
 
     schema = {
         nomeForm: {
@@ -532,7 +519,7 @@ def permissao_usuario_view(request):
     estado = form.get("estado", "")
 
     if estado in {'novo', 'editar'} and not acoes_permitidas['editar']:
-        return resposta_sem_permissao('Você não possui permissão para alterar permissões de usuários.')
+        return permission_denied_response('Você não possui permissão para alterar permissões de usuários.')
 
     validator = SchemaValidator(schema[nomeForm])
     if not validator.validate(campos):

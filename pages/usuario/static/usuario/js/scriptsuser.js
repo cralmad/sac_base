@@ -14,6 +14,7 @@ import { fazerRequisicao } from "/static/js/base.js";
 import { initSmartInputs } from "/static/js/input_rules.js";
 import { criarAtualizadorForm } from "/static/js/refresh_varSis.js";
 import { AppLoader } from "/static/js/loader.js";
+import { buttonVisibleByState, buttonAllowedByPermission, createActionChecker } from '/static/js/screen_permissions.js';
 
 const nomeForm = "cadUsuario";
 const nomeFormCons = "consUsuario";
@@ -22,49 +23,34 @@ const form2 = document.getElementById(nomeFormCons);
 
 getDataBackEnd();
 
-function obterPermissoesUsuario() {
-  return getScreenPermissions('usuario', {
+const podeExecutarAcao = createActionChecker({
+  screenKey: 'usuario',
+  getScreenPermissions,
+  fallback: {
     acessar: false,
     consultar: false,
     incluir: false,
     editar: false,
     excluir: false,
-  });
-}
+  },
+});
 
-function podeExecutarAcao(acao) {
-  return Boolean(obterPermissoesUsuario()?.[acao]);
+function obterPermissoesUsuario() {
+  return {
+    acessar: podeExecutarAcao('acessar'),
+    consultar: podeExecutarAcao('consultar'),
+    incluir: podeExecutarAcao('incluir'),
+    editar: podeExecutarAcao('editar'),
+    excluir: podeExecutarAcao('excluir'),
+  };
 }
 
 function botaoDeveFicarVisivel(botao, estado) {
-  const estadosPermitidos = (botao.dataset.showOn || '')
-    .split(',')
-    .map(item => item.trim())
-    .filter(Boolean);
-
-  return estadosPermitidos.includes(estado);
+  return buttonVisibleByState(botao, estado);
 }
 
 function podeExibirBotaoPorPermissao(botaoId, estado) {
-  if (botaoId === 'btn-novo') {
-    return podeExecutarAcao('incluir');
-  }
-
-  if (botaoId === 'btn-editar') {
-    return podeExecutarAcao('editar');
-  }
-
-  if (botaoId === 'btn-salvar' || botaoId === 'btn-cancelar') {
-    if (estado === 'novo') {
-      return podeExecutarAcao('incluir');
-    }
-
-    if (estado === 'editar') {
-      return podeExecutarAcao('editar');
-    }
-  }
-
-  return true;
+  return buttonAllowedByPermission({ buttonId: botaoId, state: estado, canExecute: podeExecutarAcao });
 }
 
 function validarPermissaoPorEstado(estado) {
@@ -296,7 +282,13 @@ document.addEventListener('DOMContentLoaded', () => {
     tabelaCorpo.innerHTML = '';
 
     if (!Array.isArray(registros) || registros.length === 0) {
-      tabelaCorpo.innerHTML = '<tr><td colspan="6" class="text-center">Nenhum registro encontrado</td></tr>';
+      const linhaSemDados = document.createElement('tr');
+      const celulaSemDados = document.createElement('td');
+      celulaSemDados.colSpan = 6;
+      celulaSemDados.className = 'text-center';
+      celulaSemDados.textContent = 'Nenhum registro encontrado';
+      linhaSemDados.appendChild(celulaSemDados);
+      tabelaCorpo.appendChild(linhaSemDados);
       return;
     }
 
@@ -304,21 +296,29 @@ document.addEventListener('DOMContentLoaded', () => {
       const linha = document.createElement('tr');
       const ativoStatus = registro.is_active ? '✓' : '✗';
       const alivoBadge = registro.is_active ? 'bg-success' : 'bg-danger';
-      
-      linha.innerHTML = `
-        <td>${registro.id || ''}</td>
-        <td>${registro.first_name || ''}</td>
-        <td>${registro.username || ''}</td>
-        <td>${registro.email || ''}</td>
-        <td>
-          <span class="badge ${alivoBadge}">${ativoStatus}</span>
-        </td>
-        <td class="text-center">
-          <button class="btn btn-sm btn-primary btn-selecionar" data-id="${registro.id}">
-            Selecionar
-          </button>
-        </td>
-      `;
+
+      [registro.id, registro.first_name, registro.username, registro.email].forEach(valor => {
+        const td = document.createElement('td');
+        td.textContent = String(valor ?? '');
+        linha.appendChild(td);
+      });
+
+      const tdStatus = document.createElement('td');
+      const badge = document.createElement('span');
+      badge.className = `badge ${alivoBadge}`;
+      badge.textContent = ativoStatus;
+      tdStatus.appendChild(badge);
+      linha.appendChild(tdStatus);
+
+      const tdAcao = document.createElement('td');
+      tdAcao.className = 'text-center';
+      const btnSelecionar = document.createElement('button');
+      btnSelecionar.className = 'btn btn-sm btn-primary btn-selecionar';
+      btnSelecionar.dataset.id = String(registro.id ?? '');
+      btnSelecionar.textContent = 'Selecionar';
+      tdAcao.appendChild(btnSelecionar);
+      linha.appendChild(tdAcao);
+
       tabelaCorpo.appendChild(linha);
     });
   }

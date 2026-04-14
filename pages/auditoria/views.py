@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from pages.auditoria.models import AuditEvent
 from sac_base.form_validador import SchemaValidator
+from sac_base.permissions_utils import build_action_permissions, permission_denied_response
 from sac_base.sisvar_builders import build_error_payload, build_form_state, build_sisvar_payload, build_sisvar_response
 
 User = get_user_model()
@@ -18,20 +19,6 @@ PERMISSOES_AUDITORIA = {
     "acessar": "auditoria.acessar_consulta_auditoria",
     "consultar": "auditoria.acessar_consulta_auditoria",
 }
-
-
-def obter_acoes_permitidas_auditoria(usuario):
-    if not usuario or not getattr(usuario, "is_authenticated", False):
-        return {acao: False for acao in PERMISSOES_AUDITORIA}
-
-    return {
-        acao: usuario.has_perm(codename)
-        for acao, codename in PERMISSOES_AUDITORIA.items()
-    }
-
-
-def resposta_sem_permissao(mensagem, status=403):
-    return JsonResponse(build_error_payload(mensagem), status=status)
 
 
 def listar_atores_auditoria():
@@ -211,7 +198,7 @@ def consultar_eventos(campos):
 def auditoria_view(request):
     template = "auditoria.html"
     nome_form = "consAuditoria"
-    acoes_permitidas = obter_acoes_permitidas_auditoria(getattr(request, "user", None))
+    acoes_permitidas = build_action_permissions(getattr(request, "user", None), PERMISSOES_AUDITORIA)
 
     schema = {
         nome_form: {

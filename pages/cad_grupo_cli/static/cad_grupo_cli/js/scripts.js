@@ -5,9 +5,11 @@ import {
   hidratarFormulario, setFormState, confirmar, getScreenPermissions, getDataBackEnd
 } from '/static/js/sisVar.js';
 import { fazerRequisicao }      from '/static/js/base.js';
+import { escapeHtml }           from '/static/js/html.js';
 import { initSmartInputs }      from '/static/js/input_rules.js';
 import { criarAtualizadorForm } from '/static/js/refresh_varSis.js';
 import { AppLoader }            from '/static/js/loader.js';
+import { buttonVisibleByState, buttonAllowedByPermission, createActionChecker } from '/static/js/screen_permissions.js';
 
 // 2. CONSTANTES
 const nomeForm     = 'cadGrupoCli';
@@ -17,53 +19,34 @@ const form2 = document.getElementById(nomeFormCons);
 
 getDataBackEnd();
 
-function obterPermissoesGrupoCli() {
-  return getScreenPermissions('cad_grupo_cli', {
+const podeExecutarAcao = createActionChecker({
+  screenKey: 'cad_grupo_cli',
+  getScreenPermissions,
+  fallback: {
     acessar: false,
     consultar: false,
     incluir: false,
     editar: false,
     excluir: false,
-  });
-}
-
-function podeExecutarAcao(acao) {
-  return Boolean(obterPermissoesGrupoCli()?.[acao]);
-}
+  },
+});
 
 function botaoDeveFicarVisivel(botao, estado) {
-  const estadosPermitidos = (botao.dataset.showOn || '')
-    .split(',')
-    .map(item => item.trim())
-    .filter(Boolean);
-
-  return estadosPermitidos.includes(estado);
+  return buttonVisibleByState(botao, estado);
 }
 
 function podeExibirBotaoPorPermissao(botaoId, estado) {
-  if (botaoId === 'btn-novo') {
-    return podeExecutarAcao('incluir');
-  }
+  return buttonAllowedByPermission({ buttonId: botaoId, state: estado, canExecute: podeExecutarAcao });
+}
 
-  if (botaoId === 'btn-editar') {
-    return podeExecutarAcao('editar');
-  }
-
-  if (botaoId === 'btn-excluir') {
-    return podeExecutarAcao('excluir');
-  }
-
-  if (botaoId === 'btn-salvar' || botaoId === 'btn-cancelar') {
-    if (estado === 'novo') {
-      return podeExecutarAcao('incluir');
-    }
-
-    if (estado === 'editar') {
-      return podeExecutarAcao('editar');
-    }
-  }
-
-  return true;
+function obterPermissoesGrupoCli() {
+  return {
+    acessar: podeExecutarAcao('acessar'),
+    consultar: podeExecutarAcao('consultar'),
+    incluir: podeExecutarAcao('incluir'),
+    editar: podeExecutarAcao('editar'),
+    excluir: podeExecutarAcao('excluir'),
+  };
 }
 
 // 3. VÍNCULO sisVar ↔ inputs do formulário principal
@@ -75,15 +58,6 @@ initSmartInputs((input, value) => { updateFormField(nomeForm, input.name, value)
 const updater2 = criarAtualizadorForm({ formId: nomeFormCons, setter: updateFormField, form: form2 });
 form2.addEventListener('input', updater2);
 
-// Utilitário: escapa strings para inserção segura no DOM (evita XSS)
-function escHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 // Utilitário: marca/desmarca campo com erro visual Bootstrap
 function marcarCampoErro(formEl, nomeCampo, ativo) {
@@ -230,7 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     confirmar({
       titulo: 'Confirmar Exclusão',
-      mensagem: `Deseja excluir o grupo "${escHtml(descricao)}"? Esta ação não pode ser desfeita.`,
+      mensagem: `Deseja excluir o grupo "${escapeHtml(descricao)}"? Esta ação não pode ser desfeita.`,
       onConfirmar: async () => {
         clearMessages();
         if (!podeExecutarAcao('excluir')) {
@@ -335,7 +309,13 @@ tabelaCorpo.addEventListener('click', async e => {
     tabelaCorpo.innerHTML = '';
 
     if (!Array.isArray(registros) || registros.length === 0) {
-      tabelaCorpo.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Nenhum registro encontrado.</td></tr>';
+      const linhaVazia = document.createElement('tr');
+      const celulaVazia = document.createElement('td');
+      celulaVazia.colSpan = 3;
+      celulaVazia.className = 'text-center text-muted';
+      celulaVazia.textContent = 'Nenhum registro encontrado.';
+      linhaVazia.appendChild(celulaVazia);
+      tabelaCorpo.appendChild(linhaVazia);
       return;
     }
 

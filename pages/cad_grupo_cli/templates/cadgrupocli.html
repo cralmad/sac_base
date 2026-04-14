@@ -14,7 +14,7 @@
   {# ── Formulário principal ── #}
   <form id="cadGrupoCli" data-form-lock="cadGrupoCli" method="POST">
     {% csrf_token %}
-    <div class="container-md-3 my-3 mx-auto">
+    <div class="container-xl my-3 mx-auto">
       <div class="row g-3">
 
         <div class="col-12 col-sm-5">
@@ -26,28 +26,30 @@
       </div>
     </div>
 
-    <button id="btn-salvar"   class="btn btn-primary d-none"           data-show-on="novo,editar" type="submit">
-      <i class="bi bi-save"></i> Salvar
-    </button>
-    <button id="btn-editar"   type="button" data-show-on="visualizar"  class="btn btn-warning d-none">
-      <i class="bi bi-pencil"></i> Editar
-    </button>
-    <button id="btn-novo"     type="button" data-show-on="visualizar"  class="btn btn-success d-none">
-      <i class="bi bi-plus-circle"></i> Novo
-    </button>
-    <button id="btn-excluir"  type="button" data-show-on="visualizar"  class="btn btn-danger d-none">
-      <i class="bi bi-trash"></i> Excluir
-    </button>
-    <button id="btn-cancelar" type="button" data-show-on="novo,editar" class="btn btn-outline-secondary d-none">
-      <i class="bi bi-x-circle"></i> Cancelar
-    </button>
-    <button type="button" id="btn-abrir-pesquisa" class="btn btn-secondary d-none">
-      <i class="bi bi-search"></i> Pesquisar
-    </button>
+    <div class="btn-actions">
+      <button id="btn-salvar"   class="btn btn-primary d-none"           data-show-on="novo,editar" type="submit">
+        <i class="bi bi-save"></i> Salvar
+      </button>
+      <button id="btn-editar"   type="button" data-show-on="visualizar"  class="btn btn-warning d-none">
+        <i class="bi bi-pencil"></i> Editar
+      </button>
+      <button id="btn-novo"     type="button" data-show-on="visualizar"  class="btn btn-success d-none">
+        <i class="bi bi-plus-circle"></i> Novo
+      </button>
+      <button id="btn-excluir"  type="button" data-show-on="visualizar"  class="btn btn-danger d-none">
+        <i class="bi bi-trash"></i> Excluir
+      </button>
+      <button id="btn-cancelar" type="button" data-show-on="novo,editar" class="btn btn-outline-secondary d-none">
+        <i class="bi bi-x-circle"></i> Cancelar
+      </button>
+      <button type="button" id="btn-abrir-pesquisa" class="btn btn-secondary d-none">
+        <i class="bi bi-search"></i> Pesquisar
+      </button>
+    </div>
   </form>
 
   {# ── Tela de pesquisa ── #}
-  <div id="div-pesquisa" class="container d-none">
+  <div id="div-pesquisa" class="container-xl d-none mt-3">
     <div class="card shadow-sm">
       <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
         <span>Consultar Grupo de Clientes</span>
@@ -56,7 +58,7 @@
       <div class="card-body">
 
         <form id="consGrupoCli" method="POST">
-          <div class="container-md-3 my-3 mx-auto">
+          <div class="container-xl my-3 mx-auto">
             <div class="row g-3">
 
               <div class="col-12 col-sm-5">

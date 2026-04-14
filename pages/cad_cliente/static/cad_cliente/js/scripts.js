@@ -13,8 +13,10 @@ import {
 } from '/static/js/sisVar.js';
 import { fazerRequisicao } from '/static/js/base.js';
 import { initSmartInputs } from '/static/js/input_rules.js';
+import { initHierarchicalSelects } from '/static/js/conditional_select.js';
 import { criarAtualizadorForm } from '/static/js/refresh_varSis.js';
 import { AppLoader } from '/static/js/loader.js';
+import { buttonVisibleByState, buttonAllowedByPermission, createActionChecker } from '/static/js/screen_permissions.js';
 
 // ── Bloqueio de cliques precoces no carregamento da página ────────────────────
 AppLoader.show();
@@ -24,56 +26,38 @@ const nomeForm     = 'cadCliente';
 const nomeFormCons = 'consCliente';
 const form  = document.getElementById(nomeForm);
 const form2 = document.getElementById(nomeFormCons);
+let hierarquiaGeograficaInicializada = false;
 
 getDataBackEnd();
 
-function obterPermissoesCliente() {
-  return getScreenPermissions('cad_cliente', {
+const podeExecutarAcao = createActionChecker({
+  screenKey: 'cad_cliente',
+  getScreenPermissions,
+  fallback: {
     acessar: false,
     consultar: false,
     incluir: false,
     editar: false,
     excluir: false,
-  });
-}
-
-function podeExecutarAcao(acao) {
-  return Boolean(obterPermissoesCliente()?.[acao]);
-}
+  },
+});
 
 function botaoDeveFicarVisivel(botao, estado) {
-  const estadosPermitidos = (botao.dataset.showOn || '')
-    .split(',')
-    .map(item => item.trim())
-    .filter(Boolean);
-
-  return estadosPermitidos.includes(estado);
+  return buttonVisibleByState(botao, estado);
 }
 
 function podeExibirBotaoPorPermissao(botaoId, estado) {
-  if (botaoId === 'btn-novo') {
-    return podeExecutarAcao('incluir');
-  }
+  return buttonAllowedByPermission({ buttonId: botaoId, state: estado, canExecute: podeExecutarAcao });
+}
 
-  if (botaoId === 'btn-editar') {
-    return podeExecutarAcao('editar');
-  }
-
-  if (botaoId === 'btn-excluir') {
-    return podeExecutarAcao('excluir');
-  }
-
-  if (botaoId === 'btn-salvar' || botaoId === 'btn-cancelar') {
-    if (estado === 'novo') {
-      return podeExecutarAcao('incluir');
-    }
-
-    if (estado === 'editar') {
-      return podeExecutarAcao('editar');
-    }
-  }
-
-  return true;
+function obterPermissoesCliente() {
+  return {
+    acessar: podeExecutarAcao('acessar'),
+    consultar: podeExecutarAcao('consultar'),
+    incluir: podeExecutarAcao('incluir'),
+    editar: podeExecutarAcao('editar'),
+    excluir: podeExecutarAcao('excluir'),
+  };
 }
 
 // ── Atualizadores de sisVar ───────────────────────────────────────────────────
@@ -94,7 +78,11 @@ initSmartInputs((input, value) => {
 function preencherSelectGrupos() {
   const sel = document.getElementById('grupo');
   const grupos = getOptions('grupos', []);
-  sel.innerHTML = '<option value="">Selecione</option>';
+  sel.innerHTML = '';
+  const optionPadrao = document.createElement('option');
+  optionPadrao.value = '';
+  optionPadrao.textContent = 'Selecione';
+  sel.appendChild(optionPadrao);
   grupos.forEach(g => {
     const opt = document.createElement('option');
     opt.value = g.id;
@@ -104,68 +92,68 @@ function preencherSelectGrupos() {
 }
 
 function preencherSelectPaises() {
-  const sel = document.getElementById('pais');
+  if (hierarquiaGeograficaInicializada) {
+    return;
+  }
+
   const paises = getOptions('paises', []);
-  sel.innerHTML = '<option value="">Selecione</option>';
-  paises.forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    opt.textContent = p.nome;
-    sel.appendChild(opt);
+  const regioes = getOptions('regioes', []);
+  const cidades = getOptions('cidades', []);
+
+  const regioesPorId = new Map(regioes.map(regiao => [String(regiao.id), regiao]));
+  const hierarchy = {};
+
+  paises.forEach((pais) => {
+    hierarchy[String(pais.id)] = {
+      label: pais.nome,
+      children: {},
+    };
   });
-}
 
-function preencherSelectRegioes(paisId) {
-  const selRegiao = document.getElementById('regiao');
-  const selCidade = document.getElementById('cidade');
-  selRegiao.innerHTML = '<option value="">Selecione</option>';
-  selCidade.innerHTML = '<option value="">Selecione</option>';
-  selCidade.disabled = true;
+  regioes.forEach((regiao) => {
+    const paisNode = hierarchy[String(regiao.pais_id)];
+    if (!paisNode) {
+      return;
+    }
 
-  if (!paisId) {
-    selRegiao.disabled = true;
-    return;
-  }
-
-  const regioes = getOptions('regioes', []).filter(r => r.pais_id == paisId);
-  regioes.forEach(r => {
-    const opt = document.createElement('option');
-    opt.value = r.id;
-    opt.textContent = r.sigla ? `${r.sigla} - ${r.nome}` : r.nome;
-    selRegiao.appendChild(opt);
+    paisNode.children[String(regiao.id)] = {
+      label: regiao.sigla ? `${regiao.sigla} - ${regiao.nome}` : regiao.nome,
+      children: {},
+    };
   });
-  selRegiao.disabled = regioes.length === 0;
-}
 
-function preencherSelectCidades(regiaoId) {
-  const selCidade = document.getElementById('cidade');
-  selCidade.innerHTML = '<option value="">Selecione</option>';
+  cidades.forEach((cidade) => {
+    const regiao = regioesPorId.get(String(cidade.regiao_id));
+    if (!regiao) {
+      return;
+    }
 
-  if (!regiaoId) {
-    selCidade.disabled = true;
-    return;
-  }
+    const paisNode = hierarchy[String(regiao.pais_id)];
+    const regiaoNode = paisNode?.children?.[String(cidade.regiao_id)];
+    if (!regiaoNode) {
+      return;
+    }
 
-  const cidades = getOptions('cidades', []).filter(c => c.regiao_id == regiaoId);
-  cidades.forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c.id;
-    opt.textContent = c.nome;
-    selCidade.appendChild(opt);
+    regiaoNode.children[String(cidade.id)] = {
+      label: cidade.nome,
+    };
   });
-  selCidade.disabled = cidades.length === 0;
+
+  initHierarchicalSelects(form, {
+    cad_cliente_geo: hierarchy,
+  });
+
+  hierarquiaGeograficaInicializada = true;
 }
 
 // ── Cascata de selects ────────────────────────────────────────────────────────
 document.getElementById('pais').addEventListener('change', function () {
-  preencherSelectRegioes(this.value);
   updateFormField(nomeForm, 'pais', this.value ? parseInt(this.value) : null);
   updateFormField(nomeForm, 'regiao', null);
   updateFormField(nomeForm, 'cidade', null);
 });
 
 document.getElementById('regiao').addEventListener('change', function () {
-  preencherSelectCidades(this.value);
   updateFormField(nomeForm, 'regiao', this.value ? parseInt(this.value) : null);
   updateFormField(nomeForm, 'cidade', null);
 });
@@ -191,11 +179,11 @@ function hidratarSelects(campos) {
   if (campos.grupo)  selGrupo.value  = campos.grupo;
   if (campos.pais) {
     selPais.value = campos.pais;
-    preencherSelectRegioes(campos.pais);
+    selPais.dispatchEvent(new Event('change', { bubbles: true }));
   }
   if (campos.regiao) {
     selRegiao.value = campos.regiao;
-    preencherSelectCidades(campos.regiao);
+    selRegiao.dispatchEvent(new Event('change', { bubbles: true }));
   }
   if (campos.cidade) selCidade.value = campos.cidade;
 }
@@ -360,8 +348,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setFormState(nomeForm, 'novo');
     preencherSelectGrupos();
     preencherSelectPaises();
-    document.getElementById('regiao').disabled = true;
-    document.getElementById('cidade').disabled = true;
     aplicarPermissoesNaInterface();
   });
 

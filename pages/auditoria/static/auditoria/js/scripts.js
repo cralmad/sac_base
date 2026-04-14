@@ -82,7 +82,11 @@ function preencherSelectAtores() {
   const valorAtual = String(getForm(nomeForm)?.campos?.actor_id ?? "");
   const atores = getContextoAuditoria().atores || [];
 
-  select.innerHTML = '<option value="">Todos</option>';
+  select.innerHTML = '';
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "Todos";
+  select.appendChild(defaultOption);
   atores.forEach(ator => {
     const option = document.createElement("option");
     option.value = String(ator.id);
@@ -97,7 +101,11 @@ function preencherSelectAcoes() {
   const valorAtual = getForm(nomeForm)?.campos?.action ?? "";
   const acoes = getContextoAuditoria().acoes || [];
 
-  select.innerHTML = '<option value="">Todas</option>';
+  select.innerHTML = '';
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "Todas";
+  select.appendChild(defaultOption);
   acoes.forEach(acao => {
     const option = document.createElement("option");
     option.value = acao.value;
@@ -112,7 +120,11 @@ function preencherSelectApps() {
   const valorAtual = getForm(nomeForm)?.campos?.app_label ?? "";
   const entidades = getContextoAuditoria().entidades || [];
 
-  select.innerHTML = '<option value="">Todas</option>';
+  select.innerHTML = '';
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "Todas";
+  select.appendChild(defaultOption);
   entidades.forEach(entidade => {
     const option = document.createElement("option");
     option.value = entidade.app_label;
@@ -130,7 +142,11 @@ function preencherSelectModels() {
   const entidade = entidades.find(item => item.app_label === appLabel);
   const models = entidade?.models || [];
 
-  select.innerHTML = '<option value="">Todos</option>';
+  select.innerHTML = '';
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "Todos";
+  select.appendChild(defaultOption);
   models.forEach(model => {
     const option = document.createElement("option");
     option.value = model;
@@ -173,7 +189,13 @@ function renderizarTabela() {
   tabelaCorpo.innerHTML = "";
 
   if (!Array.isArray(registrosAtuais) || registrosAtuais.length === 0) {
-    tabelaCorpo.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Nenhum evento encontrado.</td></tr>';
+    const trVazio = document.createElement("tr");
+    const tdVazio = document.createElement("td");
+    tdVazio.colSpan = 7;
+    tdVazio.className = "text-center text-muted";
+    tdVazio.textContent = "Nenhum evento encontrado.";
+    trVazio.appendChild(tdVazio);
+    tabelaCorpo.appendChild(trVazio);
     return;
   }
 

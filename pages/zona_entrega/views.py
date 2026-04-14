@@ -8,6 +8,7 @@ from pages.auditoria.models import AuditEvent
 from pages.auditoria.utils import diff_snapshots, registrar_auditoria, snapshot_instance
 from pages.filial.models import Filial, UsuarioFilial
 from sac_base.form_validador import SchemaValidator
+from sac_base.permissions_utils import build_action_permissions, extract_validation_messages, permission_denied_response
 from sac_base.sisvar_builders import build_error_payload, build_form_response, build_form_state, build_records_response, build_sisvar_payload, build_success_payload
 
 from .models import ZonaEntrega, ZonaEntregaExcecaoPostal, ZonaEntregaFaixaPostal
@@ -20,34 +21,6 @@ PERMISSOES_ZONA_ENTREGA = {
     "editar": "zona_entrega.change_zonaentrega",
     "excluir": "zona_entrega.delete_zonaentrega",
 }
-
-
-def obter_acoes_permitidas(usuario):
-    if not usuario or not getattr(usuario, "is_authenticated", False):
-        return {acao: False for acao in PERMISSOES_ZONA_ENTREGA}
-
-    return {
-        acao: usuario.has_perm(codename)
-        for acao, codename in PERMISSOES_ZONA_ENTREGA.items()
-    }
-
-
-def resposta_sem_permissao(mensagem, status=403):
-    return JsonResponse(build_error_payload(mensagem), status=status)
-
-
-def extrair_mensagens_validacao(exc):
-    if hasattr(exc, "message_dict"):
-        return [
-            f"{campo} - {mensagem}"
-            for campo, mensagens in exc.message_dict.items()
-            for mensagem in mensagens
-        ]
-
-    if hasattr(exc, "messages"):
-        return list(exc.messages)
-
-    return [str(exc)]
 
 
 def get_filiais_escrita_queryset(usuario):
@@ -193,7 +166,7 @@ def cadastro_zona_entrega_view(request):
     nome_form = "cadZonaEntrega"
     nome_form_cons = "consZonaEntrega"
     usuario = getattr(request, "user", None)
-    acoes_permitidas = obter_acoes_permitidas(usuario)
+    acoes_permitidas = build_action_permissions(usuario, PERMISSOES_ZONA_ENTREGA)
 
     schema = {
         nome_form: {
@@ -245,9 +218,9 @@ def cadastro_zona_entrega_view(request):
     estado = form.get("estado", "")
 
     if estado == "novo" and not acoes_permitidas["incluir"]:
-        return resposta_sem_permissao("Você não possui permissão para incluir zona de entrega.")
+        return permission_denied_response("Você não possui permissão para incluir zona de entrega.")
     if estado == "editar" and not acoes_permitidas["editar"]:
-        return resposta_sem_permissao("Você não possui permissão para editar zona de entrega.")
+        return permission_denied_response("Você não possui permissão para editar zona de entrega.")
 
     validator = SchemaValidator(schema[nome_form])
     if not validator.validate(campos):
@@ -337,7 +310,7 @@ def cadastro_zona_entrega_view(request):
                 extra_data=extra_data,
             )
     except ValidationError as exc:
-        return JsonResponse(build_error_payload(extrair_mensagens_validacao(exc)), status=422)
+        return JsonResponse(build_error_payload(extract_validation_messages(exc)), status=422)
 
     zona.refresh_from_db()
     return JsonResponse(build_form_response(
@@ -409,7 +382,7 @@ def cadastro_zona_entrega_del_view(request):
     usuario = getattr(request, "user", None)
 
     if not usuario or not usuario.has_perm(PERMISSOES_ZONA_ENTREGA["excluir"]):
-        return resposta_sem_permissao("Você não possui permissão para excluir zona de entrega.")
+        return permission_denied_response("Você não possui permissão para excluir zona de entrega.")
 
     if request.method != "POST":
         return JsonResponse(build_error_payload("Método não permitido."), status=405)

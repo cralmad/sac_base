@@ -11,6 +11,7 @@ from pages.cad_cliente.models import Cliente
 from pages.filial.models import Filial, UsuarioFilial
 from pages.motorista.models import Motorista
 from sac_base.form_validador import SchemaValidator
+from sac_base.permissions_utils import build_action_permissions
 from sac_base.sisvar_builders import (
     build_error_payload,
     build_form_response,
@@ -97,6 +98,7 @@ def _serialize_pedido_form(pedido):
         "dt_entrega": pedido.dt_entrega.isoformat() if pedido.dt_entrega else "",
         "estado": pedido.estado or "",
         "volume": pedido.volume,
+        "volume_conf": pedido.volume_conf,
         "nome_dest": pedido.nome_dest or "",
         "email_dest": pedido.email_dest or "",
         "fone_dest": pedido.fone_dest or "",
@@ -105,6 +107,7 @@ def _serialize_pedido_form(pedido):
         "codpost_dest": pedido.codpost_dest or "",
         "cidade_dest": pedido.cidade_dest or "",
         "obs": pedido.obs or "",
+        "obs_rota": pedido.obs_rota or "",
         "cliente_id": pedido.cliente_id,
         "motorista_id": pedido.motorista_id,
         "peso": str(pedido.peso) if pedido.peso is not None else "",
@@ -143,6 +146,7 @@ def _build_campos_pedido_iniciais():
         "dt_entrega": "",
         "estado": "",
         "volume": "",
+        "volume_conf": 0,
         "nome_dest": "",
         "email_dest": "",
         "fone_dest": "",
@@ -151,6 +155,7 @@ def _build_campos_pedido_iniciais():
         "codpost_dest": "",
         "cidade_dest": "",
         "obs": "",
+        "obs_rota": "",
         "cliente_id": None,
         "motorista_id": None,
         "peso": "",
@@ -172,15 +177,6 @@ def _listar_motoristas_filial(filial_id):
         {"id": m.id, "codigo": m.codigo or "", "nome": m.nome}
         for m in Motorista.objects.filter(is_deleted=False, filial_id=filial_id).order_by("nome")
     ]
-
-
-def obter_acoes_permitidas(usuario):
-    if not usuario or not getattr(usuario, "is_authenticated", False):
-        return {acao: False for acao in PERMISSOES_PEDIDO}
-    return {
-        acao: usuario.has_perm(codename)
-        for acao, codename in PERMISSOES_PEDIDO.items()
-    }
 
 
 def get_filiais_escrita_queryset(usuario):
@@ -214,7 +210,7 @@ def obter_filial_escrita(filial_id, usuario):
 @permission_required(PERMISSOES_PEDIDO["acessar"], raise_exception=True)
 def pedidos_importacao_view(request):
     usuario = getattr(request, "user", None)
-    acoes_permitidas = obter_acoes_permitidas(usuario)
+    acoes_permitidas = build_action_permissions(usuario, PERMISSOES_PEDIDO)
 
     if request.method == "GET":
         request.sisvar_extra = build_sisvar_payload(
@@ -236,7 +232,7 @@ def pedidos_cadastro_view(request):
     nome_form = "cadPedido"
     nome_cons = "consPedido"
     usuario = getattr(request, "user", None)
-    acoes = obter_acoes_permitidas(usuario)
+    acoes = build_action_permissions(usuario, PERMISSOES_PEDIDO)
 
     schema = {
         nome_form: {
@@ -251,6 +247,7 @@ def pedidos_cadastro_view(request):
             "dt_entrega": {"type": "string", "required": False, "value": ""},
             "estado": {"type": "string", "required": False, "value": ""},
             "volume": {"type": "string", "required": False, "value": ""},
+            "volume_conf": {"type": "string", "required": False, "value": "0"},
             "nome_dest": {"type": "string", "required": False, "value": ""},
             "email_dest": {"type": "string", "required": False, "value": ""},
             "fone_dest": {"type": "string", "required": False, "value": ""},
@@ -259,6 +256,7 @@ def pedidos_cadastro_view(request):
             "codpost_dest": {"type": "string", "required": False, "value": ""},
             "cidade_dest": {"type": "string", "required": False, "value": ""},
             "obs": {"type": "string", "required": False, "value": ""},
+            "obs_rota": {"type": "string", "required": False, "value": ""},
             "cliente_id": {"type": "string", "required": False, "value": ""},
             "motorista_id": {"type": "string", "required": False, "value": ""},
             "peso": {"type": "string", "required": False, "value": ""},
@@ -352,6 +350,7 @@ def pedidos_cadastro_view(request):
                 "dt_entrega": _parse_date(campos.get("dt_entrega")),
                 "estado": (campos.get("estado") or "").strip() or None,
                 "volume": _parse_int(campos.get("volume")),
+                "volume_conf": _parse_int(campos.get("volume_conf")) or 0,
                 "nome_dest": (campos.get("nome_dest") or "").strip() or None,
                 "email_dest": (campos.get("email_dest") or "").strip() or None,
                 "fone_dest": (campos.get("fone_dest") or "").strip() or None,
@@ -360,6 +359,7 @@ def pedidos_cadastro_view(request):
                 "codpost_dest": (campos.get("codpost_dest") or "").strip() or None,
                 "cidade_dest": (campos.get("cidade_dest") or "").strip() or None,
                 "obs": (campos.get("obs") or "").strip() or None,
+                "obs_rota": (campos.get("obs_rota") or "").strip() or None,
                 "cliente_id": _parse_int(campos.get("cliente_id")),
                 "motorista_id": _parse_int(campos.get("motorista_id")),
                 "peso": _parse_decimal(campos.get("peso")),

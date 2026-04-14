@@ -7,6 +7,7 @@ import { fazerRequisicao } from '/static/js/base.js';
 import { initSmartInputs } from '/static/js/input_rules.js';
 import { criarAtualizadorForm } from '/static/js/refresh_varSis.js';
 import { AppLoader } from '/static/js/loader.js';
+import { buttonVisibleByState, buttonAllowedByPermission, createActionChecker } from '/static/js/screen_permissions.js';
 
 const nomeForm = 'cadFilial';
 const nomeFormCons = 'consFilial';
@@ -15,37 +16,34 @@ const form2 = document.getElementById(nomeFormCons);
 
 getDataBackEnd();
 
-function obterPermissoesFilial() {
-  return getScreenPermissions('filial', {
+const podeExecutarAcao = createActionChecker({
+  screenKey: 'filial',
+  getScreenPermissions,
+  fallback: {
     acessar: false,
     consultar: false,
     incluir: false,
     editar: false,
     excluir: false,
-  });
-}
-
-function podeExecutarAcao(acao) {
-  return Boolean(obterPermissoesFilial()?.[acao]);
-}
+  },
+});
 
 function botaoDeveFicarVisivel(botao, estado) {
-  return (botao.dataset.showOn || '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .includes(estado);
+  return buttonVisibleByState(botao, estado);
 }
 
 function podeExibirBotaoPorPermissao(botaoId, estado) {
-  if (botaoId === 'btn-novo') return podeExecutarAcao('incluir');
-  if (botaoId === 'btn-editar') return podeExecutarAcao('editar');
-  if (botaoId === 'btn-excluir') return podeExecutarAcao('excluir');
-  if (botaoId === 'btn-salvar' || botaoId === 'btn-cancelar') {
-    if (estado === 'novo') return podeExecutarAcao('incluir');
-    if (estado === 'editar') return podeExecutarAcao('editar');
-  }
-  return true;
+  return buttonAllowedByPermission({ buttonId: botaoId, state: estado, canExecute: podeExecutarAcao });
+}
+
+function obterPermissoesFilial() {
+  return {
+    acessar: podeExecutarAcao('acessar'),
+    consultar: podeExecutarAcao('consultar'),
+    incluir: podeExecutarAcao('incluir'),
+    editar: podeExecutarAcao('editar'),
+    excluir: podeExecutarAcao('excluir'),
+  };
 }
 
 const updater = criarAtualizadorForm({ formId: nomeForm, setter: updateFormField, form });
@@ -92,7 +90,11 @@ function renderizarPaises() {
     if (!select) return;
 
     const valorAtual = String(getForm(nomeForm)?.campos?.[campo] ?? '');
-    select.innerHTML = '<option value="">Selecione</option>';
+    select.innerHTML = '';
+    const optionPadrao = document.createElement('option');
+    optionPadrao.value = '';
+    optionPadrao.textContent = 'Selecione';
+    select.appendChild(optionPadrao);
 
     paises.forEach((pais) => {
       const option = document.createElement('option');
@@ -182,19 +184,35 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderizarTabela(registros) {
-    tabelaCorpo.innerHTML = registros.map((registro) => `
-      <tr>
-        <td>${registro.id}</td>
-        <td>${registro.codigo}</td>
-        <td>${registro.nome}</td>
-        <td>${registro.pais_atuacao || ''}</td>
-        <td>${registro.tipo}</td>
-        <td>${registro.ativa ? 'Sim' : 'Não'}</td>
-        <td class="text-center">
-          <button type="button" class="btn btn-sm btn-primary btn-selecionar" data-id="${registro.id}">Selecionar</button>
-        </td>
-      </tr>
-    `).join('');
+    tabelaCorpo.innerHTML = '';
+    registros.forEach((registro) => {
+      const tr = document.createElement('tr');
+
+      [
+        registro.id,
+        registro.codigo,
+        registro.nome,
+        registro.pais_atuacao || '',
+        registro.tipo,
+        registro.ativa ? 'Sim' : 'Não',
+      ].forEach((valor) => {
+        const td = document.createElement('td');
+        td.textContent = String(valor ?? '');
+        tr.appendChild(td);
+      });
+
+      const tdAcao = document.createElement('td');
+      tdAcao.className = 'text-center';
+      const btnSelecionar = document.createElement('button');
+      btnSelecionar.type = 'button';
+      btnSelecionar.className = 'btn btn-sm btn-primary btn-selecionar';
+      btnSelecionar.dataset.id = String(registro.id ?? '');
+      btnSelecionar.textContent = 'Selecionar';
+      tdAcao.appendChild(btnSelecionar);
+      tr.appendChild(tdAcao);
+
+      tabelaCorpo.appendChild(tr);
+    });
   }
 
   btnAbrirPesquisa.addEventListener('click', alternarTelas);

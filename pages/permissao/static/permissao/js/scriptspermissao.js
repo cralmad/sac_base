@@ -15,6 +15,7 @@ import { initSmartInputs } from "/static/js/input_rules.js";
 import { criarAtualizadorForm } from "/static/js/refresh_varSis.js";
 import { AppLoader } from "/static/js/loader.js";
 import { PERMISSOES_SCHEMA } from "./permissao_schema.js";
+import { buttonVisibleByState, buttonAllowedByPermission, createActionChecker } from '/static/js/screen_permissions.js';
 
 const nomeForm     = "cadGrupo";
 const nomeFormCons = "consGrupo";
@@ -23,53 +24,34 @@ const form2        = document.getElementById(nomeFormCons);
 
 getDataBackEnd();
 
-function obterPermissoesGrupo() {
-  return getScreenPermissions('permissao_grupo', {
+const podeExecutarAcao = createActionChecker({
+  screenKey: 'permissao_grupo',
+  getScreenPermissions,
+  fallback: {
     acessar: false,
     consultar: false,
     incluir: false,
     editar: false,
     excluir: false,
-  });
-}
+  },
+});
 
-function podeExecutarAcao(acao) {
-  return Boolean(obterPermissoesGrupo()?.[acao]);
+function obterPermissoesGrupo() {
+  return {
+    acessar: podeExecutarAcao('acessar'),
+    consultar: podeExecutarAcao('consultar'),
+    incluir: podeExecutarAcao('incluir'),
+    editar: podeExecutarAcao('editar'),
+    excluir: podeExecutarAcao('excluir'),
+  };
 }
 
 function botaoDeveFicarVisivel(botao, estado) {
-  const estadosPermitidos = (botao.dataset.showOn || '')
-    .split(',')
-    .map(item => item.trim())
-    .filter(Boolean);
-
-  return estadosPermitidos.includes(estado);
+  return buttonVisibleByState(botao, estado);
 }
 
 function podeExibirBotaoPorPermissao(botaoId, estado) {
-  if (botaoId === "btn-novo") {
-    return podeExecutarAcao("incluir");
-  }
-
-  if (botaoId === "btn-editar") {
-    return podeExecutarAcao("editar");
-  }
-
-  if (botaoId === "btn-excluir") {
-    return podeExecutarAcao("excluir");
-  }
-
-  if (botaoId === "btn-salvar" || botaoId === "btn-cancelar") {
-    if (estado === "novo") {
-      return podeExecutarAcao("incluir");
-    }
-
-    if (estado === "editar") {
-      return podeExecutarAcao("editar");
-    }
-  }
-
-  return true;
+  return buttonAllowedByPermission({ buttonId: botaoId, state: estado, canExecute: podeExecutarAcao });
 }
 
 function validarPermissaoPorEstado(estado) {
@@ -120,14 +102,25 @@ function renderizarAbas() {
       col.className = "col-12 col-sm-6 col-md-4";
 
       const id = `chk-${modulo}-${codename.replace(/\./g, "-")}`;
-      col.innerHTML = `
-        <div class="form-check">
-          <input class="form-check-input perm-checkbox" type="checkbox"
-            id="${id}"
-            data-codename="${codename}"
-            disabled>
-          <label class="form-check-label" for="${id}">${label}</label>
-        </div>`;
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "form-check";
+
+      const input = document.createElement("input");
+      input.className = "form-check-input perm-checkbox";
+      input.type = "checkbox";
+      input.id = id;
+      input.dataset.codename = String(codename ?? "");
+      input.disabled = true;
+
+      const labelEl = document.createElement("label");
+      labelEl.className = "form-check-label";
+      labelEl.setAttribute("for", id);
+      labelEl.textContent = String(label ?? "");
+
+      wrapper.appendChild(input);
+      wrapper.appendChild(labelEl);
+      col.appendChild(wrapper);
       container.appendChild(col);
     });
   });
@@ -413,20 +406,36 @@ document.addEventListener("DOMContentLoaded", () => {
     tabelaCorpo.innerHTML = "";
 
     if (!Array.isArray(registros) || registros.length === 0) {
-      tabelaCorpo.innerHTML = '<tr><td colspan="3" class="text-center">Nenhum registro encontrado</td></tr>';
+      const linhaSemDados = document.createElement("tr");
+      const celulaSemDados = document.createElement("td");
+      celulaSemDados.colSpan = 3;
+      celulaSemDados.className = "text-center";
+      celulaSemDados.textContent = "Nenhum registro encontrado";
+      linhaSemDados.appendChild(celulaSemDados);
+      tabelaCorpo.appendChild(linhaSemDados);
       return;
     }
 
     registros.forEach(reg => {
       const linha = document.createElement("tr");
-      linha.innerHTML = `
-        <td>${reg.id || ""}</td>
-        <td>${reg.name || ""}</td>
-        <td class="text-center">
-          <button class="btn btn-sm btn-primary btn-selecionar" data-id="${reg.id}">
-            Selecionar
-          </button>
-        </td>`;
+
+      const tdId = document.createElement("td");
+      tdId.textContent = String(reg.id ?? "");
+
+      const tdNome = document.createElement("td");
+      tdNome.textContent = String(reg.name ?? "");
+
+      const tdAcao = document.createElement("td");
+      tdAcao.className = "text-center";
+      const btnSelecionar = document.createElement("button");
+      btnSelecionar.className = "btn btn-sm btn-primary btn-selecionar";
+      btnSelecionar.dataset.id = String(reg.id ?? "");
+      btnSelecionar.textContent = "Selecionar";
+
+      tdAcao.appendChild(btnSelecionar);
+      linha.appendChild(tdId);
+      linha.appendChild(tdNome);
+      linha.appendChild(tdAcao);
       tabelaCorpo.appendChild(linha);
     });
   }

@@ -7,6 +7,7 @@ import {
 } from "/static/js/sisVar.js";
 
 import { AppLoader } from "/static/js/loader.js";
+import { escapeHtml } from "/static/js/html.js";
 
 getDataBackEnd();
 
@@ -81,47 +82,98 @@ export async function inicializarNavbarUsuario() {
     }
 
     const navbarContainer = document.getElementById("navbase");
+    const containerFluid = navbarContainer?.querySelector(".container-fluid");
+    if (!containerFluid) {
+      return;
+    }
 
-    const filialHtml = filialAtiva
-      ? `
-      <div class="d-flex align-items-center ms-auto me-2 text-light small" style="min-width: 0; max-width: 48vw;">
-        <i class="bi bi-buildings me-2"></i>
-        <span class="fw-semibold me-2 d-none d-md-inline">${filialAtiva.isMatriz ? "Matriz ativa:" : "Filial ativa:"}</span>
-        <span class="badge text-bg-light text-dark text-truncate" style="max-width: 100%;">${filialAtiva.nome} (${filialAtiva.codigo})</span>
-      </div>
-    `
-      : "<div class=\"ms-auto\"></div>";
+    if (filialAtiva) {
+      const filialWrapper = document.createElement("div");
+      filialWrapper.className = "d-flex align-items-center ms-auto me-2 text-light small";
+      filialWrapper.style.minWidth = "0";
+      filialWrapper.style.maxWidth = "48vw";
 
-    const dropdownHtml = `
-      ${filialHtml}
-      <div class="dropdown ms-auto">
-        <a class="nav-link dropdown-toggle text-light d-flex align-items-center gap-2"
-           href="#"
-           role="button"
-           data-bs-toggle="dropdown"
-           aria-expanded="false">
-          <i class="bi bi-person-circle"></i>
-          <span class="d-none d-sm-inline">${usuario.nome}</span>
-        </a>
+      const filialIcon = document.createElement("i");
+      filialIcon.className = "bi bi-buildings me-2";
+      filialWrapper.appendChild(filialIcon);
 
-        <ul class="dropdown-menu dropdown-menu-end">
-          <li class="dropdown-item-text fw-bold d-sm-none">${usuario.nome}</li>
-          <li class="d-sm-none"><hr class="dropdown-divider"></li>
-          <li>
-            <a class="dropdown-item d-flex align-items-center gap-2" href="/app/usuario/alterarsenha/">
-              <i class="bi bi-key"></i> Alterar senha
-            </a>
-          </li>
-          <li>
-            <a class="dropdown-item d-flex align-items-center gap-2 text-danger" href="/app/usuario/logout/">
-              <i class="bi bi-box-arrow-right"></i> Logout
-            </a>
-          </li>
-        </ul>
-      </div>
-    `;
+      const filialLabel = document.createElement("span");
+      filialLabel.className = "fw-semibold me-2 d-none d-md-inline";
+      filialLabel.textContent = filialAtiva.isMatriz ? "Matriz ativa:" : "Filial ativa:";
+      filialWrapper.appendChild(filialLabel);
 
-    navbarContainer.querySelector(".container-fluid").insertAdjacentHTML("beforeend", dropdownHtml);
+      const filialBadge = document.createElement("span");
+      filialBadge.className = "badge text-bg-light text-dark text-truncate";
+      filialBadge.style.maxWidth = "100%";
+      filialBadge.textContent = `${filialAtiva.nome} (${filialAtiva.codigo})`;
+      filialWrapper.appendChild(filialBadge);
+
+      containerFluid.appendChild(filialWrapper);
+    } else {
+      const spacer = document.createElement("div");
+      spacer.className = "ms-auto";
+      containerFluid.appendChild(spacer);
+    }
+
+    const dropdown = document.createElement("div");
+    dropdown.className = "dropdown ms-auto";
+
+    const toggle = document.createElement("a");
+    toggle.className = "nav-link dropdown-toggle text-light d-flex align-items-center gap-2";
+    toggle.href = "#";
+    toggle.setAttribute("role", "button");
+    toggle.setAttribute("data-bs-toggle", "dropdown");
+    toggle.setAttribute("aria-expanded", "false");
+
+    const toggleIcon = document.createElement("i");
+    toggleIcon.className = "bi bi-person-circle";
+    toggle.appendChild(toggleIcon);
+
+    const toggleText = document.createElement("span");
+    toggleText.className = "d-none d-sm-inline";
+    toggleText.textContent = usuario.nome || "";
+    toggle.appendChild(toggleText);
+
+    const menu = document.createElement("ul");
+    menu.className = "dropdown-menu dropdown-menu-end";
+
+    const mobileUserItem = document.createElement("li");
+    mobileUserItem.className = "dropdown-item-text fw-bold d-sm-none";
+    mobileUserItem.textContent = usuario.nome || "";
+    menu.appendChild(mobileUserItem);
+
+    const dividerWrapper = document.createElement("li");
+    dividerWrapper.className = "d-sm-none";
+    const divider = document.createElement("hr");
+    divider.className = "dropdown-divider";
+    dividerWrapper.appendChild(divider);
+    menu.appendChild(dividerWrapper);
+
+    const alterarSenhaItem = document.createElement("li");
+    const alterarSenhaLink = document.createElement("a");
+    alterarSenhaLink.className = "dropdown-item d-flex align-items-center gap-2";
+    alterarSenhaLink.href = "/app/usuario/alterarsenha/";
+    const alterarSenhaIcon = document.createElement("i");
+    alterarSenhaIcon.className = "bi bi-key";
+    alterarSenhaLink.appendChild(alterarSenhaIcon);
+    alterarSenhaLink.appendChild(document.createTextNode(" Alterar senha"));
+    alterarSenhaItem.appendChild(alterarSenhaLink);
+    menu.appendChild(alterarSenhaItem);
+
+    const logoutItem = document.createElement("li");
+    const logoutLink = document.createElement("a");
+    logoutLink.className = "dropdown-item d-flex align-items-center gap-2 text-danger";
+    logoutLink.href = "/app/usuario/logout/";
+    const logoutIcon = document.createElement("i");
+    logoutIcon.className = "bi bi-box-arrow-right";
+    logoutLink.appendChild(logoutIcon);
+    logoutLink.appendChild(document.createTextNode(" Logout"));
+    logoutItem.appendChild(logoutLink);
+    menu.appendChild(logoutItem);
+
+    dropdown.appendChild(toggle);
+    dropdown.appendChild(menu);
+    containerFluid.appendChild(dropdown);
 
     // Marca o link ativo na sidebar com base na URL atual
     marcarLinkAtivo();

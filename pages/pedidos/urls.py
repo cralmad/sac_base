@@ -1,4 +1,5 @@
-from django.urls import path
+
+from django.urls import path, include
 
 from .views import (
     pedido_motoristas_view,
@@ -22,4 +23,7 @@ urlpatterns = [
     path("logistica/pedidos/mov/del", pedido_mov_del_view, name="pedidos_mov_del"),
     path("logistica/pedidos/importacao/", pedidos_importacao_view, name="pedidos_importacao"),
     path("logistica/pedidos/importar", pedidos_importar_view, name="pedidos_importar"),
+
+    # Relatório de conferência de volumes
+    path("logistica/", include("pages.pedidos.urls_relatorio")),
 ]

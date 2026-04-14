@@ -1,4 +1,5 @@
 import { AppLoader } from '/static/js/loader.js';
+import { escapeHtml } from '/static/js/html.js';
 import {
   getDataset,
   getCsrfToken,
@@ -37,7 +38,15 @@ function exibirStats(stats) {
   Object.entries(LABELS_STATS).forEach(([key, label]) => {
     if (key in stats) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${label}</td><td class="text-end">${stats[key]}</td>`;
+      const tdLabel = document.createElement('td');
+      tdLabel.textContent = String(label ?? '');
+
+      const tdValor = document.createElement('td');
+      tdValor.className = 'text-end';
+      tdValor.textContent = String(stats[key] ?? '');
+
+      tr.appendChild(tdLabel);
+      tr.appendChild(tdValor);
       tbody.appendChild(tr);
     }
   });

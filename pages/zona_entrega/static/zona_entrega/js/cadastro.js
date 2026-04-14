@@ -7,6 +7,7 @@ import { fazerRequisicao } from '/static/js/base.js';
 import { initSmartInputs } from '/static/js/input_rules.js';
 import { criarAtualizadorForm } from '/static/js/refresh_varSis.js';
 import { AppLoader } from '/static/js/loader.js';
+import { buttonVisibleByState, buttonAllowedByPermission, createActionChecker } from '/static/js/screen_permissions.js';
 
 const nomeForm = 'cadZonaEntrega';
 const nomeFormCons = 'consZonaEntrega';
@@ -15,37 +16,34 @@ const form2 = document.getElementById(nomeFormCons);
 
 getDataBackEnd();
 
-function obterPermissoesZona() {
-  return getScreenPermissions('zona_entrega', {
+const podeExecutarAcao = createActionChecker({
+  screenKey: 'zona_entrega',
+  getScreenPermissions,
+  fallback: {
     acessar: false,
     consultar: false,
     incluir: false,
     editar: false,
     excluir: false,
-  });
-}
-
-function podeExecutarAcao(acao) {
-  return Boolean(obterPermissoesZona()?.[acao]);
-}
+  },
+});
 
 function botaoDeveFicarVisivel(botao, estado) {
-  return (botao.dataset.showOn || '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .includes(estado);
+  return buttonVisibleByState(botao, estado);
 }
 
 function podeExibirBotaoPorPermissao(botaoId, estado) {
-  if (botaoId === 'btn-novo') return podeExecutarAcao('incluir');
-  if (botaoId === 'btn-editar') return podeExecutarAcao('editar');
-  if (botaoId === 'btn-excluir') return podeExecutarAcao('excluir');
-  if (botaoId === 'btn-salvar' || botaoId === 'btn-cancelar') {
-    if (estado === 'novo') return podeExecutarAcao('incluir');
-    if (estado === 'editar') return podeExecutarAcao('editar');
-  }
-  return true;
+  return buttonAllowedByPermission({ buttonId: botaoId, state: estado, canExecute: podeExecutarAcao });
+}
+
+function obterPermissoesZona() {
+  return {
+    acessar: podeExecutarAcao('acessar'),
+    consultar: podeExecutarAcao('consultar'),
+    incluir: podeExecutarAcao('incluir'),
+    editar: podeExecutarAcao('editar'),
+    excluir: podeExecutarAcao('excluir'),
+  };
 }
 
 function getFiliaisAtuacao() {
@@ -65,7 +63,11 @@ function renderizarFiliais() {
   const valorPesquisa = String(getForm(nomeFormCons)?.campos?.filial_cons ?? '');
 
   if (selectPrincipal) {
-    selectPrincipal.innerHTML = '<option value="">Selecione</option>';
+    selectPrincipal.innerHTML = '';
+    const optionPadraoPrincipal = document.createElement('option');
+    optionPadraoPrincipal.value = '';
+    optionPadraoPrincipal.textContent = 'Selecione';
+    selectPrincipal.appendChild(optionPadraoPrincipal);
     filiais.forEach((filial) => {
       const option = document.createElement('option');
       option.value = String(filial.id);
@@ -76,7 +78,11 @@ function renderizarFiliais() {
   }
 
   if (selectPesquisa) {
-    selectPesquisa.innerHTML = '<option value="">Todas</option>';
+    selectPesquisa.innerHTML = '';
+    const optionPadraoPesquisa = document.createElement('option');
+    optionPadraoPesquisa.value = '';
+    optionPadraoPesquisa.textContent = 'Todas';
+    selectPesquisa.appendChild(optionPadraoPesquisa);
     filiais.forEach((filial) => {
       const option = document.createElement('option');
       option.value = String(filial.id);
@@ -133,25 +139,81 @@ function renderizarFaixas() {
   const faixas = getForm(nomeForm)?.campos?.faixas || [];
   const bloqueado = formEmVisualizacao();
 
+  tbody.innerHTML = '';
+
   if (!faixas.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhuma faixa cadastrada.</td></tr>';
+    const trVazio = document.createElement('tr');
+    const tdVazio = document.createElement('td');
+    tdVazio.colSpan = 5;
+    tdVazio.className = 'text-center text-muted';
+    tdVazio.textContent = 'Nenhuma faixa cadastrada.';
+    trVazio.appendChild(tdVazio);
+    tbody.appendChild(trVazio);
     return;
   }
 
-  tbody.innerHTML = faixas.map((faixa, index) => `
-    <tr data-index="${index}">
-      <td>
-        <select class="form-select faixa-tipo" ${bloqueado ? 'disabled' : ''}>
-          <option value="CP4" ${faixa.tipo_intervalo === 'CP4' ? 'selected' : ''}>CP4</option>
-          <option value="CP7" ${faixa.tipo_intervalo !== 'CP4' ? 'selected' : ''}>CP7</option>
-        </select>
-      </td>
-      <td><input type="text" class="form-control faixa-inicial" maxlength="8" value="${faixa.codigo_postal_inicial || ''}" placeholder="0000-000" ${bloqueado ? 'disabled' : ''}></td>
-      <td><input type="text" class="form-control faixa-final" maxlength="8" value="${faixa.codigo_postal_final || ''}" placeholder="0000-000" ${bloqueado ? 'disabled' : ''}></td>
-      <td class="text-center"><input type="checkbox" class="form-check-input faixa-ativa" ${faixa.ativa !== false ? 'checked' : ''} ${bloqueado ? 'disabled' : ''}></td>
-      <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger btn-remover-faixa" ${bloqueado ? 'disabled' : ''}>Remover</button></td>
-    </tr>
-  `).join('');
+  faixas.forEach((faixa, index) => {
+    const tr = document.createElement('tr');
+    tr.dataset.index = String(index);
+
+    const tdTipo = document.createElement('td');
+    const selectTipo = document.createElement('select');
+    selectTipo.className = 'form-select faixa-tipo';
+    selectTipo.disabled = bloqueado;
+    ['CP4', 'CP7'].forEach((tipo) => {
+      const opt = document.createElement('option');
+      opt.value = tipo;
+      opt.textContent = tipo;
+      opt.selected = (faixa.tipo_intervalo === 'CP4' && tipo === 'CP4') || (faixa.tipo_intervalo !== 'CP4' && tipo === 'CP7');
+      selectTipo.appendChild(opt);
+    });
+    tdTipo.appendChild(selectTipo);
+
+    const tdInicial = document.createElement('td');
+    const inputInicial = document.createElement('input');
+    inputInicial.type = 'text';
+    inputInicial.className = 'form-control faixa-inicial';
+    inputInicial.maxLength = 8;
+    inputInicial.value = faixa.codigo_postal_inicial || '';
+    inputInicial.placeholder = '0000-000';
+    inputInicial.disabled = bloqueado;
+    tdInicial.appendChild(inputInicial);
+
+    const tdFinal = document.createElement('td');
+    const inputFinal = document.createElement('input');
+    inputFinal.type = 'text';
+    inputFinal.className = 'form-control faixa-final';
+    inputFinal.maxLength = 8;
+    inputFinal.value = faixa.codigo_postal_final || '';
+    inputFinal.placeholder = '0000-000';
+    inputFinal.disabled = bloqueado;
+    tdFinal.appendChild(inputFinal);
+
+    const tdAtiva = document.createElement('td');
+    tdAtiva.className = 'text-center';
+    const inputAtiva = document.createElement('input');
+    inputAtiva.type = 'checkbox';
+    inputAtiva.className = 'form-check-input faixa-ativa';
+    inputAtiva.checked = faixa.ativa !== false;
+    inputAtiva.disabled = bloqueado;
+    tdAtiva.appendChild(inputAtiva);
+
+    const tdAcao = document.createElement('td');
+    tdAcao.className = 'text-center';
+    const btnRemover = document.createElement('button');
+    btnRemover.type = 'button';
+    btnRemover.className = 'btn btn-sm btn-outline-danger btn-remover-faixa';
+    btnRemover.disabled = bloqueado;
+    btnRemover.textContent = 'Remover';
+    tdAcao.appendChild(btnRemover);
+
+    tr.appendChild(tdTipo);
+    tr.appendChild(tdInicial);
+    tr.appendChild(tdFinal);
+    tr.appendChild(tdAtiva);
+    tr.appendChild(tdAcao);
+    tbody.appendChild(tr);
+  });
 
   tbody.querySelectorAll('input, select').forEach((input) => {
     input.addEventListener('input', atualizarFaixasNoSisVar);
@@ -172,25 +234,83 @@ function renderizarExcecoes() {
   const excecoes = getForm(nomeForm)?.campos?.excecoes || [];
   const bloqueado = formEmVisualizacao();
 
+  tbody.innerHTML = '';
+
   if (!excecoes.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhuma exceção cadastrada.</td></tr>';
+    const trVazio = document.createElement('tr');
+    const tdVazio = document.createElement('td');
+    tdVazio.colSpan = 5;
+    tdVazio.className = 'text-center text-muted';
+    tdVazio.textContent = 'Nenhuma exceção cadastrada.';
+    trVazio.appendChild(tdVazio);
+    tbody.appendChild(trVazio);
     return;
   }
 
-  tbody.innerHTML = excecoes.map((excecao, index) => `
-    <tr data-index="${index}">
-      <td>
-        <select class="form-select excecao-tipo" ${bloqueado ? 'disabled' : ''}>
-          <option value="EXCLUIR" ${excecao.tipo_excecao !== 'INCLUIR' ? 'selected' : ''}>Excluir</option>
-          <option value="INCLUIR" ${excecao.tipo_excecao === 'INCLUIR' ? 'selected' : ''}>Incluir</option>
-        </select>
-      </td>
-      <td><input type="text" class="form-control excecao-codigo" maxlength="8" value="${excecao.codigo_postal || ''}" placeholder="0000-000" ${bloqueado ? 'disabled' : ''}></td>
-      <td class="text-center"><input type="checkbox" class="form-check-input excecao-ativa" ${excecao.ativa !== false ? 'checked' : ''} ${bloqueado ? 'disabled' : ''}></td>
-      <td><input type="text" class="form-control excecao-observacao" maxlength="200" value="${excecao.observacao || ''}" ${bloqueado ? 'disabled' : ''}></td>
-      <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger btn-remover-excecao" ${bloqueado ? 'disabled' : ''}>Remover</button></td>
-    </tr>
-  `).join('');
+  excecoes.forEach((excecao, index) => {
+    const tr = document.createElement('tr');
+    tr.dataset.index = String(index);
+
+    const tdTipo = document.createElement('td');
+    const selectTipo = document.createElement('select');
+    selectTipo.className = 'form-select excecao-tipo';
+    selectTipo.disabled = bloqueado;
+    const optExcluir = document.createElement('option');
+    optExcluir.value = 'EXCLUIR';
+    optExcluir.textContent = 'Excluir';
+    optExcluir.selected = excecao.tipo_excecao !== 'INCLUIR';
+    const optIncluir = document.createElement('option');
+    optIncluir.value = 'INCLUIR';
+    optIncluir.textContent = 'Incluir';
+    optIncluir.selected = excecao.tipo_excecao === 'INCLUIR';
+    selectTipo.appendChild(optExcluir);
+    selectTipo.appendChild(optIncluir);
+    tdTipo.appendChild(selectTipo);
+
+    const tdCodigo = document.createElement('td');
+    const inputCodigo = document.createElement('input');
+    inputCodigo.type = 'text';
+    inputCodigo.className = 'form-control excecao-codigo';
+    inputCodigo.maxLength = 8;
+    inputCodigo.value = excecao.codigo_postal || '';
+    inputCodigo.placeholder = '0000-000';
+    inputCodigo.disabled = bloqueado;
+    tdCodigo.appendChild(inputCodigo);
+
+    const tdAtiva = document.createElement('td');
+    tdAtiva.className = 'text-center';
+    const inputAtiva = document.createElement('input');
+    inputAtiva.type = 'checkbox';
+    inputAtiva.className = 'form-check-input excecao-ativa';
+    inputAtiva.checked = excecao.ativa !== false;
+    inputAtiva.disabled = bloqueado;
+    tdAtiva.appendChild(inputAtiva);
+
+    const tdObs = document.createElement('td');
+    const inputObs = document.createElement('input');
+    inputObs.type = 'text';
+    inputObs.className = 'form-control excecao-observacao';
+    inputObs.maxLength = 200;
+    inputObs.value = excecao.observacao || '';
+    inputObs.disabled = bloqueado;
+    tdObs.appendChild(inputObs);
+
+    const tdAcao = document.createElement('td');
+    tdAcao.className = 'text-center';
+    const btnRemover = document.createElement('button');
+    btnRemover.type = 'button';
+    btnRemover.className = 'btn btn-sm btn-outline-danger btn-remover-excecao';
+    btnRemover.disabled = bloqueado;
+    btnRemover.textContent = 'Remover';
+    tdAcao.appendChild(btnRemover);
+
+    tr.appendChild(tdTipo);
+    tr.appendChild(tdCodigo);
+    tr.appendChild(tdAtiva);
+    tr.appendChild(tdObs);
+    tr.appendChild(tdAcao);
+    tbody.appendChild(tr);
+  });
 
   tbody.querySelectorAll('input, select').forEach((input) => {
     input.addEventListener('input', atualizarExcecoesNoSisVar);
@@ -347,17 +467,35 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderizarTabela(registros) {
-    tabelaCorpo.innerHTML = registros.map((registro) => `
-      <tr>
-        <td>${registro.id}</td>
-        <td>${registro.filial}</td>
-        <td>${registro.pais_atuacao || ''}</td>
-        <td>${registro.codigo}</td>
-        <td>${registro.descricao}</td>
-        <td>${registro.ativa ? 'Sim' : 'Não'}</td>
-        <td class="text-center"><button type="button" class="btn btn-sm btn-primary btn-selecionar" data-id="${registro.id}">Selecionar</button></td>
-      </tr>
-    `).join('');
+    tabelaCorpo.innerHTML = '';
+    registros.forEach((registro) => {
+      const tr = document.createElement('tr');
+
+      [
+        registro.id,
+        registro.filial,
+        registro.pais_atuacao || '',
+        registro.codigo,
+        registro.descricao,
+        registro.ativa ? 'Sim' : 'Não',
+      ].forEach((valor) => {
+        const td = document.createElement('td');
+        td.textContent = String(valor ?? '');
+        tr.appendChild(td);
+      });
+
+      const tdAcao = document.createElement('td');
+      tdAcao.className = 'text-center';
+      const btnSelecionar = document.createElement('button');
+      btnSelecionar.type = 'button';
+      btnSelecionar.className = 'btn btn-sm btn-primary btn-selecionar';
+      btnSelecionar.dataset.id = String(registro.id ?? '');
+      btnSelecionar.textContent = 'Selecionar';
+      tdAcao.appendChild(btnSelecionar);
+      tr.appendChild(tdAcao);
+
+      tabelaCorpo.appendChild(tr);
+    });
   }
 
   btnAbrirPesquisa.addEventListener('click', alternarTelas);

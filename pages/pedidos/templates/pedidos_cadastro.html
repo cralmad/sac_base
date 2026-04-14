@@ -24,7 +24,7 @@
     {% csrf_token %}
     <div class="tab-content border border-top-0 p-2" id="pedidoTabsContent">
       <div class="tab-pane fade show active" id="geral" role="tabpanel">
-        <div class="container-md-3 my-3 mx-auto">
+        <div class="container-xl my-3 mx-auto">
           <div class="row g-3">
             <div class="col-12 col-md-4">
               <label class="form-label mb-0" for="filial_id">Matriz/Filial *</label>
@@ -58,6 +58,21 @@
               <input id="volume" name="volume" class="form-control" type="number" min="0" step="1" inputmode="numeric">
             </div>
             <div class="col-12 col-md-2">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="volume_conf">
+                <span>Volume Conf.</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="Conferência da entrada dos volumes no armazém.">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <input id="volume_conf" name="volume_conf" class="form-control" type="number" min="0" step="1" inputmode="numeric">
+            </div>
+            <div class="col-12 col-md-2">
               <label class="form-label mb-0" for="peso">Peso</label>
               <input id="peso" name="peso" class="form-control" type="number" min="0" step="0.001" inputmode="decimal">
             </div>
@@ -68,7 +83,7 @@
             <div class="col-12 col-md-2 d-flex align-items-end">
               <div class="form-check mb-2">
                 <input id="expresso" name="expresso" class="form-check-input" type="checkbox">
-                <label class="form-check-label" for="expresso">Expresso</label>
+                <label class="form-check-label" for="expresso"><b>EXPRESSO</b></label>
               </div>
             </div>
 
@@ -129,12 +144,16 @@
               <label class="form-label mb-0" for="obs">Comentários</label>
               <textarea id="obs" name="obs" class="form-control" rows="5"></textarea>
             </div>
+            <div class="col-12">
+              <label class="form-label mb-0" for="obs_rota">Comentários de Rota</label>
+              <textarea id="obs_rota" name="obs_rota" class="form-control" rows="4"></textarea>
+            </div>
           </div>
         </div>
       </div>
 
       <div class="tab-pane fade" id="mov" role="tabpanel">
-        <div class="container-md-3 my-3 mx-auto">
+        <div class="container-xl my-3 mx-auto">
           <div class="d-flex gap-2 mb-3">
             <button id="btn-mov-novo" type="button" class="btn btn-outline-primary btn-sm">
               <i class="bi bi-plus-circle"></i> Nova Movimentação
@@ -163,7 +182,7 @@
       </div>
     </div>
 
-    <div class="d-grid gap-2 d-md-flex mt-3">
+    <div class="btn-actions">
       <button id="btn-salvar" class="btn btn-primary d-none" data-show-on="novo,editar" type="submit"><i class="bi bi-save"></i> Salvar</button>
       <button id="btn-editar" class="btn btn-warning d-none" data-show-on="visualizar" type="button"><i class="bi bi-pencil"></i> Editar</button>
       <button id="btn-novo" class="btn btn-success d-none" data-show-on="visualizar" type="button"><i class="bi bi-plus-circle"></i> Novo</button>
@@ -174,7 +193,7 @@
   </form>
 </div>
 
-<div id="div-pesquisa" class="container-md-3 d-none mt-3">
+<div id="div-pesquisa" class="container-xl d-none mt-3">
   <div class="card shadow-sm">
     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
       <span>Consultar Pedidos</span>
