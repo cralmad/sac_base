@@ -153,6 +153,7 @@ class TentativaEntrega(models.Model):
     faturado = models.BooleanField(default=False)
     interno = models.BooleanField(default=False)
     dt_entrega = models.DateField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "tentativa_entrega"

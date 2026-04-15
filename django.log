@@ -28,3 +28,71 @@ ERROR 2026-04-14 23:34:58,977 middleware Erro ao validar access token: could not
 
 ERROR 2026-04-14 23:35:10,044 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
 
+ERROR 2026-04-16 00:09:39,714 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:50,831 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:55,966 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:56,035 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,256 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,258 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,312 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,314 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,415 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,421 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,455 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,473 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,506 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,506 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,580 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,583 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,670 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,671 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,689 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,691 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,745 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,748 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,788 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,790 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,839 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,842 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,872 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,872 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,956 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:57,958 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:58,002 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:58,005 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:58,048 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-16 00:09:58,058 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+

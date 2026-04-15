@@ -13,7 +13,9 @@ const movLista = document.getElementById('mov-lista');
 const loader = document.getElementById('loader');
 const fimLista = document.getElementById('fim-lista');
 const URL_SALVAR = root?.dataset?.urlSalvar ?? '';
+const URL_IMPRIMIR = root?.dataset?.urlImprimir ?? '';
 const podeEditar = hasScreenPermission('relatorio', 'editar');
+const btnImprimir = document.getElementById('btn-imprimir-relatorio');
 
 
 // ─── Renderização segura via createElement ───────────────────────────────────
@@ -97,15 +99,16 @@ function criarMovCard(mov) {
   const inner = document.createElement('div');
   inner.className = 'mov-card h-100';
   inner.dataset.id = mov.id;
+  inner.dataset.updatedAt = mov.updated_at ?? '';
 
   // ── Visualização do Carro salvo (topo do card, reflete apenas o valor persistido) ──
   const carroDisplay = document.createElement('div');
   carroDisplay.className = 'mov-carro-display';
   const carroDisplayLabel = document.createElement('span');
-  carroDisplayLabel.className = 'mov-carro-display-label text-muted small';
+  carroDisplayLabel.className = 'mov-carro-display-label';
   carroDisplayLabel.textContent = 'Carro';
   const carroDisplayValue = document.createElement('span');
-  carroDisplayValue.className = 'badge bg-primary ms-1';
+  carroDisplayValue.className = 'badge bg-primary';
   carroDisplayValue.dataset.carroDisplay = '';
   carroDisplayValue.textContent = (mov.carro != null && String(mov.carro).trim() !== '') ? mov.carro : '—';
   carroDisplay.appendChild(carroDisplayLabel);
@@ -129,6 +132,7 @@ function criarMovCard(mov) {
     labelEl.className = 'mov-field-label';
     labelEl.textContent = rotulo;
     const span = document.createElement('span');
+    if (rotulo === 'Referência') span.className = 'fw-semibold';
     span.textContent = valor;
     div.appendChild(labelEl);
     div.appendChild(span);
@@ -319,9 +323,11 @@ document.getElementById('filtro-relatorio').addEventListener('submit', e => {
     data_tentativa: document.getElementById('filtro-data').value,
     referencia: document.getElementById('filtro-referencia').value,
     tipo: document.getElementById('filtro-tipo').value,
+    conferido: document.getElementById('filtro-conferido').value,
   };
   resetarLista();
   carregarPagina();
+  if (btnImprimir) btnImprimir.disabled = false;
 });
 
 window.addEventListener('scroll', () => {
@@ -378,6 +384,7 @@ movLista.addEventListener('click', async e => {
   const obs_rota = card.querySelector('textarea[data-campo="obs_rota"]').value;
   const volume_conf = card.querySelector('input[data-campo="volume_conf"]').value;
   const periodo = card.querySelector('select[data-campo="periodo"]')?.value ?? '';
+  const updated_at = card.dataset.updatedAt ?? '';
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Salvando';
@@ -386,17 +393,42 @@ movLista.addEventListener('click', async e => {
     const resp = await fetch(URL_SALVAR, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
-      body: JSON.stringify({ id, carro, obs_rota, volume_conf, periodo }),
+      body: JSON.stringify({ id, carro, obs_rota, volume_conf, periodo, updated_at }),
     });
     if (resp.status === 401) {
       btn.innerHTML = '<i class="bi bi-lock"></i> Sessão expirada';
       setTimeout(() => { window.location.href = '/app/usuario/login/'; }, 1500);
       return;
     }
+    if (resp.status === 409) {
+      const data = await resp.json().catch(() => ({}));
+      btn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Conflito';
+      btn.classList.replace('btn-success', 'btn-warning');
+      card.classList.add('border-warning');
+      // Mostra aviso inline no card
+      let avisoEl = card.querySelector('.mov-conflito-aviso');
+      if (!avisoEl) {
+        avisoEl = document.createElement('div');
+        avisoEl.className = 'mov-conflito-aviso alert alert-warning py-1 px-2 mt-1 small';
+        card.querySelector('.btn-salvar-wrapper').before(avisoEl);
+      }
+      avisoEl.textContent = data.mensagem || 'Registro alterado por outro usuário. Recarregue e tente novamente.';
+      // Atualiza o timestamp local para que nova tentativa de salvar possa ser comparada corretamente
+      if (data.updated_at) card.dataset.updatedAt = data.updated_at;
+      setTimeout(() => {
+        btn.innerHTML = '<i class="bi bi-check"></i> Salvar';
+        btn.classList.replace('btn-warning', 'btn-success');
+        btn.disabled = false;
+      }, 3000);
+      return;
+    }
     const data = await resp.json();
     if (data.success) {
       btn.innerHTML = '<i class="bi bi-check"></i> Salvo';
       desmarcarAlterado(card);
+      if (data.updated_at) card.dataset.updatedAt = data.updated_at;
+      card.classList.remove('border-warning');
+      card.querySelector('.mov-conflito-aviso')?.remove();
       const displayEl = card.querySelector('[data-carro-display]');
       if (displayEl) displayEl.textContent = String(carro).trim() !== '' ? carro : '—';
       setTimeout(() => { btn.innerHTML = '<i class="bi bi-check"></i> Salvar'; btn.disabled = false; }, 1000);
@@ -419,15 +451,27 @@ function aplicarAtualizacaoWs(payload) {
   const card = movLista.querySelector(`.mov-card[data-id="${payload.id}"]`);
   if (!card) return;
 
-  const inputCarro = card.querySelector('[data-campo="carro"]');
-  if (inputCarro && payload.carro != null) {
-    inputCarro.value = payload.carro;
+  // Badge do carro: sempre atualizar quando a chave estiver presente no payload,
+  // independente de o usuário ter permissão de edição.
+  if ('carro' in payload) {
     const displayEl = card.querySelector('[data-carro-display]');
-    if (displayEl) displayEl.textContent = String(payload.carro).trim() !== '' ? payload.carro : '—';
+    if (displayEl) {
+      const v = payload.carro;
+      displayEl.textContent = (v != null && String(v).trim() !== '') ? v : '—';
+    }
   }
 
-  const inputVol = card.querySelector('[data-campo="volume_conf"]');
-  if (inputVol && payload.volume_conf != null) inputVol.value = payload.volume_conf;
+  // Input de carro (apenas existe para usuários com podeEditar)
+  const inputCarro = card.querySelector('input[data-campo="carro"]');
+  if (inputCarro && 'carro' in payload && payload.carro != null) {
+    inputCarro.value = payload.carro;
+  }
+
+  // Input de volume_conf
+  const inputVol = card.querySelector('input[data-campo="volume_conf"]');
+  if (inputVol && 'volume_conf' in payload) {
+    inputVol.value = payload.volume_conf ?? 0;
+  }
 
   const textarea = card.querySelector('[data-campo="obs_rota"]');
   if (textarea && payload.obs_rota != null) textarea.value = payload.obs_rota;
@@ -435,9 +479,16 @@ function aplicarAtualizacaoWs(payload) {
   const periodoSel = card.querySelector('[data-campo="periodo"]');
   if (periodoSel && payload.periodo != null) periodoSel.value = payload.periodo;
 
-  // Sinaliza brevemente que o card foi atualizado remotamente
-  card.classList.add('table-info');
-  setTimeout(() => card.classList.remove('table-info'), 1500);
+  // Atualiza o timestamp de controle de concorrência
+  if (payload.updated_at) card.dataset.updatedAt = payload.updated_at;
+
+  // Remove aviso de conflito se existir (o WS trouxe o estado atual)
+  card.querySelector('.mov-conflito-aviso')?.remove();
+  card.classList.remove('border-warning');
+
+  // Flash visual de atualização remota
+  card.classList.add('mov-ws-flash');
+  setTimeout(() => card.classList.remove('mov-ws-flash'), 1500);
   desmarcarAlterado(card);
 }
 
@@ -465,3 +516,161 @@ function conectarWebSocket() {
 }
 
 conectarWebSocket();
+
+
+// ─── Relatório de impressão ────────────────────────────────────────────────────
+
+function gerarHtmlRelatorio(grupos, filtros) {
+  const dataExib = filtros.data_tentativa
+    ? new Date(filtros.data_tentativa + 'T00:00:00').toLocaleDateString('pt-PT')
+    : '';
+
+  const cabecalho = `
+    <div class="cabecalho-relatorio">
+      <h2>Conferência de Volumes</h2>
+      <p>Data: <strong>${dataExib}</strong>
+        ${filtros.tipo ? ` &nbsp;|&nbsp; Tipo: <strong>${filtros.tipo}</strong>` : ''}
+        ${filtros.conferido ? ` &nbsp;|&nbsp; Conferido: <strong>${filtros.conferido.toUpperCase()}</strong>` : ''}
+      </p>
+    </div>`;
+
+  let corpo = '';
+  for (const grupo of grupos) {
+    // Linha de cabeçalho do grupo
+    corpo += `
+    <div class="grupo-header">
+      <span>Carro: <strong>${grupo.carro}</strong></span>
+      <span>Data: <strong>${grupo.data_tentativa}</strong></span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Referência</th>
+          <th>Tipo</th>
+          <th>Cód. Postal</th>
+          <th>Cidade</th>
+          <th>Vol.</th>
+          <th>Peso</th>
+          <th>Obs. Rota</th>
+          <th>Conferido</th>
+        </tr>
+      </thead>
+      <tbody>`;
+    for (const l of grupo.linhas) {
+      const conferidoClass = l.conferido === 'SIM' ? 'conf-sim' : 'conf-nao';
+      // Escapa conteúdo usando um trick seguro (sem innerHTML dinâmico)
+      corpo += `
+        <tr>
+          <td>${_esc(l.pedido)}</td>
+          <td>${_esc(l.tipo)}</td>
+          <td>${_esc(l.codpost_dest)}</td>
+          <td>${_esc(l.cidade_dest)}</td>
+          <td>${_esc(l.volume)}</td>
+          <td>${_esc(l.peso)}</td>
+          <td class="obs-rota">${_esc(l.obs_rota)}</td>
+          <td class="${conferidoClass}">${_esc(l.conferido)}</td>
+        </tr>`;
+    }
+    corpo += `</tbody></table>`;
+  }
+
+  return `<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>Relatório de Conferência</title>
+<style>
+  @page { size: A4 portrait; margin: 12mm 10mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 9pt; color: #111; }
+  .cabecalho-relatorio { margin-bottom: 6mm; }
+  .cabecalho-relatorio h2 { font-size: 13pt; margin-bottom: 2mm; }
+  .cabecalho-relatorio p { font-size: 9pt; color: #444; }
+  .grupo-header {
+    background: #2c5282;
+    color: #fff;
+    padding: 3mm 4mm;
+    margin-top: 5mm;
+    margin-bottom: 1mm;
+    border-radius: 3px;
+    display: flex;
+    gap: 12mm;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    margin-bottom: 3mm;
+  }
+  thead { background: #e8edf5; }
+  th, td {
+    border: 1px solid #c5ccd8;
+    padding: 2mm 2.5mm;
+    vertical-align: top;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+  th { font-size: 8pt; text-align: left; }
+  /* Larguras das colunas */
+  table th:nth-child(1), table td:nth-child(1) { width: 14%; } /* Referência */
+  table th:nth-child(2), table td:nth-child(2) { width: 7%; }  /* Tipo */
+  table th:nth-child(3), table td:nth-child(3) { width: 9%; }  /* Cód. Postal */
+  table th:nth-child(4), table td:nth-child(4) { width: 12%; } /* Cidade */
+  table th:nth-child(5), table td:nth-child(5) { width: 5%; }  /* Vol. */
+  table th:nth-child(6), table td:nth-child(6) { width: 8%; }  /* Peso */
+  table th:nth-child(7), table td:nth-child(7) { width: 33%; } /* Obs. Rota */
+  table th:nth-child(8), table td:nth-child(8) { width: 12%; } /* Conferido */
+  .obs-rota { font-size: 8pt; }
+  .conf-sim { color: #155724; font-weight: bold; }
+  .conf-nao { color: #721c24; font-weight: bold; }
+  tr:nth-child(even) { background: #f7f9fc; }
+  @media print {
+    .grupo-header { page-break-before: auto; }
+    tr { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+${cabecalho}
+${corpo}
+</body>
+</html>`;
+}
+
+function _esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+btnImprimir?.addEventListener('click', async () => {
+  if (!filtros.data_tentativa) return;
+  AppLoader.show();
+  try {
+    const resp = await fetch(URL_IMPRIMIR, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+      body: JSON.stringify({ filtros }),
+    });
+    const data = await resp.json();
+    if (!data.success) {
+      alert(data.mensagem || 'Erro ao gerar relatório.');
+      return;
+    }
+    const html = gerarHtmlRelatorio(data.grupos, data.filtros);
+    const win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) { alert('Permita popups para gerar o relatório.'); return; }
+    win.document.write(html);
+    win.document.close();
+    win.addEventListener('load', () => win.print());
+  } catch {
+    alert('Erro ao gerar relatório.');
+  } finally {
+    AppLoader.hide();
+  }
+});
