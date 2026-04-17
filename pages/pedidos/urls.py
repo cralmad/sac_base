@@ -26,4 +26,7 @@ urlpatterns = [
 
     # Relatório de conferência de volumes
     path("logistica/", include("pages.pedidos.urls_relatorio")),
+
+    # Mapa de conferência / rotas
+    path("logistica/", include("pages.pedidos.urls_mapa")),
 ]

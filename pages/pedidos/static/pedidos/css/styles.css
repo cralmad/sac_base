@@ -138,6 +138,12 @@
 .mov-sanfona-toggle[aria-expanded="true"] .mov-sanfona-icon {
   transform: rotate(180deg);
 }
+/* Campo obs. do pedido — somente leitura, ocupa toda a largura */
+.mov-field-obs {
+  grid-column: 1 / -1;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 @media (max-width: 600px) {
   .mov-card {
     padding: 0.5rem;

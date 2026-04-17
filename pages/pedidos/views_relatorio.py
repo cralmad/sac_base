@@ -16,6 +16,7 @@ from sac_base.sisvar_builders import build_sisvar_payload
 PERMISSOES_RELATORIO = {
     "acessar": "pedidos.view_tentativaentrega",
     "editar": "pedidos.change_tentativaentrega",
+    "editar_carro": "pedidos.change_carro_tentativaentrega",
 }
 
 @login_required
@@ -71,6 +72,7 @@ def relatorio_conferencia_view(request):
             "referencia": pedido.pedido or pedido.id_vonzu,
             "codpost_dest": pedido.codpost_dest or "",
             "cidade_dest": pedido.cidade_dest or "",
+            "obs": pedido.obs or "",
             "volume": pedido.volume,
             "peso": str(pedido.peso) if pedido.peso is not None else "",
             "carro": mov.carro,

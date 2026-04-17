@@ -15,7 +15,12 @@ const fimLista = document.getElementById('fim-lista');
 const URL_SALVAR = root?.dataset?.urlSalvar ?? '';
 const URL_IMPRIMIR = root?.dataset?.urlImprimir ?? '';
 const podeEditar = hasScreenPermission('relatorio', 'editar');
+const podeEditarCarro = hasScreenPermission('relatorio', 'editar_carro');
 const btnImprimir = document.getElementById('btn-imprimir-relatorio');
+const btnAbrirMapa = document.getElementById('btn-abrir-mapa');
+const barraAcoes = document.getElementById('barra-acoes-cards');
+const btnExpandirTodos = document.getElementById('btn-expandir-todos');
+let todosExpandidos = false;
 
 
 // ─── Renderização segura via createElement ───────────────────────────────────
@@ -58,13 +63,16 @@ function criarCampoNumerico(id, campo, valor, readonly) {
   const inputGroup = document.createElement('div');
   inputGroup.className = 'input-group';
 
-  const btnMenos = document.createElement('button');
-  btnMenos.type = 'button';
-  btnMenos.className = 'btn btn-outline-secondary btn-sm btn-campo-menor';
-  btnMenos.dataset.campo = campo;
-  btnMenos.dataset.op = '-';
-  btnMenos.setAttribute('tabindex', '-1');
-  btnMenos.textContent = '-';
+  if (!readonly) {
+    const btnMenos = document.createElement('button');
+    btnMenos.type = 'button';
+    btnMenos.className = 'btn btn-outline-secondary btn-sm btn-campo-menor';
+    btnMenos.dataset.campo = campo;
+    btnMenos.dataset.op = '-';
+    btnMenos.setAttribute('tabindex', '-1');
+    btnMenos.textContent = '-';
+    inputGroup.appendChild(btnMenos);
+  }
 
   const input = document.createElement('input');
   input.type = 'text';
@@ -72,20 +80,20 @@ function criarCampoNumerico(id, campo, valor, readonly) {
   input.id = `${campo}-${id}`;
   input.value = Math.max(0, parseInt(valor ?? 0, 10) || 0);
   input.dataset.campo = campo;
-  // Sempre readonly: valor só muda via botões +/-
   input.setAttribute('readonly', '');
-
-  const btnMais = document.createElement('button');
-  btnMais.type = 'button';
-  btnMais.className = 'btn btn-outline-secondary btn-sm btn-campo-maior';
-  btnMais.dataset.campo = campo;
-  btnMais.dataset.op = '+';
-  btnMais.setAttribute('tabindex', '-1');
-  btnMais.textContent = '+';
-
-  inputGroup.appendChild(btnMenos);
+  if (readonly) input.setAttribute('disabled', '');
   inputGroup.appendChild(input);
-  inputGroup.appendChild(btnMais);
+
+  if (!readonly) {
+    const btnMais = document.createElement('button');
+    btnMais.type = 'button';
+    btnMais.className = 'btn btn-outline-secondary btn-sm btn-campo-maior';
+    btnMais.dataset.campo = campo;
+    btnMais.dataset.op = '+';
+    btnMais.setAttribute('tabindex', '-1');
+    btnMais.textContent = '+';
+    inputGroup.appendChild(btnMais);
+  }
   wrapper.appendChild(label);
   wrapper.appendChild(inputGroup);
   return wrapper;
@@ -138,6 +146,18 @@ function criarMovCard(mov) {
     div.appendChild(span);
     leitura.appendChild(div);
   }
+  if (mov.obs) {
+    const obsDiv = document.createElement('div');
+    obsDiv.className = 'mov-field-obs';
+    const obsLabel = document.createElement('span');
+    obsLabel.className = 'mov-field-label';
+    obsLabel.textContent = 'Obs.';
+    const obsValue = document.createElement('span');
+    obsValue.textContent = mov.obs;
+    obsDiv.appendChild(obsLabel);
+    obsDiv.appendChild(obsValue);
+    leitura.appendChild(obsDiv);
+  }
   inner.appendChild(leitura);
 
   // ── Edição (apenas com permissão) ──────────────────────────────────────
@@ -177,7 +197,7 @@ function criarMovCard(mov) {
     collapseInner.className = 'mov-fields mt-1';
 
     // Carro
-    collapseInner.appendChild(criarCampoNumerico(mov.id, 'carro', mov.carro, false));
+    collapseInner.appendChild(criarCampoNumerico(mov.id, 'carro', mov.carro, !podeEditarCarro));
 
     // Período
     const periodoWrapper = document.createElement('div');
@@ -289,6 +309,7 @@ async function carregarPagina() {
         for (const mov of data.registros) {
           movLista.appendChild(criarMovCard(mov));
         }
+        if (podeEditar && barraAcoes) barraAcoes.classList.remove('d-none');
         if (!data.has_next) {
           fim = true;
           fimLista.classList.remove('d-none');
@@ -310,8 +331,11 @@ async function carregarPagina() {
 function resetarLista() {
   pagina = 1;
   fim = false;
+  todosExpandidos = false;
   movLista.replaceChildren();
   fimLista.classList.add('d-none');
+  if (barraAcoes) barraAcoes.classList.add('d-none');
+  if (btnExpandirTodos) btnExpandirTodos.innerHTML = '<i class="bi bi-chevron-expand"></i> Expandir todos';
 }
 
 
@@ -328,6 +352,14 @@ document.getElementById('filtro-relatorio').addEventListener('submit', e => {
   resetarLista();
   carregarPagina();
   if (btnImprimir) btnImprimir.disabled = false;
+  if (btnAbrirMapa && filtros.data_tentativa) {
+    const url = new URL(btnAbrirMapa.href, window.location.origin);
+    url.searchParams.set('data', filtros.data_tentativa);
+    btnAbrirMapa.href = url.toString();
+    btnAbrirMapa.classList.remove('disabled');
+    btnAbrirMapa.removeAttribute('aria-disabled');
+    btnAbrirMapa.removeAttribute('tabindex');
+  }
 });
 
 window.addEventListener('scroll', () => {
@@ -444,6 +476,20 @@ movLista.addEventListener('click', async e => {
   }
 });
 
+
+// Expandir / recolher todos os cards
+btnExpandirTodos?.addEventListener('click', () => {
+  const collapses = movLista.querySelectorAll('.collapse');
+  if (todosExpandidos) {
+    collapses.forEach(el => bootstrap.Collapse.getOrCreateInstance(el).hide());
+    btnExpandirTodos.innerHTML = '<i class="bi bi-chevron-expand"></i> Expandir todos';
+    todosExpandidos = false;
+  } else {
+    collapses.forEach(el => bootstrap.Collapse.getOrCreateInstance(el).show());
+    btnExpandirTodos.innerHTML = '<i class="bi bi-chevron-contract"></i> Recolher todos';
+    todosExpandidos = true;
+  }
+});
 
 // ─── WebSocket — atualização em tempo real ────────────────────────────────────
 
@@ -667,7 +713,6 @@ btnImprimir?.addEventListener('click', async () => {
     if (!win) { alert('Permita popups para gerar o relatório.'); return; }
     win.document.write(html);
     win.document.close();
-    win.addEventListener('load', () => win.print());
   } catch {
     alert('Erro ao gerar relatório.');
   } finally {

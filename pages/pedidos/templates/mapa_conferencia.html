@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Mapa de Conferência{% endblock %}
+
+{% block estilo %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<link rel="stylesheet" href="{% static 'pedidos/css/mapa.css' %}">
+{% endblock %}
+
+{% block content %}
+<div id="mapa-root" class="container-xl my-3"
+     data-url-pontos="{% url 'mapa_conferencia_pontos' %}"
+     data-url-salvar-coord="{% url 'mapa_conferencia_salvar_coord' %}"
+     data-url-rota="{% url 'mapa_conferencia_rota' %}"
+     data-url-salvar="{% url 'relatorio_conferencia_salvar' %}"
+     data-data-inicial="{{ data_tentativa }}">
+
+  <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+    <h2 class="mb-0 me-auto">Mapa de Conferência</h2>
+  </div>
+
+  {# Barra de filtros #}
+  <form id="form-filtro-mapa" class="row g-2 mb-3">
+    <div class="col-6 col-md-3">
+      <label class="form-label mb-0" for="mapa-filtro-data">Data de Entrega *</label>
+      <input type="date" id="mapa-filtro-data" name="data" class="form-control" value="{{ data_tentativa }}" required>
+    </div>
+    <div class="col-6 col-md-2 d-flex align-items-end">
+      <button type="submit" class="btn btn-primary w-100">
+        <i class="bi bi-map"></i> Carregar
+      </button>
+    </div>
+    <div class="col-6 col-md-2 d-flex align-items-end">
+      <button type="button" id="btn-mostrar-rotas" class="btn btn-outline-success w-100" disabled>
+        <i class="bi bi-signpost-split"></i> Rotas por carro
+      </button>
+    </div>
+    <div class="col-6 col-md-2 d-flex align-items-end">
+      <button type="button" id="btn-limpar-rotas" class="btn btn-outline-secondary w-100 d-none">
+        <i class="bi bi-x-lg"></i> Limpar rotas
+      </button>
+    </div>
+  </form>
+
+  {# Legenda de carros #}
+  <div id="mapa-legenda" class="mapa-legenda-wrapper mb-2 d-none">
+    <span class="mapa-legenda-titulo">Carros:</span>
+    <div id="mapa-legenda-itens" class="d-flex flex-wrap gap-2"></div>
+  </div>
+
+  {# Alerta geocoding #}
+  <div id="mapa-aviso-geocoding" class="alert alert-info py-2 d-none" role="alert">
+    <i class="bi bi-hourglass-split"></i>
+    <span id="mapa-aviso-texto">Geocodificando endereços, aguarde…</span>
+  </div>
+
+  {# Mapa #}
+  <div id="mapa-leaflet" class="mapa-container"></div>
+
+  {# Painel lateral de detalhes #}
+  <div id="mapa-painel" class="mapa-painel d-none">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <strong id="mapa-painel-titulo">Detalhes</strong>
+      <button type="button" class="btn-close btn-sm" id="mapa-painel-fechar" aria-label="Fechar"></button>
+    </div>
+    <div id="mapa-painel-corpo"></div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script type="module" src="{% static 'js/mapa_conferencia.js' %}"></script>
+{% endblock %}

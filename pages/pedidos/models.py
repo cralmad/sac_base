@@ -111,6 +111,8 @@ class Pedido(AuditFieldsMixin, models.Model):
     )
     peso = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
     expresso = models.BooleanField(default=False)
+    lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 
     class Meta:
         db_table = "pedido"
@@ -157,6 +159,9 @@ class TentativaEntrega(models.Model):
 
     class Meta:
         db_table = "tentativa_entrega"
+        permissions = [
+            ("change_carro_tentativaentrega", "Pode alterar o campo Carro na conferência de volumes"),
+        ]
         indexes = [
             models.Index(fields=["pedido", "data_tentativa"]),
             models.Index(fields=["data_tentativa", "faturado"]),

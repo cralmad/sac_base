@@ -69,7 +69,17 @@
         <i class="bi bi-printer"></i> Relatório
       </button>
     </div>
+    <div class="col-12 col-md-2 d-flex align-items-end">
+      <a id="btn-abrir-mapa" href="{% url 'mapa_conferencia' %}" class="btn btn-outline-primary w-100 disabled" aria-disabled="true" tabindex="-1">
+        <i class="bi bi-map"></i> Mapa
+      </a>
+    </div>
   </form>
+  <div id="barra-acoes-cards" class="d-flex justify-content-end mb-2 d-none">
+    <button type="button" id="btn-expandir-todos" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-chevron-expand"></i> Expandir todos
+    </button>
+  </div>
   <div id="mov-lista" class="row g-3"></div>
   <div id="loader" class="text-center my-3 d-none">
     <div class="spinner-border" role="status">
