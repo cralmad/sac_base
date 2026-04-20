@@ -11,6 +11,7 @@ from .views import (
     pedidos_cadastro_view,
     pedidos_importacao_view,
     pedidos_importar_view,
+    pedidos_relatorio_volumes_view,
 )
 
 urlpatterns = [
@@ -23,6 +24,7 @@ urlpatterns = [
     path("logistica/pedidos/mov/del", pedido_mov_del_view, name="pedidos_mov_del"),
     path("logistica/pedidos/importacao/", pedidos_importacao_view, name="pedidos_importacao"),
     path("logistica/pedidos/importar", pedidos_importar_view, name="pedidos_importar"),
+    path("logistica/pedidos/relatorio-volumes/", pedidos_relatorio_volumes_view, name="pedidos_relatorio_volumes"),
 
     # Relatório de conferência de volumes
     path("logistica/", include("pages.pedidos.urls_relatorio")),

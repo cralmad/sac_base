@@ -1,3 +1,5 @@
+from decimal import Decimal, ROUND_HALF_UP
+
 from django.conf import settings
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import ValidationError
@@ -41,6 +43,8 @@ def build_filial_campos_iniciais():
         "pais_atuacao_id": None,
         "is_matriz": primeira_unidade,
         "ativa": True,
+        "lat_deposito": "",
+        "lng_deposito": "",
     }
 
 
@@ -64,6 +68,8 @@ def serializar_form_filial(filial):
         "pais_atuacao_id": filial.pais_atuacao_id,
         "is_matriz": filial.is_matriz,
         "ativa": filial.ativa,
+        "lat_deposito": str(filial.lat_deposito) if filial.lat_deposito is not None else "",
+        "lng_deposito": str(filial.lng_deposito) if filial.lng_deposito is not None else "",
     }
 
 
@@ -83,6 +89,8 @@ def cadastro_filial_view(request):
             "pais_atuacao_id": {"type": "string", "required": True, "value": ""},
             "is_matriz": {"type": "boolean", "required": False, "value": primeira_unidade},
             "ativa": {"type": "boolean", "required": False, "value": True},
+            "lat_deposito": {"type": "string", "required": False, "value": ""},
+            "lng_deposito": {"type": "string", "required": False, "value": ""},
         },
         nome_form_cons: {
             "codigo_cons": {"type": "string", "maxlength": 20, "required": False, "value": ""},
@@ -147,6 +155,18 @@ def cadastro_filial_view(request):
     is_matriz = bool(campos.get("is_matriz"))
     ativa = bool(campos.get("ativa"))
 
+    def _parse_coord(val):
+        s = str(val or "").strip()
+        if not s:
+            return None
+        try:
+            return Decimal(s).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP)
+        except Exception:
+            return None
+
+    lat_deposito = _parse_coord(campos.get("lat_deposito"))
+    lng_deposito = _parse_coord(campos.get("lng_deposito"))
+
     try:
         pais_endereco = Pais.objects.get(id=int(pais_endereco_id))
     except (TypeError, ValueError, Pais.DoesNotExist):
@@ -172,6 +192,8 @@ def cadastro_filial_view(request):
                     pais_atuacao=pais_atuacao,
                     is_matriz=is_matriz,
                     ativa=ativa,
+                    lat_deposito=lat_deposito,
+                    lng_deposito=lng_deposito,
                 )
             except ValidationError as exc:
                 return JsonResponse(build_error_payload(extract_validation_messages(exc)), status=422)
@@ -200,6 +222,8 @@ def cadastro_filial_view(request):
             filial.pais_atuacao = pais_atuacao
             filial.is_matriz = is_matriz
             filial.ativa = ativa
+            filial.lat_deposito = lat_deposito
+            filial.lng_deposito = lng_deposito
 
             try:
                 filial.save()

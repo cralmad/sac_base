@@ -90,6 +90,18 @@ def mapa_conferencia_view(request):
     return render(request, "mapa_conferencia.html", {"data_tentativa": data_tentativa})
 
 
+def _coordenadas_deposito(request):
+    """Retorna {'lat': ..., 'lng': ...} da filial ativa, ou None se não configurado."""
+    filial = getattr(request, "filial_ativa", None)
+    if filial is None:
+        return None
+    lat = filial.lat_deposito
+    lng = filial.lng_deposito
+    if lat is None or lng is None:
+        return None
+    return {"lat": float(lat), "lng": float(lng)}
+
+
 @login_required
 @permission_required(PERMISSOES_MAPA["acessar"], raise_exception=True)
 @csrf_protect
@@ -193,6 +205,7 @@ def mapa_pontos_view(request):
         "geojson": {"type": "FeatureCollection", "features": features},
         "total": len(features),
         "sem_coord": geocoding_falhou,
+        "deposito": _coordenadas_deposito(request),
     })
 
 
@@ -242,23 +255,22 @@ def mapa_rota_view(request):
         return JsonResponse({"success": False, "mensagem": "Mínimo 2 pontos para traçar rota."}, status=400)
 
     coordenadas = [[p["lng"], p["lat"]] for p in pontos]
-
+    # OSRM público — gratuito, sem chave de API
+    # Formato: lng,lat;lng,lat;...
+    coords_str = ";".join(f"{lng},{lat}" for lng, lat in coordenadas)
     try:
-        resp = http_requests.post(
-            "https://api.openrouteservice.org/v2/directions/driving-car/geojson",
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": "5b3ce3597851110001cf6248a3e2f89f60e54ebcae7b30d6e44c75a3",  # chave demo pública ORS
-            },
-            json={"coordinates": coordenadas},
+        resp = http_requests.get(
+            f"https://router.project-osrm.org/route/v1/driving/{coords_str}",
+            params={"overview": "full", "geometries": "geojson"},
+            headers=NOMINATIM_HEADERS,
             timeout=15,
         )
         resp.raise_for_status()
         data = resp.json()
-        geometry = data["features"][0]["geometry"]
+        geometry = data["routes"][0]["geometry"]
         return JsonResponse({"success": True, "geometry": geometry, "carro": carro})
     except Exception as exc:
-        logger.warning("ORS rota falhou: %s", exc)
+        logger.warning("OSRM rota falhou: %s", exc)
         # Fallback: retorna polyline reta entre os pontos
         return JsonResponse({
             "success": True,

@@ -96,3 +96,7 @@ ERROR 2026-04-16 00:09:58,048 middleware Erro ao validar access token: could not
 
 ERROR 2026-04-16 00:09:58,058 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
 
+ERROR 2026-04-17 19:37:07,655 middleware Erro ao validar access token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+
+ERROR 2026-04-17 19:37:18,752 middleware Erro inesperado no refresh token: could not translate host name "sac-confec.chyi06koyaeh.us-east-1.rds.amazonaws.com" to address: Name or service not known
+

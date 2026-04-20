@@ -166,3 +166,90 @@ def relatorio_conferencia_imprimir_view(request):
         })
 
     return JsonResponse({"success": True, "grupos": grupos, "filtros": filtros})
+
+
+# ─── Relatório de Rotas por Carro ─────────────────────────────────────────────
+
+PERMISSOES_ROTAS = {
+    "acessar": "pedidos.view_tentativaentrega",
+}
+
+@login_required
+@permission_required(PERMISSOES_ROTAS["acessar"], raise_exception=True)
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def relatorio_rotas_view(request):
+    if request.method == "GET":
+        request.sisvar_extra = build_sisvar_payload(
+            permissions={"rotas": build_action_permissions(request.user, PERMISSOES_ROTAS)}
+        )
+        return render(request, "relatorio_rotas.html")
+
+    # POST: retorna grupos por carro
+    data = request.sisvar_front or {}
+    filtros = data.get("filtros", {})
+    data_tentativa = filtros.get("data_tentativa", "").strip()
+    carro_filtro = filtros.get("carro", "").strip()
+
+    if not data_tentativa:
+        return JsonResponse({"success": False, "mensagem": "A data é obrigatória."}, status=400)
+
+    try:
+        dt = datetime.strptime(data_tentativa, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"success": False, "mensagem": "Data inválida."}, status=400)
+
+    qs = (
+        TentativaEntrega.objects
+        .select_related("pedido")
+        .filter(data_tentativa=dt)
+    )
+    if carro_filtro:
+        try:
+            qs = qs.filter(carro=int(carro_filtro))
+        except ValueError:
+            pass
+
+    qs = qs.order_by("carro", "pedido__codpost_dest", "pedido__pedido")
+
+    grupos = []
+    for carro_val, items in groupby(qs, key=lambda m: m.carro):
+        linhas = []
+        data_str = None
+        for mov in items:
+            p = mov.pedido
+            if data_str is None:
+                data_str = mov.data_tentativa.strftime("%d/%m/%Y")
+            tipo_abrev = "R" if (p.tipo or "").upper() == "RECOLHA" else "E"
+            fones = " / ".join(f for f in [p.fone_dest or "", p.fone_dest2 or ""] if f)
+            peso_str = ""
+            if p.peso is not None:
+                try:
+                    peso_str = str(int(p.peso))
+                except Exception:
+                    peso_str = str(p.peso)
+            linhas.append({
+                "pedido": p.pedido or str(p.id_vonzu),
+                "tipo": tipo_abrev,
+                "nome_dest": p.nome_dest or "",
+                "fones": fones,
+                "endereco_dest": p.endereco_dest or "",
+                "cidade_dest": p.cidade_dest or "",
+                "codpost_dest": p.codpost_dest or "",
+                "volumes": f"{p.volume_conf or 0}/{p.volume or 0}",
+                "peso": peso_str,
+                "periodo": mov.periodo or "",
+                "obs_rota": p.obs_rota or "",
+            })
+        grupos.append({
+            "carro": str(carro_val) if carro_val is not None else "—",
+            "data_tentativa": data_str or dt.strftime("%d/%m/%Y"),
+            "total": len(linhas),
+            "linhas": linhas,
+        })
+
+    return JsonResponse({
+        "success": True,
+        "grupos": grupos,
+        "data_fmt": dt.strftime("%d/%m/%Y"),
+    })

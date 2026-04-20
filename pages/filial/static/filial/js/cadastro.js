@@ -107,6 +107,15 @@ function renderizarPaises() {
   });
 }
 
+async function geocodificarDeposito(endereco) {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(endereco)}`;
+  const resp = await fetch(url, { headers: { 'Accept-Language': 'pt-BR,pt' } });
+  if (!resp.ok) throw new Error('Erro ao consultar geocodificação.');
+  const dados = await resp.json();
+  if (!dados.length) throw new Error('Endereço não encontrado.');
+  return { lat: dados[0].lat, lng: dados[0].lon, label: dados[0].display_name };
+}
+
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   clearMessages();
@@ -344,6 +353,33 @@ document.addEventListener('DOMContentLoaded', () => {
     hidratarFormulario(nomeForm);
     aplicarPermissoesNaInterface();
     alternarTelas();
+  });
+
+  const btnLocalizarDeposito = document.getElementById('btn-localizar-deposito');
+  const inpBuscaDeposito = document.getElementById('busca_deposito');
+  const divBuscaStatus = document.getElementById('busca-deposito-status');
+  const msgBuscaStatus = document.getElementById('busca-deposito-msg');
+
+  btnLocalizarDeposito.addEventListener('click', async () => {
+    const endereco = (inpBuscaDeposito.value || '').trim();
+    if (!endereco) {
+      definirMensagem('erro', 'Informe o endereço do depósito antes de localizar.', false);
+      return;
+    }
+    AppLoader.show();
+    divBuscaStatus.classList.add('d-none');
+    try {
+      const { lat, lng, label } = await geocodificarDeposito(endereco);
+      updateFormField(nomeForm, 'lat_deposito', lat);
+      updateFormField(nomeForm, 'lng_deposito', lng);
+      hidratarFormulario(nomeForm);
+      msgBuscaStatus.textContent = `Localizado: ${label}`;
+      divBuscaStatus.classList.remove('d-none');
+    } catch (err) {
+      definirMensagem('erro', err.message || 'Erro ao localizar endereço.', false);
+    } finally {
+      AppLoader.hide();
+    }
   });
 
   renderizarPaises();

@@ -86,6 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const filialId = document.getElementById('filial_id').value;
     const arquivoInput = document.getElementById('arquivo_csv');
+    const verificarVolumes = document.getElementById('verificar_volumes')?.checked ? '1' : '0';
 
     if (!filialId) {
       definirMensagem('erro', 'Selecione uma filial.');
@@ -99,6 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const formData = new FormData();
     formData.append('filial_id', filialId);
     formData.append('arquivo_csv', arquivoInput.files[0]);
+    formData.append('verificar_volumes', verificarVolumes);
 
     AppLoader.show();
     btnBaixar.classList.add('d-none');
@@ -124,6 +126,10 @@ document.addEventListener('DOMContentLoaded', () => {
         btnBaixar.classList.remove('d-none');
         // Dispara o download automaticamente após importação
         baixarRelatorio(ultimoRelatorio, ultimoNomeRelatorio);
+        // Abre o relatório de volumes numa nova aba, se disponível
+        if (data.relatorio_volumes_url) {
+          window.open(data.relatorio_volumes_url, '_blank');
+        }
         form.reset();
       }
     } catch (err) {

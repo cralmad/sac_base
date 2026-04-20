@@ -1,5 +1,6 @@
 import csv
 import io
+import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
@@ -16,6 +17,26 @@ TIPO_MAP = {
     "delivery": "ENTREGA",
     "pickup": "RECOLHA",
 }
+
+# Padrão: DESCRICAO (QTD) (COD_FORNECEDOR)
+_RE_PRODUTO = re.compile(r'(.+?)\s+\((\d+)\)\s+\((\d+)\)')
+
+
+def _parse_description(desc):
+    """Retorna lista de dicts {descricao, quantidade, cod_fornecedor} da Description VONZU."""
+    if not desc or not desc.strip():
+        return []
+    desc = desc.strip().lstrip('*')
+    result = []
+    for m in _RE_PRODUTO.finditer(desc):
+        descricao = m.group(1).strip().strip(',').strip()
+        if descricao:
+            result.append({
+                'descricao': descricao,
+                'quantidade': int(m.group(2)),
+                'cod_fornecedor': m.group(3),
+            })
+    return result
 
 CAMPOS_ATUALIZAVEIS = [
     "atualizacao",
@@ -143,6 +164,7 @@ def _normalizar_linha(num_linha, row):
         "nome_motorista_csv": (row.get("Nome utilizador condutor") or "").strip() or None,
         "peso": _parse_decimal(row.get("Peso")),
         "expresso": str(row.get("Expresso") or "").strip().lower() in {"1", "true", "sim", "s", "yes", "y"},
+        "description_raw": (row.get("Description") or "").strip(),
     }, []
 
 
@@ -427,7 +449,7 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
     except Exception as exc:
         return {"sucesso": False, "erros": [f"Erro ao salvar dados: {exc}"], "relatorio": "", "stats": {}}
 
-    relatorio = _gerar_relatorio(
+    relatorio_volumes = _gerar_relatorio(
         nome_arquivo=nome_arquivo,
         filial=filial,
         total_lidas=total_lidas,
@@ -439,10 +461,22 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
         avisos=avisos_fk,
     )
 
+    # Relatório de volumes: todos os pedidos que têm Description no CSV
+    dados_volumes = []
+    for _num_linha, dados in linhas_resolvidas:
+        artigos = _parse_description(dados.get("description_raw", ""))
+        if artigos:
+            dados_volumes.append({
+                "referencia": dados.get("pedido") or str(dados["id_vonzu"]),
+                "peso": str(dados.get("peso") or ""),
+                "volume": dados.get("volume"),
+                "artigos": artigos,
+            })
+
     return {
         "sucesso": True,
         "erros": [],
-        "relatorio": relatorio,
+        "relatorio": relatorio_volumes,
         "stats": {
             "total_lidas": total_lidas,
             "ignoradas": ignoradas,
@@ -452,4 +486,5 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
             "tentativas": tentativas,
             "avisos_fk": len(avisos_fk),
         },
+        "dados_volumes": dados_volumes,
     }

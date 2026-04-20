@@ -45,6 +45,69 @@
           </div>
         </div>
       </div>
+
+      <div class="row g-3 mt-1">
+        <div class="col-12">
+          <h6 class="text-muted">Localização do Depósito</h6>
+        </div>
+        <div class="col-12 col-sm-7">
+          <label class="form-label mb-0 d-flex align-items-center gap-1" for="busca_deposito">
+            <span>Endereço</span>
+            <span
+              class="text-primary"
+              role="button"
+              tabindex="0"
+              data-bs-toggle="tooltip"
+              data-bs-placement="top"
+              data-bs-title="Digite o endereço do depósito e clique em Localizar para preencher automaticamente as coordenadas.">
+              <i class="bi bi-question-circle"></i>
+            </span>
+          </label>
+          <input id="busca_deposito" type="text" class="form-control"
+            placeholder="Ex: Rua das Flores, 100, Lisboa"
+            autocomplete="off">
+        </div>
+        <div class="col-12 col-sm-3 d-flex align-items-end">
+          <button id="btn-localizar-deposito" type="button" class="btn btn-outline-secondary w-100">
+            <i class="bi bi-geo-alt"></i> Localizar
+          </button>
+        </div>
+        <div class="col-12 col-sm-3">
+          <label class="form-label mb-0 d-flex align-items-center gap-1" for="lat_deposito">
+            <span>Latitude</span>
+            <span
+              class="text-primary"
+              role="button"
+              tabindex="0"
+              data-bs-toggle="tooltip"
+              data-bs-placement="top"
+              data-bs-title="Latitude do depósito (preenchida automaticamente ao localizar o endereço ou informada manualmente).">
+              <i class="bi bi-question-circle"></i>
+            </span>
+          </label>
+          <input id="lat_deposito" name="lat_deposito" type="text" class="form-control smart-input"
+            placeholder="-23.550520" autocomplete="off">
+        </div>
+        <div class="col-12 col-sm-3">
+          <label class="form-label mb-0 d-flex align-items-center gap-1" for="lng_deposito">
+            <span>Longitude</span>
+            <span
+              class="text-primary"
+              role="button"
+              tabindex="0"
+              data-bs-toggle="tooltip"
+              data-bs-placement="top"
+              data-bs-title="Longitude do depósito (preenchida automaticamente ao localizar o endereço ou informada manualmente).">
+              <i class="bi bi-question-circle"></i>
+            </span>
+          </label>
+          <input id="lng_deposito" name="lng_deposito" type="text" class="form-control smart-input"
+            placeholder="-46.633308" autocomplete="off">
+        </div>
+        <div id="busca-deposito-status" class="col-12 d-none">
+          <small class="text-muted" id="busca-deposito-msg"></small>
+        </div>
+      </div>
     </div>
 
     <div class="btn-actions">

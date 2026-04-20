@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Relatório de Volumes{% endblock %}
+
+{% block page_title %}Relatório de Volumes{% endblock %}
+
+{% block estilo %}
+<style>
+  .rv-table th { white-space: nowrap; }
+  .rv-artigos { margin: 0; padding: 0; list-style: none; }
+  .rv-artigos li { border-bottom: 1px solid #dee2e6; padding: 2px 0; font-size: 0.85rem; }
+  .rv-artigos li:last-child { border-bottom: none; }
+  .rv-qty { display: inline-block; min-width: 2rem; text-align: right; font-weight: bold; margin-right: 0.4rem; }
+  .rv-cod { color: #6c757d; font-size: 0.78rem; margin-left: 0.3rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-xl my-3">
+
+  {% if sem_dados %}
+    <div class="alert alert-warning">
+      <i class="bi bi-exclamation-triangle"></i>
+      Nenhum dado de volumes disponível. Por favor, realize uma importação com a opção "Verificar Volumes" marcada.
+    </div>
+  {% else %}
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+      <div>
+        <h4 class="mb-0">Relatório de Volumes</h4>
+        {% if nome_arquivo %}
+          <small class="text-muted">Arquivo: {{ nome_arquivo }}</small>
+        {% endif %}
+      </div>
+      <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+        <i class="bi bi-printer"></i> Imprimir
+      </button>
+    </div>
+
+    {% if pedidos %}
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered table-hover rv-table">
+          <thead class="table-light">
+            <tr>
+              <th>Referência</th>
+              <th class="text-end">Peso (kg)</th>
+              <th class="text-end">Volume</th>
+              <th>Artigos</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in pedidos %}
+            <tr>
+              <td>{{ p.referencia }}</td>
+              <td class="text-end">{{ p.peso|default:"—" }}</td>
+              <td class="text-end">{{ p.volume|default:"—" }}</td>
+              <td>
+                <ul class="rv-artigos">
+                  {% for artigo in p.artigos %}
+                  <li>
+                    <span class="rv-qty">{{ artigo.quantidade }}x</span>
+                    {{ artigo.descricao }}
+                    <span class="rv-cod">({{ artigo.cod_fornecedor }})</span>
+                  </li>
+                  {% endfor %}
+                </ul>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-muted small mt-2">
+        Total de pedidos com artigos: <strong>{{ pedidos|length }}</strong>
+      </p>
+    {% else %}
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i>
+        Nenhum pedido com artigos encontrado no arquivo importado.
+      </div>
+    {% endif %}
+  {% endif %}
+
+</div>
+{% endblock %}

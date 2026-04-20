@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
-from django.contrib.auth.decorators import permission_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -545,6 +545,7 @@ def pedidos_importar_view(request):
 
     arquivo = request.FILES.get("arquivo_csv")
     filial_id = request.POST.get("filial_id")
+    verificar_volumes = request.POST.get("verificar_volumes") == "1"
 
     if not arquivo:
         return JsonResponse(build_error_payload("Arquivo CSV não enviado."), status=400)
@@ -582,6 +583,14 @@ def pedidos_importar_view(request):
     if stats["avisos_fk"]:
         resumo += f" {stats['avisos_fk']} aviso(s) de FK — consulte o relatório."
 
+    relatorio_url = None
+    if verificar_volumes and resultado.get("dados_volumes"):
+        request.session["relatorio_volumes"] = {
+            "nome_arquivo": nome_arquivo,
+            "dados": resultado["dados_volumes"],
+        }
+        relatorio_url = "/app/logistica/pedidos/relatorio-volumes/"
+
     return JsonResponse(
         {
             "success": True,
@@ -589,5 +598,19 @@ def pedidos_importar_view(request):
             "nome_relatorio": f"relatorio_{nome_arquivo.replace('.csv', '')}.txt",
             "stats": stats,
             "mensagens": {"sucesso": {"conteudo": [resumo], "ignorar": True}},
+            "relatorio_volumes_url": relatorio_url,
         }
     )
+
+
+@login_required
+@permission_required(PERMISSOES_PEDIDO["importar"], raise_exception=True)
+def pedidos_relatorio_volumes_view(request):
+    dados_sessao = request.session.pop("relatorio_volumes", None)
+    if not dados_sessao:
+        return render(request, "relatorio_volumes.html", {"sem_dados": True})
+    return render(request, "relatorio_volumes.html", {
+        "nome_arquivo": dados_sessao.get("nome_arquivo", ""),
+        "pedidos": dados_sessao.get("dados", []),
+        "sem_dados": False,
+    })

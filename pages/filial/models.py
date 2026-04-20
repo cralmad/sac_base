@@ -25,6 +25,8 @@ class Filial(models.Model):
     )
     is_matriz = models.BooleanField(default=False)
     ativa = models.BooleanField(default=True)
+    lat_deposito = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    lng_deposito = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 
     class Meta:
         db_table = "filial"

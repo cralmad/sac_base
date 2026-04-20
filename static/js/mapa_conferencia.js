@@ -1,4 +1,4 @@
-import { getCsrfToken, hasScreenPermission } from '/static/js/sisVar.js';
+import { getCsrfToken, hasScreenPermission, confirmar } from '/static/js/sisVar.js';
 import { AppLoader } from '/static/js/loader.js';
 
 // ─── Constantes e estado ─────────────────────────────────────────────────────
@@ -23,10 +23,12 @@ const painel          = document.getElementById('mapa-painel');
 const painelTitulo    = document.getElementById('mapa-painel-titulo');
 const painelCorpo     = document.getElementById('mapa-painel-corpo');
 
-let mapaLeaflet = null;
-let marcadores  = {};       // mov_id → marker
-let rotasLayer  = null;     // LayerGroup de polylines
-let geojsonData = null;     // última FeatureCollection carregada
+let mapaLeaflet   = null;
+let marcadores    = {};       // mov_id → marker
+let rotasLayer    = null;     // LayerGroup de polylines
+let geojsonData   = null;     // última FeatureCollection carregada
+let depositoCoord = null;     // { lat, lng } da filial ativa, ou null
+let marcadorDeposito = null;  // Leaflet marker do depósito
 
 // ─── Inicialização do mapa ───────────────────────────────────────────────────
 
@@ -86,6 +88,15 @@ function conteudoPopup(p) {
                               data-mov-id="${p.mov_id}" data-carro="${p.carro ?? ''}">
                               ✏️ Alterar carro
                            </button>` : ''}
+      ${podeEditar ? `
+      <hr class="my-1">
+      <div class="input-group input-group-sm mt-1">
+        <input type="text" class="form-control inp-popup-busca-local"
+               placeholder="Buscar endereço para reposicionar…"
+               data-pedido-id="${p.pedido_id}" data-mov-id="${p.mov_id}">
+        <button class="btn btn-outline-secondary btn-popup-buscar-local" type="button" title="Buscar">🔍</button>
+      </div>
+      <div class="mapa-popup-busca-status small text-muted mt-1"></div>` : ''}
     </div>`;
 }
 
@@ -110,11 +121,22 @@ function renderizarMarcadores(geojson) {
     marker.feature = feat;
 
     if (podeEditar) {
-      marker.on('dragend', async (e) => {
+      marker.on('dragend', (e) => {
+        const latLngOriginal = L.latLng(feat.geometry.coordinates[1], feat.geometry.coordinates[0]);
         const { lat: novoLat, lng: novoLng } = e.target.getLatLng();
-        await salvarCoordenadas(p.pedido_id, novoLat, novoLng);
-        // Atualiza no geojson em memória
-        feat.geometry.coordinates = [novoLng, novoLat];
+
+        // Reverte imediatamente — só move se o utilizador confirmar
+        marker.setLatLng(latLngOriginal);
+
+        confirmar({
+          titulo: 'Confirmar reposicionamento',
+          mensagem: `Mover o ponto "${p.referencia}" para a nova localização?`,
+          onConfirmar: async () => {
+            marker.setLatLng([novoLat, novoLng]);
+            feat.geometry.coordinates = [novoLng, novoLat];
+            await salvarCoordenadas(p.pedido_id, novoLat, novoLng);
+          },
+        });
       });
     }
 
@@ -122,12 +144,71 @@ function renderizarMarcadores(geojson) {
     marcadores[p.mov_id] = marker;
   }
 
-  // Evento delegado nos popups (alterar carro)
+  // Evento delegado nos popups (alterar carro + busca de endereço)
   mapaLeaflet.on('popupopen', (e) => {
     const popup = e.popup.getElement();
-    const btn = popup?.querySelector('.btn-popup-editar-carro');
-    if (!btn) return;
-    btn.addEventListener('click', () => abrirPainelCarro(btn.dataset.movId, btn.dataset.carro, e.popup));
+    if (!popup) return;
+
+    // Botão editar carro
+    const btnCarro = popup.querySelector('.btn-popup-editar-carro');
+    if (btnCarro) {
+      btnCarro.addEventListener('click', () => abrirPainelCarro(btnCarro.dataset.movId, btnCarro.dataset.carro, e.popup));
+    }
+
+    // Busca de endereço para reposicionar pin
+    const btnBuscar = popup.querySelector('.btn-popup-buscar-local');
+    const inpBusca  = popup.querySelector('.inp-popup-busca-local');
+    const statusEl  = popup.querySelector('.mapa-popup-busca-status');
+    if (!btnBuscar || !inpBusca) return;
+
+    const executarBusca = async () => {
+      const q = inpBusca.value.trim();
+      if (!q) return;
+      btnBuscar.disabled = true;
+      btnBuscar.textContent = '\u23f3';
+      statusEl.textContent = 'Buscando...';
+      try {
+        const resp = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=pt`,
+          { headers: { 'Accept-Language': 'pt-PT,pt' } }
+        );
+        const resultados = await resp.json();
+        if (!resultados.length) {
+          statusEl.textContent = 'Endereço não encontrado.';
+          return;
+        }
+        const novoLat = parseFloat(resultados[0].lat);
+        const novoLng = parseFloat(resultados[0].lon);
+        const pedidoId = parseInt(inpBusca.dataset.pedidoId, 10);
+        const movId    = inpBusca.dataset.movId;
+
+        // Move o marcador
+        const marker = marcadores[movId];
+        if (marker) {
+          marker.setLatLng([novoLat, novoLng]);
+          mapaLeaflet.panTo([novoLat, novoLng]);
+        }
+
+        // Salva coordenadas no banco
+        await salvarCoordenadas(pedidoId, novoLat, novoLng);
+
+        // Atualiza geojson em memória
+        const feat = geojsonData?.features.find(f => String(f.properties.mov_id) === String(movId));
+        if (feat) feat.geometry.coordinates = [novoLng, novoLat];
+
+        statusEl.textContent = `\u2713 Posicionado em: ${resultados[0].display_name.slice(0, 60)}...`;
+        statusEl.className = 'mapa-popup-busca-status small text-success mt-1';
+      } catch {
+        statusEl.textContent = 'Erro ao buscar endereço.';
+        statusEl.className = 'mapa-popup-busca-status small text-danger mt-1';
+      } finally {
+        btnBuscar.disabled = false;
+        btnBuscar.textContent = '\uD83D\uDD0D';
+      }
+    };
+
+    btnBuscar.addEventListener('click', executarBusca);
+    inpBusca.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); executarBusca(); } });
   });
 }
 
@@ -209,9 +290,11 @@ async function carregarPontos(data) {
       return;
     }
 
-    geojsonData = result.geojson;
+    geojsonData   = result.geojson;
+    depositoCoord = result.deposito ?? null;
     renderizarMarcadores(geojsonData);
     renderizarLegenda(geojsonData);
+    renderizarDeposito();
 
     // Ajusta o mapa aos marcadores
     const coords = geojsonData.features.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]]);
@@ -246,6 +329,29 @@ async function salvarCoordenadas(pedidoId, lat, lng) {
   }
 }
 
+// ─── Marcador do depósito ────────────────────────────────────────────────────
+
+function criarIconeDeposito() {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+      <circle cx="16" cy="16" r="15" fill="#1a1a2e" stroke="#fff" stroke-width="2"/>
+      <text x="16" y="21" text-anchor="middle" font-size="16" fill="#fff">🏭</text>
+    </svg>`;
+  return L.divIcon({ html: svg, iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -18], className: '' });
+}
+
+function renderizarDeposito() {
+  if (marcadorDeposito) { marcadorDeposito.remove(); marcadorDeposito = null; }
+  if (!depositoCoord || !mapaLeaflet) return;
+  marcadorDeposito = L.marker([depositoCoord.lat, depositoCoord.lng], {
+    icon: criarIconeDeposito(),
+    title: 'Depósito',
+    zIndexOffset: 1000,
+  });
+  marcadorDeposito.bindPopup('<strong>Depósito</strong><br>Ponto de partida/chegada das rotas.');
+  marcadorDeposito.addTo(mapaLeaflet);
+}
+
 // ─── Rotas por carro ─────────────────────────────────────────────────────────
 
 async function tracarRotas() {
@@ -259,6 +365,14 @@ async function tracarRotas() {
     const c = f.properties.carro ?? '__sem_carro__';
     if (!grupos.has(c)) grupos.set(c, { pontos: [], cor: f.properties.cor });
     grupos.get(c).pontos.push({ lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] });
+  }
+
+  // Inclui depósito como ponto de partida e chegada, se configurado
+  if (depositoCoord) {
+    for (const grupo of grupos.values()) {
+      grupo.pontos.unshift({ lat: depositoCoord.lat, lng: depositoCoord.lng });
+      grupo.pontos.push({ lat: depositoCoord.lat, lng: depositoCoord.lng });
+    }
   }
 
   const promessas = [];
