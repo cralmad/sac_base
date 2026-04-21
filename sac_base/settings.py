@@ -35,7 +35,7 @@ def env_list(name, default=None):
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
-URL_BD = os.environ.get('BANCO_DE_DADOS')
+URL_BD = os.environ.get('BANCO_DE_DADOS') or os.environ.get('DATABASE_URL')
 SETTINGS_MODULE = os.environ.get('DJANGO_SETTINGS_MODULE', '')
 USANDO_SETTINGS_TESTE_LOCAL = SETTINGS_MODULE == 'sac_base.settings_test'
 
