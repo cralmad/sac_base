@@ -113,3 +113,47 @@ O layout deve seguir rigorosamente a abordagem Mobile-First:
 * **Renderização Segura:** Ao precisar gerar HTML dinamicamente em JS, usar helper global compartilhado para escape ou construir o DOM com `document.createElement`.
 * **Layout Consistente:** Para páginas de cadastro/consulta, preferir containers Bootstrap válidos e consistentes entre apps, evitando classes ad hoc no template.
 * **Container de Pesquisa:** O bloco `#div-pesquisa` deve usar `class="container-xl d-none mt-3"` para manter alinhamento e respiro visual consistentes entre apps.
+
+---
+
+## 7. VARIÁVEIS DE AMBIENTE (PRODUÇÃO — HEROKU)
+
+### Obrigatórias
+| Variável | Descrição |
+|---|---|
+| `BANCO_DE_DADOS` | URL de conexão com o banco (ex.: `postgres://user:pass@host:5432/db`). O settings também aceita `DATABASE_URL` como fallback (padrão do addon Heroku Postgres). |
+| `DJANGO_SECRET_KEY` | Chave secreta do Django. Gerar com `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"`. **Nunca reutilizar a chave de desenvolvimento.** |
+| `DJANGO_ALLOWED_HOSTS` | Domínios aceitos, separados por vírgula. Ex.: `meuapp.herokuapp.com,meudominio.com`. |
+| `DJANGO_CSRF_TRUSTED_ORIGINS` | Origens confiáveis para CSRF, separadas por vírgula. Ex.: `https://meuapp.herokuapp.com,https://meudominio.com`. |
+
+### Segurança (assumem valor seguro automaticamente quando `DJANGO_DEBUG` está ausente/false)
+| Variável | Padrão em produção | Descrição |
+|---|---|---|
+| `DJANGO_DEBUG` | `false` (não definir em prod) | Nunca definir como `true` em produção. |
+| `DJANGO_SESSION_COOKIE_SECURE` | `true` | Cookies de sessão somente via HTTPS. |
+| `DJANGO_CSRF_COOKIE_SECURE` | `true` | Cookie CSRF somente via HTTPS. |
+| `DJANGO_AUTH_COOKIE_SECURE` | `true` | Cookie JWT somente via HTTPS. |
+| `DJANGO_USE_X_FORWARDED_PROTO` | `false` | Definir como `true` no Heroku para reconhecer HTTPS via proxy. |
+| `DJANGO_SECURE_SSL_REDIRECT` | `false` | Definir como `true` para redirecionar HTTP → HTTPS. |
+
+### Opcionais / Infraestrutura
+| Variável | Descrição |
+|---|---|
+| `REDIS_URL` | URL do Redis. Necessário para WebSockets em ambientes multi-dyno (addon Heroku Redis). Sem ela, usa `InMemoryChannelLayer` (não funciona com mais de um dyno). |
+| `DJANGO_DB_SSL_REQUIRE` | `true` por padrão em produção. Forçar SSL na conexão com o banco. |
+
+### Exemplo mínimo para o Heroku
+```bash
+heroku config:set BANCO_DE_DADOS="postgres://..." \
+  DJANGO_SECRET_KEY="..." \
+  DJANGO_ALLOWED_HOSTS="meuapp.herokuapp.com" \
+  DJANGO_CSRF_TRUSTED_ORIGINS="https://meuapp.herokuapp.com" \
+  DJANGO_USE_X_FORWARDED_PROTO=true \
+  DJANGO_SECURE_SSL_REDIRECT=true
+```
+
+### Após o deploy
+```bash
+heroku run python manage.py migrate
+heroku run python manage.py collectstatic --noinput  # executado automaticamente no build
+```

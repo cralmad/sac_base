@@ -22,8 +22,13 @@
 }
 .mov-fields {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 0.5rem 1.5rem;
+}
+@media (min-width: 576px) {
+  .mov-fields {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 /* Input numérico compacto (carro / volume_conf) — somente leitura via botões */
 .input-num-xs {
@@ -58,13 +63,18 @@
 .mov-obs-wrapper {
   grid-column: 1 / -1;
 }
-/* Botão salvar centralizado em 60% */
+/* Botão salvar centralizado */
 .btn-salvar-wrapper {
   display: flex;
   justify-content: center;
 }
 .btn-salvar-mov {
-  width: 60%;
+  width: 100%;
+}
+@media (min-width: 576px) {
+  .btn-salvar-mov {
+    width: 60%;
+  }
 }
 /* Labels de campos somente leitura */
 .mov-field-label {
@@ -144,12 +154,43 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
-@media (max-width: 600px) {
+/* Padding reduzido em telas muito pequenas */
+@media (max-width: 374px) {
   .mov-card {
     padding: 0.5rem;
     font-size: 0.98em;
   }
-  .mov-fields {
-    grid-template-columns: 1fr;
+}
+
+/* ── Relatório de Volumes ──────────────────────────────────────── */
+.rv-artigos {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rv-artigos li {
+  border-bottom: 1px solid #dee2e6;
+  padding: 2px 0;
+  font-size: 0.85rem;
+}
+.rv-artigos li:last-child {
+  border-bottom: none;
+}
+.rv-qty {
+  display: inline-block;
+  min-width: 2rem;
+  text-align: right;
+  font-weight: bold;
+  margin-right: 0.4rem;
+}
+.rv-cod {
+  color: #6c757d;
+  font-size: 0.78rem;
+  margin-left: 0.3rem;
+}
+/* white-space: nowrap nos th apenas em telas >= 576px */
+@media (min-width: 576px) {
+  .rv-table th {
+    white-space: nowrap;
   }
 }

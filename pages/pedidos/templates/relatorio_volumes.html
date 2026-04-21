@@ -6,14 +6,7 @@
 {% block page_title %}Relatório de Volumes{% endblock %}
 
 {% block estilo %}
-<style>
-  .rv-table th { white-space: nowrap; }
-  .rv-artigos { margin: 0; padding: 0; list-style: none; }
-  .rv-artigos li { border-bottom: 1px solid #dee2e6; padding: 2px 0; font-size: 0.85rem; }
-  .rv-artigos li:last-child { border-bottom: none; }
-  .rv-qty { display: inline-block; min-width: 2rem; text-align: right; font-weight: bold; margin-right: 0.4rem; }
-  .rv-cod { color: #6c757d; font-size: 0.78rem; margin-left: 0.3rem; }
-</style>
+<link rel="stylesheet" href="{% static 'pedidos/css/styles.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -27,7 +20,6 @@
   {% else %}
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
       <div>
-        <h4 class="mb-0">Relatório de Volumes</h4>
         {% if nome_arquivo %}
           <small class="text-muted">Arquivo: {{ nome_arquivo }}</small>
         {% endif %}
