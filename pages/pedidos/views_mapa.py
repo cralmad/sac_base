@@ -2,13 +2,17 @@ import json
 import time
 import logging
 
+import jwt
 import requests as http_requests
+from django.conf import settings
 from django.contrib.auth.decorators import login_required, permission_required
 from django.http import JsonResponse
 from django.shortcuts import render
-from django.views.decorators.csrf import csrf_protect
+from django.urls import reverse
+from django.utils import timezone as dj_timezone
+from django.views.decorators.csrf import csrf_protect, csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
-from datetime import datetime
+from datetime import datetime, time as dt_time
 
 from pages.pedidos.models import Pedido, TentativaEntrega
 from sac_base.permissions_utils import build_action_permissions
@@ -278,3 +282,197 @@ def mapa_rota_view(request):
             "carro": carro,
             "fallback": True,
         })
+
+
+# ─── Mapa Público (link por carro, sem login) ────────────────────────────────
+
+_ALGO_JWT = "HS256"
+_PERIODOS_VALIDOS = {"MANHA", "TARDE", ""}
+
+
+def _fim_do_dia(data) -> datetime:
+    """Retorna datetime aware (UTC) correspondente a 23:59:59 do dia indicado."""
+    fim_local = datetime.combine(data, dt_time(23, 59, 59))
+    return dj_timezone.make_aware(fim_local, dj_timezone.get_current_timezone())
+
+
+def _gerar_token_carro(carro: int, data) -> str:
+    """Gera JWT com carro + data da rota. Expira às 23:59:59 desse mesmo dia."""
+    payload = {
+        "carro": int(carro),
+        "data": str(data),          # YYYY-MM-DD
+        "exp": _fim_do_dia(data),
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=_ALGO_JWT)
+
+
+def _validar_token_carro(token: str):
+    """Valida JWT e retorna (carro, data). Levanta jwt.PyJWTError se inválido."""
+    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[_ALGO_JWT])
+    carro = int(payload["carro"])
+    from datetime import date as _date
+    data = _date.fromisoformat(payload["data"])
+    return carro, data
+
+
+@login_required
+@permission_required(PERMISSOES_MAPA["acessar"], raise_exception=True)
+@require_http_methods(["GET"])
+def mapa_publico_gerar_link_view(request):
+    """Gera e retorna o link público para um carro e data (padrão: hoje)."""
+    try:
+        carro = int(request.GET.get("carro", ""))
+        if carro <= 0:
+            raise ValueError
+    except (ValueError, TypeError):
+        return JsonResponse({"success": False, "mensagem": "Parâmetro 'carro' inválido."}, status=400)
+
+    data_str = request.GET.get("data", "").strip()
+    if data_str:
+        try:
+            from datetime import date as _date
+            data = _date.fromisoformat(data_str)
+        except ValueError:
+            return JsonResponse({"success": False, "mensagem": "Parâmetro 'data' inválido."}, status=400)
+    else:
+        data = dj_timezone.localdate()
+
+    token = _gerar_token_carro(carro, data)
+    url = request.build_absolute_uri(reverse("mapa_publico", kwargs={"token": token}))
+    return JsonResponse({"success": True, "url": url, "carro": carro, "data": str(data)})
+
+
+@require_http_methods(["GET"])
+def mapa_publico_view(request, token):
+    """Renderiza a página pública do mapa para o carro embutido no token."""
+    erro = None
+    carro = None
+    data_fmt = ""
+    try:
+        carro, data = _validar_token_carro(token)
+        data_fmt = data.strftime("%d/%m/%Y")
+    except jwt.ExpiredSignatureError:
+        erro = "expirado"
+    except Exception:
+        erro = "invalido"
+
+    return render(request, "mapa_publico.html", {
+        "carro": carro,
+        "token": token,
+        "data_fmt": data_fmt,
+        "erro": erro,
+    })
+
+
+@csrf_exempt
+@require_POST
+def mapa_publico_pontos_view(request, token):
+    """Retorna GeoJSON dos pontos para o carro e data do token (sem login)."""
+    try:
+        carro, data = _validar_token_carro(token)
+    except Exception:
+        return JsonResponse({"success": False, "mensagem": "Link inválido ou expirado."}, status=403)
+    movs = (
+        TentativaEntrega.objects
+        .filter(data_tentativa=data, carro=carro)
+        .select_related("pedido")
+        .order_by("pedido__codpost_dest")
+    )
+
+    features = []
+    linhas = []
+    periodo_atual = None
+    cor = _cor_carro(carro)
+    total_pedidos = 0
+    sem_coord = 0
+
+    for mov in movs:
+        pedido = mov.pedido
+        if pedido is None:
+            continue
+
+        total_pedidos += 1
+
+        if periodo_atual is None:
+            periodo_atual = mov.periodo
+
+        fones = " / ".join(f for f in [pedido.fone_dest or "", pedido.fone_dest2 or ""] if f)
+        linhas.append({
+            "mov_id": mov.id,
+            "referencia": str(pedido.pedido or pedido.id_vonzu),
+            "tipo": "R" if (pedido.tipo or "").upper() == "RECOLHA" else "E",
+            "nome_dest": pedido.nome_dest or "",
+            "fones": fones,
+            "endereco_dest": pedido.endereco_dest or "",
+            "cidade_dest": pedido.cidade_dest or "",
+            "codpost_dest": pedido.codpost_dest or "",
+            "volume": pedido.volume,
+            "peso": pedido.peso,
+            "obs_rota": pedido.obs_rota or "",
+            "periodo": mov.periodo or "",
+        })
+
+        lat = float(pedido.lat) if pedido.lat is not None else None
+        lng = float(pedido.lng) if pedido.lng is not None else None
+        if lat is None or lng is None:
+            sem_coord += 1
+            continue
+
+        features.append({
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [lng, lat]},
+            "properties": {
+                "mov_id": mov.id,
+                "referencia": str(pedido.pedido or pedido.id_vonzu),
+                "tipo": pedido.tipo or "",
+                "endereco": pedido.endereco_dest or "",
+                "codpost": pedido.codpost_dest or "",
+                "cidade": pedido.cidade_dest or "",
+                "volume": pedido.volume,
+                "obs": pedido.obs or "",
+                "obs_rota": pedido.obs_rota or "",
+                "periodo": mov.periodo or "",
+                "cor": cor,
+            },
+        })
+
+    return JsonResponse({
+        "success": True,
+        "geojson": {"type": "FeatureCollection", "features": features},
+        "linhas": linhas,
+        "total": total_pedidos,
+        "total_mapa": len(features),
+        "sem_coord": sem_coord,
+        "periodo_atual": periodo_atual or "",
+    })
+
+
+@csrf_exempt
+@require_POST
+def mapa_publico_periodo_view(request, token):
+    """Atualiza o período de TODAS as TentativaEntrega do carro+data do token."""
+    try:
+        carro, data = _validar_token_carro(token)
+    except Exception:
+        return JsonResponse({"success": False, "mensagem": "Link inválido ou expirado."}, status=403)
+
+    try:
+        body = json.loads(request.body)
+        periodo = str(body.get("periodo", "")).strip().upper()
+    except Exception:
+        return JsonResponse({"success": False, "mensagem": "JSON inválido."}, status=400)
+
+    if periodo not in _PERIODOS_VALIDOS:
+        return JsonResponse({"success": False, "mensagem": "Período inválido. Use 'MANHA' ou 'TARDE'."}, status=400)
+
+    mov_ids = body.get("mov_ids")
+    qs = TentativaEntrega.objects.filter(data_tentativa=data, carro=carro)
+    if mov_ids is not None:
+        try:
+            mov_ids = [int(i) for i in mov_ids]
+        except (ValueError, TypeError):
+            return JsonResponse({"success": False, "mensagem": "mov_ids inválido."}, status=400)
+        qs = qs.filter(id__in=mov_ids)
+
+    atualizados = qs.update(periodo=periodo or None)
+    return JsonResponse({"success": True, "atualizados": atualizados, "periodo": periodo})

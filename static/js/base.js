@@ -249,23 +249,3 @@ document.addEventListener("DOMContentLoaded", async () => {
   inicializarTooltips();
   AppLoader.hide();
 });
-
-/*****************DEBUG**********************/
-import { __debugState } from '/static/js/sisVar.js';
-
-window.__DEBUG__ = {
-  get state() {
-    return __debugState();
-  }
-};
-
-function exibir() {
-  console.log(window.__DEBUG__.state);
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  const testeBtn = document.getElementById('teste');
-  if (testeBtn) {
-    testeBtn.addEventListener('click', exibir);
-  }
-});

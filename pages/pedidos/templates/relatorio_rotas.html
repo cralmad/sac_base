@@ -15,7 +15,8 @@
   border-radius: .375rem .375rem 0 0;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: .5rem 1rem;
   font-weight: 600;
   font-size: .95rem;
 }
@@ -25,7 +26,8 @@
   padding: .1rem .45rem;
   font-size: .8rem;
 }
-table.rr-tabela  { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.rr-tabela-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.rr-tabela  { width: 100%; border-collapse: collapse; font-size: 9pt; min-width: 700px; }
 table.rr-tabela th {
   background: #e9f0f7;
   color: #1a3a5c;
@@ -38,41 +40,44 @@ table.rr-tabela td {
   padding: .28rem .5rem;
   vertical-align: top;
 }
-table.rr-tabela tr:nth-child(even) td { background: #f7fafd; }
 .rr-tipo-e { color: #0a6640; font-weight: 700; }
 .rr-tipo-r { color: #7c2020; font-weight: 700; }
 .rr-obs    { color: #555; font-size: .78rem; font-style: italic; }
 .rr-periodo-MANHA { color: #b55a00; font-weight: 600; }
 .rr-periodo-TARDE { color: #0055a5; font-weight: 600; }
+table.rr-tabela tr.rr-nao-segue td { background: #e0e0e0 !important; }
 
 /* ── Impressão ── */
 @media print {
-  @page { size: A4 landscape; margin: 8mm 10mm; }
+  @page { size: A4 landscape; margin: 6mm 8mm; }
   body, .container-xl, .container-fluid { padding: 0 !important; margin: 0 !important; }
   .rr-filtros, #rr-toolbar, .navbar, .sidebar, footer,
   [data-bs-toggle], .btn, #container-mensagens { display: none !important; }
-  .rr-grupo { page-break-inside: avoid; margin-bottom: .6rem; }
+  .rr-grupo { margin-bottom: .25rem; }
   .rr-grupo-header {
     background: #1a3a5c !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     color: #fff !important;
-    padding: .2rem .5rem;
-    font-size: .82rem;
+    padding: .1rem .4rem;
+    font-size: 8pt;
   }
-  table.rr-tabela  { font-size: .72rem; }
-  table.rr-tabela th { background: #dce6f1 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: .2rem .35rem; }
-  table.rr-tabela td { padding: .18rem .35rem; }
-  table.rr-tabela tr:nth-child(even) td { background: #f5f8fb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .rr-tabela-scroll { overflow: visible; }
+  table.rr-tabela  { font-size: 8pt; min-width: 0; }
+  table.rr-tabela th { background: #dce6f1 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: .1rem .25rem; }
+  table.rr-tabela td { padding: .08rem .25rem; vertical-align: middle; }
+  table.rr-tabela tr.rr-nao-segue td { background: #d6d6d6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .rr-tipo-e, .rr-tipo-r { font-weight: 700; }
-  h1 { font-size: 1rem !important; margin-bottom: .3rem !important; }
-  #rr-titulo-data { font-size: .85rem; }
+  h1 { font-size: .85rem !important; margin-bottom: .15rem !important; }
+  #rr-titulo-data { font-size: 7.5pt; }
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-xl my-3" id="rr-root" data-url-buscar="{% url 'relatorio_rotas' %}">
+<div class="container-xl my-3" id="rr-root"
+     data-url-buscar="{% url 'relatorio_rotas' %}"
+     data-url-link="{% url 'mapa_publico_gerar_link' %}">
 
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
     <h1 class="h4 mb-0"><i class="bi bi-truck me-2"></i>Rotas por Carro</h1>

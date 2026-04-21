@@ -21,47 +21,52 @@ PERIODO_CHOICES = [
     ("TARDE", "TARDE"),
 ]
 
-ESTADO_DEFINITIONS = [
-    ("created", "Criado", 0),
-    ("assigned", "Atribuído", 0),
-    ("pending", "Em distribuição", 0),
-    ("completed", "Concluído", 1),
-    ("EA", "Entrada em armazém e está OK", 0),
-    ("CA", "Cliente ausente", 0),
-    ("R", "Entrega recusada", 0),
-    ("DA", "Difícil acesso (rua)", 0),
-    ("EM", "Erro de morada", 0),
-    ("DVP", "Entrega com danos visíveis", 1),
-    ("DVR", "Entrada em armazém: danos visíveis", 0),
-    ("cancelled", "Cancelado", 0),
-    ("A", "Pedido Cancelado", 0),
-    ("CI", "Entrega com artigos em falta", 1),
-    ("AO", "Incumprimento do dia de entrega", 0),
-    ("PNR", "Pedido não rececionado", 0),
-    ("RCD", "Recolha com danos visíveis (casa cliente)", 1),
-    ("PIT", "Pedido incompleto: responsabilidade da transportadora", 1),
-    ("reschedule_client", "Reagendamento Responsabilidade Cliente", 0),
-    ("reschedule_logisticOperator", "Reagendamento Responsabilidade Transportador", 0),
-    ("orders_vonzu", "Entrada em Vonzu", 0),
-    ("(orders_vonzu)", "CONTACTO CONFIRMADO", 0),
-    ("(orders_vonzu))", "PENDENTE CONTACTO", 0),
-    ("ExtraviadoOperador", "Extraviado no Operador", 1),
-    ("danos_visiveis_embalagem", "Receção Transportadora: danos visíveis (embalagem)", 0),
-    ("3799", "Reagendado Zona Sem entregas dia Planeado", 0),
-    ("recusa_parcial", "Recusa parcial (artigos danificados)", 0),
-    ("conferencia_condicionada", "Conferência condicionada", 0),
-    ("reactivar", "Reactivar (Reagendamento responsabilidade Leroy Merlin)", 0),
-    ("Reagendamento_Leroy_Merlin", "Reagendamento responsabilidade Leroy Merlin", 0),
-    ("returned_to_sender", "Devolvido ao Cliente", 0),
-    ("UNKNOWN", "Estado desconhecido", 0),
+ESTADO_DEFINITIONS = [# valor, label, entrega_efetivamente_concluida, segue_para_entrega
+    ("created", "Criado", 0, 1),
+    ("assigned", "Atribuído", 0, 1),
+    ("pending", "Em distribuição", 0, 1),
+    ("completed", "Concluído", 1, 0),
+    ("EA", "Entrada em armazém e está OK", 0, 1),
+    ("CA", "Cliente ausente", 0, 1),
+    ("R", "Entrega recusada", 0, 0),
+    ("DA", "Difícil acesso (rua)", 0, 1),
+    ("EM", "Erro de morada", 0, 1),
+    ("DVP", "Entrega com danos visíveis", 1, 0),
+    ("DVR", "Entrada em armazém: danos visíveis", 0, 1),
+    ("cancelled", "Cancelado", 0, 0),
+    ("A", "Pedido Cancelado", 0, 0),
+    ("CI", "Entrega com artigos em falta", 1, 0),
+    ("AO", "Incumprimento do dia de entrega", 0, 1),
+    ("PNR", "Pedido não rececionado", 0, 0),
+    ("RCD", "Recolha com danos visíveis (casa cliente)", 1, 0),
+    ("PIT", "Pedido incompleto: responsabilidade da transportadora", 1, 1),
+    ("reschedule_client", "Reagendamento Responsabilidade Cliente", 0, 1),
+    ("reschedule_logisticOperator", "Reagendamento Responsabilidade Transportador", 0, 1),
+    ("orders_vonzu", "Entrada em Vonzu", 0, 1),
+    ("(orders_vonzu)", "CONTACTO CONFIRMADO", 0, 1),
+    ("(orders_vonzu))", "PENDENTE CONTACTO", 0, 1),
+    ("ExtraviadoOperador", "Extraviado no Operador", 1, 0),
+    ("danos_visiveis_embalagem", "Receção Transportadora: danos visíveis (embalagem)", 0, 1),
+    ("3799", "Reagendado Zona Sem entregas dia Planeado", 0, 0),
+    ("recusa_parcial", "Recusa parcial (artigos danificados)", 0, 0),
+    ("conferencia_condicionada", "Conferência condicionada", 0, 1),
+    ("reactivar", "Reactivar (Reagendamento responsabilidade Leroy Merlin)", 0, 1),
+    ("Reagendamento_Leroy_Merlin", "Reagendamento responsabilidade Leroy Merlin", 0, 1),
+    ("returned_to_sender", "Devolvido ao Cliente", 0, 0),
+    ("UNKNOWN", "Estado desconhecido", 0, 0),
 ]
 
 # Django choices deve conter pares (valor, label)
-ESTADO_CHOICES = [(valor, label) for valor, label, _ in ESTADO_DEFINITIONS]
+ESTADO_CHOICES = [(valor, label) for valor, label, *_ in ESTADO_DEFINITIONS]
 
 # Estados marcados para uso futuro em identificação de entrega efetivamente concluída
 ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA = {
-    valor for valor, _label, concluida in ESTADO_DEFINITIONS if bool(concluida)
+    valor for valor, _label, concluida, _segue in ESTADO_DEFINITIONS if bool(concluida)
+}
+
+# Estados em que o pedido segue para nova tentativa de entrega
+ESTADOS_SEGUE_PARA_ENTREGA = {
+    valor for valor, _label, _concluida, segue in ESTADO_DEFINITIONS if bool(segue)
 }
 
 

@@ -9,7 +9,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from datetime import datetime
 from itertools import groupby
 
-from pages.pedidos.models import TentativaEntrega, Pedido
+from pages.pedidos.models import TentativaEntrega, Pedido, ESTADOS_SEGUE_PARA_ENTREGA
 from sac_base.permissions_utils import build_action_permissions
 from sac_base.sisvar_builders import build_sisvar_payload
 
@@ -240,6 +240,7 @@ def relatorio_rotas_view(request):
                 "peso": peso_str,
                 "periodo": mov.periodo or "",
                 "obs_rota": p.obs_rota or "",
+                "segue_para_entrega": p.estado in ESTADOS_SEGUE_PARA_ENTREGA,
             })
         grupos.append({
             "carro": str(carro_val) if carro_val is not None else "—",
