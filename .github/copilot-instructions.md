@@ -44,6 +44,12 @@ Comportamentos globais devem ser implementados uma única vez nestes arquivos:
 * **`conditional_select.js`:** Lógica para selects dependentes. Uso obrigatório sempre que houver campos condicionais.
     * Em cascatas como país → região → cidade, usar `data-hierarchy*` no template e `initHierarchicalSelects(...)` no script da página; não duplicar lógica manual de dependência.
 * **`loader.js` (AppLoader):** Deve ser ativado obrigatoriamente no carregamento da página (evitando cliques precoces) e em todas as requisições assíncronas.
+* **`smart_filter.js`** (`static/js/smart_filter.js`) **+ `smart_filter.py`** (`sac_base/smart_filter.py`): Utilitário padrão para filtros avançados em campos de texto e número em relatórios e consultas. **Uso obrigatório** sempre que houver filtros do tipo "número(s)", "faixa numérica" ou "texto(s) com curinga" em formulários de pesquisa/relatório. Nunca recriar lógica equivalente no script da página ou na view.
+    * **Frontend (JS):** importar `parseSmartNumber`, `parseSmartText`, `validateSmartNumber`, `validateSmartText`, `getMultiSelectValues` de `static/js/smart_filter.js`.
+    * **Backend (Python):** usar `apply_smart_number_filter(qs, field, value)` e `apply_smart_text_filter(qs, field, value)` de `sac_base/smart_filter.py`.
+    * **Sintaxe de número:** `1,3,5-10,11` → lista/faixa de inteiros. Exemplo de campo: `<input class="form-control font-monospace" placeholder="ex: 1,3,5-10,11">`.
+    * **Sintaxe de texto:** termos separados por vírgula, `*` como curinga no início/fim. Exemplo: `REF001,*LEROY*,COMEÇA*`. Aspas ao redor de cada termo são suportadas mas opcionais (legado).
+    * **Select múltiplo:** usar `getMultiSelectValues(selectEl)` para obter os valores selecionados e enviá-los ao backend como array (via JSON body).
 * **`styles.css`:** Estilos globais e utilitários de layout.
 
 ---

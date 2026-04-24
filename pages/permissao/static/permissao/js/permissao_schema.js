@@ -42,6 +42,8 @@ export const PERMISSOES_SCHEMA = {
     // --- Conferência de Volumes ---
     { codename: "pedidos.view_tentativaentrega",   label: "Acessar Conferência de Volumes" },
     { codename: "pedidos.change_tentativaentrega", label: "Editar Conferência de Volumes" },
+    // --- Relatório Gerencial de Pedidos ---
+    { codename: "pedidos.view_relatorio_gerencial", label: "Acessar Relatório Gerencial de Pedidos" },
     // --- Motoristas ---
     { codename: "motorista.view_motorista",   label: "Visualizar Motorista" },
     { codename: "motorista.add_motorista",    label: "Incluir Motorista" },
@@ -90,6 +92,8 @@ export const PERMISSOES_SCHEMA = {
     // --- Conferência de Volumes ---
     { codename: "pedidos.view_tentativaentrega",   label: "Acessar Conferência de Volumes" },
     { codename: "pedidos.change_tentativaentrega", label: "Editar Conferência de Volumes" },
+    // --- Relatório Gerencial de Pedidos ---
+    { codename: "pedidos.view_relatorio_gerencial", label: "Acessar Relatório Gerencial de Pedidos" },
     // --- Motoristas ---
     { codename: "motorista.view_motorista",   label: "Visualizar Motorista" },
     { codename: "motorista.add_motorista",    label: "Incluir Motorista" },

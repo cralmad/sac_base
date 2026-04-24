@@ -6,6 +6,7 @@ from .views_relatorio import (
     relatorio_sms_view,
     relatorio_sms_enviar_view,
     relatorio_sms_preview_view,
+    relatorio_gerencial_view,
 )
 from .views_relatorio_api import relatorio_conferencia_salvar_view
 
@@ -17,4 +18,5 @@ urlpatterns = [
     path('relatorio_sms/', relatorio_sms_view, name='relatorio_sms'),
     path('relatorio_sms/enviar', relatorio_sms_enviar_view, name='relatorio_sms_enviar'),
     path('relatorio_sms/preview', relatorio_sms_preview_view, name='relatorio_sms_preview'),
+    path('relatorio_gerencial/', relatorio_gerencial_view, name='relatorio_gerencial'),
 ]

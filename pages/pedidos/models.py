@@ -182,6 +182,7 @@ class TentativaEntrega(models.Model):
         permissions = [
             ("change_carro_tentativaentrega", "Pode alterar o campo Carro na conferência de volumes"),
             ("send_sms_tentativaentrega", "Pode enviar SMS de notificação de entrega"),
+            ("view_relatorio_gerencial", "Pode acessar o Relatório Gerencial de Pedidos"),
         ]
         indexes = [
             models.Index(fields=["pedido", "data_tentativa"]),

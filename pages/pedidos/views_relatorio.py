@@ -9,10 +9,11 @@ from django.views.decorators.http import require_http_methods, require_POST
 from datetime import datetime
 from itertools import groupby
 
-from pages.pedidos.models import TentativaEntrega, Pedido, ESTADOS_SEGUE_PARA_ENTREGA
+from pages.pedidos.models import TentativaEntrega, Pedido, ESTADOS_SEGUE_PARA_ENTREGA, ESTADO_DEFINITIONS
 from sac_base.permissions_utils import build_action_permissions
 from sac_base.sisvar_builders import build_sisvar_payload
 from sac_base.sms_service import montar_mensagem, enviar_sms_bulkgate, HORARIO_PERIODO as _SMS_HORARIO_PERIODO
+from sac_base.smart_filter import apply_smart_number_filter, apply_smart_text_filter
 
 PERMISSOES_RELATORIO = {
     "acessar": "pedidos.view_tentativaentrega",
@@ -476,3 +477,115 @@ def relatorio_sms_preview_view(request):
     return JsonResponse({"success": True, "previews": previews})
 
 
+# ─── Relatório Gerencial de Pedidos ──────────────────────────────────────────
+
+PERMISSOES_GERENCIAL = {
+    "acessar": "pedidos.view_relatorio_gerencial",
+}
+
+
+@login_required
+@permission_required(PERMISSOES_GERENCIAL["acessar"], raise_exception=True)
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def relatorio_gerencial_view(request):
+    if request.method == "GET":
+        estados_choices = [
+            {"value": v, "label": l}
+            for v, l, *_ in ESTADO_DEFINITIONS
+        ]
+        request.sisvar_extra = build_sisvar_payload(
+            permissions={"gerencial": build_action_permissions(request.user, PERMISSOES_GERENCIAL)},
+            options={"estados": estados_choices},
+        )
+        return render(request, "relatorio_gerencial.html")
+
+    # POST: aplica smart filters e agrupa por carro
+    data = request.sisvar_front or {}
+    filtros = data.get("filtros", {})
+
+    data_inicial   = filtros.get("data_inicial", "").strip()
+    data_final     = filtros.get("data_final", "").strip()
+    id_vonzu_str   = filtros.get("id_vonzu", "").strip()
+    referencia_str = filtros.get("referencia", "").strip()
+    estados_lista  = filtros.get("estados", [])
+    if not isinstance(estados_lista, list):
+        estados_lista = []
+
+    if not data_inicial:
+        return JsonResponse({"success": False, "mensagem": "A data inicial é obrigatória."}, status=400)
+    if not data_final:
+        return JsonResponse({"success": False, "mensagem": "A data final é obrigatória."}, status=400)
+
+    try:
+        dt_ini = datetime.strptime(data_inicial, "%Y-%m-%d").date()
+        dt_fim = datetime.strptime(data_final, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"success": False, "mensagem": "Data inválida."}, status=400)
+
+    if dt_ini > dt_fim:
+        return JsonResponse({"success": False, "mensagem": "A data inicial não pode ser maior que a data final."}, status=400)
+
+    if (dt_fim - dt_ini).days > 90:
+        return JsonResponse({"success": False, "mensagem": "O período máximo é de 90 dias."}, status=400)
+
+    qs = (
+        TentativaEntrega.objects
+        .select_related("pedido")
+        .filter(data_tentativa__range=(dt_ini, dt_fim))
+    )
+
+    qs = apply_smart_number_filter(qs, "pedido__id_vonzu", id_vonzu_str)
+    qs = apply_smart_text_filter(qs, "pedido__pedido", referencia_str)
+
+    if estados_lista:
+        qs = qs.filter(pedido__estado__in=estados_lista)
+
+    qs = qs.order_by("carro", "data_tentativa", "pedido__codpost_dest", "pedido__pedido")
+
+    grupos = []
+    for carro_val, items in groupby(qs, key=lambda m: m.carro):
+        linhas = []
+        for mov in items:
+            p = mov.pedido
+            tipo_abrev = "R" if (p.tipo or "").upper() == "RECOLHA" else "E"
+            fones = " / ".join(f for f in [p.fone_dest or "", p.fone_dest2 or ""] if f)
+            peso_str = ""
+            if p.peso is not None:
+                try:
+                    peso_str = str(int(p.peso))
+                except Exception:
+                    peso_str = str(p.peso)
+            linhas.append({
+                "pedido":         p.pedido or str(p.id_vonzu),
+                "id_vonzu":       p.id_vonzu,
+                "tipo":           tipo_abrev,
+                "data_tentativa": mov.data_tentativa.strftime("%d/%m/%Y"),
+                "nome_dest":      p.nome_dest or "",
+                "fones":          fones,
+                "endereco_dest":  p.endereco_dest or "",
+                "cidade_dest":    p.cidade_dest or "",
+                "codpost_dest":   p.codpost_dest or "",
+                "volumes":        f"{p.volume_conf or 0}/{p.volume or 0}",
+                "peso":           peso_str,
+                "periodo":        mov.periodo or "",
+                "estado":         p.estado or "",
+                "obs_rota":       p.obs_rota or "",
+                "segue_para_entrega": p.estado in ESTADOS_SEGUE_PARA_ENTREGA,
+            })
+        grupos.append({
+            "carro": str(carro_val) if carro_val is not None else "—",
+            "total": len(linhas),
+            "linhas": linhas,
+        })
+
+    data_fmt = dt_ini.strftime("%d/%m/%Y")
+    if dt_ini != dt_fim:
+        data_fmt = f"{dt_ini.strftime('%d/%m/%Y')} a {dt_fim.strftime('%d/%m/%Y')}"
+
+    return JsonResponse({
+        "success": True,
+        "grupos": grupos,
+        "data_fmt": data_fmt,
+        "total_pedidos": sum(g["total"] for g in grupos),
+    })

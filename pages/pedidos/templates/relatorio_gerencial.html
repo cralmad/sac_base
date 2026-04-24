@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Relatório Gerencial de Pedidos{% endblock %}
+
+{% block estilo %}
+<style>
+/* ── Painel de filtros ── */
+.rg-filtros      { background: #f8f9fa; border-radius: .5rem; padding: 1rem; }
+
+/* ── Grupo por carro ── */
+.rg-grupo        { margin-bottom: 1.5rem; }
+.rg-grupo-header {
+  background: #1a3a5c;
+  color: #fff;
+  padding: .35rem .75rem;
+  border-radius: .375rem .375rem 0 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .5rem 1rem;
+  font-weight: 600;
+  font-size: .95rem;
+}
+.rg-grupo-header .rg-badge {
+  background: rgba(255,255,255,.2);
+  border-radius: .25rem;
+  padding: .1rem .45rem;
+  font-size: .8rem;
+}
+
+/* ── Tabela ── */
+.rg-tabela-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.rg-tabela   { width: 100%; border-collapse: collapse; font-size: 9pt; min-width: 900px; }
+table.rg-tabela th {
+  background: #e9f0f7;
+  color: #1a3a5c;
+  border: 1px solid #c8d8e8;
+  padding: .3rem .5rem;
+  white-space: nowrap;
+}
+table.rg-tabela td {
+  border: 1px solid #dee2e6;
+  padding: .28rem .5rem;
+  vertical-align: top;
+}
+.rg-tipo-e        { color: #0a6640; font-weight: 700; }
+.rg-tipo-r        { color: #7c2020; font-weight: 700; }
+.rg-obs           { color: #555; font-size: .78rem; font-style: italic; }
+.rg-periodo-MANHA { color: #b55a00; font-weight: 600; }
+.rg-periodo-TARDE { color: #0055a5; font-weight: 600; }
+table.rg-tabela tr.rg-nao-segue td { background: #e0e0e0 !important; }
+
+/* ── Multi-select de estados ── */
+#rg-estados {
+  min-height: 6.5rem;
+  font-size: .875rem;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* ── Texto de período no cabeçalho ── */
+#rg-titulo-data {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+}
+.rg-select-actions { display: flex; gap: .25rem; margin-top: .25rem; }
+.rg-select-actions button { font-size: .75rem; padding: .1rem .4rem; }
+
+/* ── Rodapé de totais ── */
+.rg-total-bar {
+  background: #e9f0f7;
+  border: 1px solid #c8d8e8;
+  border-radius: .375rem;
+  padding: .4rem .75rem;
+  font-size: .85rem;
+  color: #1a3a5c;
+  font-weight: 600;
+}
+
+/* ── Impressão ── */
+@media print {
+  @page { size: A4 landscape; margin: 6mm 8mm; }
+  body, .container-xl { padding: 0 !important; margin: 0 !important; }
+  .rg-filtros, #rg-toolbar, .navbar, .sidebar, footer,
+  [data-bs-toggle], .btn, #container-mensagens, .rg-select-actions { display: none !important; }
+  .rg-grupo          { margin-bottom: .25rem; }
+  .rg-grupo-header   {
+    background: #1a3a5c !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color: #fff !important;
+    padding: .1rem .4rem;
+    font-size: 8pt;
+  }
+  .rg-tabela-scroll  { overflow: visible; }
+  table.rg-tabela    { font-size: 7.5pt; min-width: 0; }
+  table.rg-tabela th { background: #dce6f1 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: .1rem .25rem; }
+  table.rg-tabela td { padding: .08rem .25rem; vertical-align: middle; }
+  table.rg-tabela tr.rg-nao-segue td { background: #d6d6d6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .rg-total-bar { border: none; background: none !important; padding: 0; font-size: 7.5pt; }
+  h1 { font-size: .85rem !important; margin-bottom: .15rem !important; }
+  #rg-titulo-data { font-size: 7.5pt; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-xl my-3" id="rg-root"
+     data-url-buscar="{% url 'relatorio_gerencial' %}">
+
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="h4 mb-0 me-2"><i class="bi bi-bar-chart-line me-2"></i>Relatório Gerencial de Pedidos</h1>
+    <span id="rg-titulo-data" class="text-muted small text-end"></span>
+  </div>
+
+  <!-- Filtros -->
+  <div class="rg-filtros mb-3" id="rg-toolbar">
+    <form id="rg-form" class="row g-2 align-items-start">
+
+      <!-- Período: data inicial / data final -->
+      <div class="col-6 col-sm-6 col-md-2">
+        <label class="form-label mb-0 d-flex align-items-center gap-1" for="rg-data-ini">
+          <span>Data inicial *</span>
+          <span class="text-primary" role="button" tabindex="0"
+            data-bs-toggle="tooltip" data-bs-placement="top"
+            data-bs-title="Data inicial do período de tentativa de entrega.">
+            <i class="bi bi-question-circle"></i>
+          </span>
+        </label>
+        <input type="date" id="rg-data-ini" class="form-control" required>
+      </div>
+
+      <div class="col-6 col-sm-6 col-md-2">
+        <label class="form-label mb-0 d-flex align-items-center gap-1" for="rg-data-fim">
+          <span>Data final *</span>
+          <span class="text-primary" role="button" tabindex="0"
+            data-bs-toggle="tooltip" data-bs-placement="top"
+            data-bs-title="Data final do período. Máximo 90 dias.">
+            <i class="bi bi-question-circle"></i>
+          </span>
+        </label>
+        <input type="date" id="rg-data-fim" class="form-control" required>
+      </div>
+
+      <!-- id_vonzu — smart_filter número -->
+      <div class="col-6 col-sm-6 col-md-2">
+        <label class="form-label mb-0 d-flex align-items-center gap-1" for="rg-id-vonzu">
+          <span>ID Vonzu</span>
+          <span class="text-primary" role="button" tabindex="0"
+            data-bs-toggle="tooltip" data-bs-placement="top"
+            data-bs-title="Filtro numérico avançado. Ex: 1,3,5-10,11">
+            <i class="bi bi-question-circle"></i>
+          </span>
+        </label>
+        <input type="text" id="rg-id-vonzu" class="form-control font-monospace"
+               placeholder="ex: 1,3,5-10,11"
+               autocomplete="off">
+        <div id="rg-id-vonzu-erro" class="text-danger small d-none">Sintaxe inválida. Use: 1,3,5-10,11</div>
+      </div>
+
+      <!-- Referência — smart_filter texto -->
+      <div class="col-6 col-sm-6 col-md-2">
+        <label class="form-label mb-0 d-flex align-items-center gap-1" for="rg-referencia">
+          <span>Referência</span>
+          <span class="text-primary" role="button" tabindex="0"
+            data-bs-toggle="tooltip" data-bs-placement="top"
+            data-bs-title='Filtro de texto. Separe os termos por vírgula. Use * como curinga. Ex: REF001,*LEROY*,COMEÇA*'>
+            <i class="bi bi-question-circle"></i>
+          </span>
+        </label>
+        <input type="text" id="rg-referencia" class="form-control font-monospace"
+               placeholder='REF001,*LEROY*'
+               autocomplete="off">
+        <div id="rg-referencia-erro" class="text-danger small d-none">Informe ao menos um termo válido separado por vírgula. Ex: REF001,*TEXTO*</div>
+      </div>
+
+      <!-- Estado — smart_filter select múltiplo -->
+      <div class="col-12 col-sm-12 col-md-4">
+        <label class="form-label mb-0 d-flex align-items-center gap-1" for="rg-estados">
+          <span>Estado</span>
+          <span class="text-primary" role="button" tabindex="0"
+            data-bs-toggle="tooltip" data-bs-placement="top"
+            data-bs-title="Selecione um ou mais estados. Use Ctrl (ou Cmd) para selecionar múltiplos. Nenhum selecionado = todos.">
+            <i class="bi bi-question-circle"></i>
+          </span>
+        </label>
+        <select id="rg-estados" class="form-select" multiple></select>
+        <div class="rg-select-actions">
+          <button type="button" class="btn btn-outline-secondary" id="rg-btn-sel-todos">Todos</button>
+          <button type="button" class="btn btn-outline-secondary" id="rg-btn-des-todos">Limpar</button>
+        </div>
+      </div>
+
+      <!-- Botões -->
+      <div class="col-12 col-sm-12 col-md-2 d-flex gap-2 align-items-end">
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-search"></i><span class="d-none d-md-inline"> Buscar</span>
+        </button>
+        <button type="button" id="rg-btn-imprimir" class="btn btn-outline-secondary w-100" disabled title="Imprimir">
+          <i class="bi bi-printer"></i>
+        </button>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- Totalizador -->
+  <div id="rg-total-bar" class="rg-total-bar mb-2 d-none"></div>
+
+  <!-- Resultado -->
+  <div id="rg-resultado"></div>
+
+  <div id="rg-loader" class="text-center my-4 d-none">
+    <div class="spinner-border" role="status">
+      <span class="visually-hidden">Carregando…</span>
+    </div>
+  </div>
+
+  <div id="rg-vazio" class="text-center text-muted d-none">Nenhum registro encontrado para os filtros informados.</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'pedidos/js/relatorio_gerencial.js' %}"></script>
+{% endblock %}

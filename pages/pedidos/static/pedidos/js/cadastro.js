@@ -676,54 +676,64 @@ document.addEventListener('DOMContentLoaded', () => {
 
   formCons.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const dataCons = getForm(nomeCons);
-    const resultado = await fazerRequisicao('/app/logistica/pedidos/cons', {
-      form: { [nomeCons]: dataCons },
-    });
+    AppLoader.show();
+    try {
+      const dataCons = getForm(nomeCons);
+      const resultado = await fazerRequisicao('/app/logistica/pedidos/cons', {
+        form: { [nomeCons]: dataCons },
+      });
 
-    if (!resultado.success) {
-      if (resultado.data) updateState(resultado.data);
-      return;
+      if (!resultado.success) {
+        if (resultado.data) updateState(resultado.data);
+        return;
+      }
+
+      if (resultado.data.registros) {
+        renderPesquisa(resultado.data.registros);
+        return;
+      }
+
+      updateState(resultado.data);
+      hidratarFormulario(nomeForm);
+      preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
+      await carregarMovimentacoes();
+      await carregarDevolucoes();
+      alternar();
+      aplicarPermissoesNaInterface();
+    } finally {
+      AppLoader.hide();
     }
-
-    if (resultado.data.registros) {
-      renderPesquisa(resultado.data.registros);
-      return;
-    }
-
-    updateState(resultado.data);
-    hidratarFormulario(nomeForm);
-    preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
-    await carregarMovimentacoes();
-    await carregarDevolucoes();
-    alternar();
-    aplicarPermissoesNaInterface();
   });
 
   tabelaPedidoCorpo.addEventListener('click', async (e) => {
     const btn = e.target.closest('.btn-selecionar');
     if (!btn) return;
 
-    const id = Number(btn.dataset.id);
-    updateFormField(nomeCons, 'id_selecionado', id);
-    const dataCons = getForm(nomeCons);
-    const resultado = await fazerRequisicao('/app/logistica/pedidos/cons', {
-      form: { [nomeCons]: dataCons },
-    });
+    AppLoader.show();
+    try {
+      const id = Number(btn.dataset.id);
+      updateFormField(nomeCons, 'id_selecionado', id);
+      const dataCons = getForm(nomeCons);
+      const resultado = await fazerRequisicao('/app/logistica/pedidos/cons', {
+        form: { [nomeCons]: dataCons },
+      });
 
-    if (!resultado.success) {
-      if (resultado.data) updateState(resultado.data);
-      return;
+      if (!resultado.success) {
+        if (resultado.data) updateState(resultado.data);
+        return;
+      }
+
+      updateState(resultado.data);
+      hidratarFormulario(nomeForm);
+      preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
+      await carregarMovimentacoes();
+      await carregarDevolucoes();
+      updateFormField(nomeCons, 'id_selecionado', null);
+      alternar();
+      aplicarPermissoesNaInterface();
+    } finally {
+      AppLoader.hide();
     }
-
-    updateState(resultado.data);
-    hidratarFormulario(nomeForm);
-    preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
-    await carregarMovimentacoes();
-    await carregarDevolucoes();
-    updateFormField(nomeCons, 'id_selecionado', null);
-    alternar();
-    aplicarPermissoesNaInterface();
   });
 
   document.getElementById('btn-mov-novo').addEventListener('click', () => {
