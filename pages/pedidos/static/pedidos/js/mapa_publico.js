@@ -142,6 +142,17 @@
         return 'â€”';
     }
 
+    function focarMarcador(movId) {
+        const marker = marcadores[movId];
+        if (!marker) return;
+        mapaEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Pequeno atraso para o scroll completar antes de abrir o popup
+        setTimeout(() => {
+            mapaLeaflet.setView(marker.getLatLng(), Math.max(mapaLeaflet.getZoom(), 15));
+            marker.openPopup();
+        }, 300);
+    }
+
     function renderizarLista(linhas) {
         dadosLinhas = linhas;
         selecionados.clear();
@@ -162,9 +173,19 @@
             tdChk.appendChild(chk);
             tr.appendChild(tdChk);
 
+            // Coluna Referência (clicável → foca no mapa)
+            const tdRef = document.createElement('td');
+            const btnRef = document.createElement('button');
+            btnRef.type = 'button';
+            btnRef.className = 'btn btn-link btn-sm p-0 fw-semibold text-decoration-none';
+            btnRef.textContent = linha.referencia ?? '';
+            btnRef.title = 'Ver no mapa';
+            btnRef.addEventListener('click', () => focarMarcador(linha.mov_id));
+            tdRef.appendChild(btnRef);
+            tr.appendChild(tdRef);
+
             // Colunas de dados
             const cols = [
-                { val: linha.referencia },
                 { val: linha.tipo, cls: linha.tipo === 'R' ? 'tipo-R' : 'tipo-E' },
                 { val: linha.nome_dest },
                 { val: linha.fones },

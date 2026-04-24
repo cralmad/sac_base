@@ -25,6 +25,8 @@ class Filial(models.Model):
     )
     is_matriz = models.BooleanField(default=False)
     ativa = models.BooleanField(default=True)
+    numero = models.CharField(max_length=15, null=True, blank=True)
+    sms_confirm = models.BooleanField(default=False)
     lat_deposito = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     lng_deposito = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 
@@ -90,3 +92,21 @@ class UsuarioFilial(models.Model):
 
     def __str__(self):
         return f"{self.usuario} - {self.filial}"
+
+
+class FilialConfig(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    filial = models.OneToOneField(
+        Filial,
+        on_delete=models.CASCADE,
+        db_column="filial_id",
+        related_name="config",
+    )
+    sms_padrao_1 = models.TextField(null=True, blank=True)
+    sms_padrao_2 = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "filial_config"
+
+    def __str__(self):
+        return f"Config - {self.filial}"

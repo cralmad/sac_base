@@ -21,7 +21,7 @@ from .services import (
     serializar_filial,
     validar_filial_ativa,
 )
-from .models import Filial
+from .models import Filial, FilialConfig
 
 
 PERMISSOES_FILIAL = {
@@ -43,8 +43,12 @@ def build_filial_campos_iniciais():
         "pais_atuacao_id": None,
         "is_matriz": primeira_unidade,
         "ativa": True,
+        "numero": "",
+        "sms_confirm": False,
         "lat_deposito": "",
         "lng_deposito": "",
+        "sms_padrao_1": "",
+        "sms_padrao_2": "",
     }
 
 
@@ -60,6 +64,13 @@ def listar_paises_cadastrados():
 
 
 def serializar_form_filial(filial):
+    try:
+        config = filial.config
+        sms_padrao_1 = config.sms_padrao_1 or ""
+        sms_padrao_2 = config.sms_padrao_2 or ""
+    except FilialConfig.DoesNotExist:
+        sms_padrao_1 = ""
+        sms_padrao_2 = ""
     return {
         "id": filial.id,
         "codigo": filial.codigo,
@@ -68,8 +79,12 @@ def serializar_form_filial(filial):
         "pais_atuacao_id": filial.pais_atuacao_id,
         "is_matriz": filial.is_matriz,
         "ativa": filial.ativa,
+        "numero": filial.numero or "",
+        "sms_confirm": filial.sms_confirm,
         "lat_deposito": str(filial.lat_deposito) if filial.lat_deposito is not None else "",
         "lng_deposito": str(filial.lng_deposito) if filial.lng_deposito is not None else "",
+        "sms_padrao_1": sms_padrao_1,
+        "sms_padrao_2": sms_padrao_2,
     }
 
 
@@ -89,8 +104,12 @@ def cadastro_filial_view(request):
             "pais_atuacao_id": {"type": "string", "required": True, "value": ""},
             "is_matriz": {"type": "boolean", "required": False, "value": primeira_unidade},
             "ativa": {"type": "boolean", "required": False, "value": True},
+            "numero": {"type": "string", "maxlength": 15, "required": False, "value": ""},
+            "sms_confirm": {"type": "boolean", "required": False, "value": False},
             "lat_deposito": {"type": "string", "required": False, "value": ""},
             "lng_deposito": {"type": "string", "required": False, "value": ""},
+            "sms_padrao_1": {"type": "string", "required": False, "value": ""},
+            "sms_padrao_2": {"type": "string", "required": False, "value": ""},
         },
         nome_form_cons: {
             "codigo_cons": {"type": "string", "maxlength": 20, "required": False, "value": ""},
@@ -154,6 +173,8 @@ def cadastro_filial_view(request):
     pais_atuacao_id = campos.get("pais_atuacao_id")
     is_matriz = bool(campos.get("is_matriz"))
     ativa = bool(campos.get("ativa"))
+    numero = (campos.get("numero") or "").strip() or None
+    sms_confirm = bool(campos.get("sms_confirm"))
 
     def _parse_coord(val):
         s = str(val or "").strip()
@@ -192,6 +213,8 @@ def cadastro_filial_view(request):
                     pais_atuacao=pais_atuacao,
                     is_matriz=is_matriz,
                     ativa=ativa,
+                    numero=numero,
+                    sms_confirm=sms_confirm,
                     lat_deposito=lat_deposito,
                     lng_deposito=lng_deposito,
                 )
@@ -222,6 +245,8 @@ def cadastro_filial_view(request):
             filial.pais_atuacao = pais_atuacao
             filial.is_matriz = is_matriz
             filial.ativa = ativa
+            filial.numero = numero
+            filial.sms_confirm = sms_confirm
             filial.lat_deposito = lat_deposito
             filial.lng_deposito = lng_deposito
 
@@ -241,6 +266,13 @@ def cadastro_filial_view(request):
 
         case _:
             return JsonResponse(build_error_payload(f"Estado inválido: '{estado}'"), status=400)
+
+    sms_padrao_1 = (campos.get("sms_padrao_1") or "").strip() or None
+    sms_padrao_2 = (campos.get("sms_padrao_2") or "").strip() or None
+    FilialConfig.objects.update_or_create(
+        filial=filial,
+        defaults={"sms_padrao_1": sms_padrao_1, "sms_padrao_2": sms_padrao_2},
+    )
 
     return JsonResponse(build_form_response(
         form_id=nome_form,

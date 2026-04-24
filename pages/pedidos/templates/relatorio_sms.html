@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Envio de SMS{% endblock %}
+
+{% block estilo %}
+<style>
+/* ── Filtros ── */
+.rs-filtros { background: #f8f9fa; border-radius: .5rem; padding: 1rem; }
+
+/* ── Tabela ── */
+.rs-tabela-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.rs-tabela { width: 100%; border-collapse: collapse; font-size: .875rem; min-width: 700px; }
+table.rs-tabela th {
+  background: #e9f0f7;
+  color: #1a3a5c;
+  border: 1px solid #c8d8e8;
+  padding: .35rem .5rem;
+  white-space: nowrap;
+  font-weight: 600;
+}
+table.rs-tabela td {
+  border: 1px solid #dee2e6;
+  padding: .28rem .5rem;
+  vertical-align: middle;
+}
+table.rs-tabela tr.rs-enviado td { background: #d1e7dd; }
+.rs-tipo-e { color: #0a6640; font-weight: 700; }
+.rs-tipo-r { color: #7c2020; font-weight: 700; }
+.rs-periodo-MANHA { color: #b55a00; font-weight: 600; }
+.rs-periodo-TARDE { color: #0055a5; font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-xl my-3" id="rs-root"
+     data-url-buscar="{% url 'relatorio_sms' %}"
+     data-url-enviar="{% url 'relatorio_sms_enviar' %}"
+     data-url-preview="{% url 'relatorio_sms_preview' %}">
+
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="h4 mb-0"><i class="bi bi-chat-dots me-2"></i>Envio de SMS</h1>
+    <span id="rs-titulo-data" class="text-muted small"></span>
+  </div>
+
+  <!-- Mensagens -->
+  <div id="container-mensagens"></div>
+
+  <!-- Filtros -->
+  <div class="rs-filtros mb-3">
+    <form id="rs-form" class="row g-2 align-items-end">
+      <div class="col-6 col-md-3">
+        <label class="form-label mb-0 d-flex align-items-center gap-1" for="rs-data">
+          <span>Data *</span>
+          <span class="text-primary" role="button" tabindex="0"
+            data-bs-toggle="tooltip" data-bs-placement="top"
+            data-bs-title="Data da tentativa de entrega (obrigatório).">
+            <i class="bi bi-question-circle"></i>
+          </span>
+        </label>
+        <input type="date" id="rs-data" class="form-control" required>
+      </div>
+      <div class="col-12 col-md-3 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-search me-1"></i>Buscar
+        </button>
+        <button type="button" id="rs-btn-enviar" class="btn btn-success" disabled>
+          <i class="bi bi-send me-1"></i>Enviar SMS
+        </button>
+        <button type="button" id="rs-btn-preview" class="btn btn-outline-secondary" title="Ver prévia das mensagens">
+          <i class="bi bi-info-circle"></i>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Tabela -->
+  <div id="rs-resultado">
+    <div class="rs-tabela-scroll d-none" id="rs-tabela-wrapper">
+      <table class="rs-tabela">
+        <thead>
+          <tr>
+            <th class="text-center" style="width:40px;">
+              <input type="checkbox" id="rs-chk-todos" title="Selecionar todos" class="form-check-input">
+            </th>
+            <th>Referência</th>
+            <th>Tipo</th>
+            <th>Telefone(s)</th>
+            <th>C. Postal</th>
+            <th>Volume</th>
+            <th>Peso</th>
+            <th>Período</th>
+          </tr>
+        </thead>
+        <tbody id="rs-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="rs-loader" class="text-center my-4 d-none">
+    <div class="spinner-border" role="status">
+      <span class="visually-hidden">Carregando…</span>
+    </div>
+  </div>
+
+  <div id="rs-vazio" class="text-center text-muted d-none">Nenhuma tentativa de entrega encontrada para esta data.</div>
+
+</div>
+
+<!-- Modal prévia de mensagem SMS -->
+<div class="modal fade" id="rs-modal-preview" tabindex="-1" aria-labelledby="rs-modal-preview-label" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="rs-modal-preview-label">
+          <i class="bi bi-chat-dots me-2"></i>Prévia das mensagens SMS
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body" id="rs-modal-preview-body">
+        <div class="text-center text-muted py-3">
+          <div class="spinner-border spinner-border-sm me-2" role="status"></div>Carregando…
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'pedidos/js/relatorio_sms.js' %}"></script>
+{% endblock %}

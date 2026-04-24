@@ -21,7 +21,7 @@ from sac_base.sisvar_builders import (
     build_success_payload,
 )
 
-from .models import ESTADO_CHOICES, ORIGEM_CHOICES, PERIODO_CHOICES, TIPO_CHOICES, Pedido, TentativaEntrega
+from .models import ESTADO_CHOICES, MOTIVO_CHOICES, ORIGEM_CHOICES, PERIODO_CHOICES, TIPO_CHOICES, Devolucao, Pedido, TentativaEntrega
 from .services.importador_csv import importar_csv
 
 
@@ -128,6 +128,18 @@ def _serialize_tentativa(reg):
         "faturado": reg.faturado,
         "interno": reg.interno,
         "dt_entrega": reg.dt_entrega.isoformat() if reg.dt_entrega else "",
+    }
+
+
+def _serialize_devolucao(reg):
+    return {
+        "id": reg.id,
+        "pedido_id": reg.pedido_id,
+        "data": reg.data.isoformat() if reg.data else "",
+        "palete": reg.palete,
+        "volume": reg.volume,
+        "motivo": reg.motivo or "",
+        "obs": reg.obs or "",
     }
 
 
@@ -298,6 +310,7 @@ def pedidos_cadastro_view(request):
                 "origens": [{"value": k, "label": v} for k, v in ORIGEM_CHOICES],
                 "clientes": _listar_clientes_ativos(),
                 "periodos_mov": [{"value": k, "label": v} for k, v in PERIODO_CHOICES],
+                "motivos_dev": [{"value": k, "label": v} for k, v in MOTIVO_CHOICES],
             },
             datasets={"filiais_escrita": listar_filiais_escrita(usuario)},
         )
@@ -384,7 +397,10 @@ def pedidos_cadastro_view(request):
         form_id=nome_form,
         estado="visualizar",
         campos=_serialize_pedido_form(pedido),
-        extra_payload={"registros_mov": [_serialize_tentativa(t) for t in pedido.tentativas.select_related("motorista").order_by("-data_tentativa", "-id")]},
+        extra_payload={
+            "registros_mov": [_serialize_tentativa(t) for t in pedido.tentativas.select_related("motorista").order_by("-data_tentativa", "-id")],
+            "registros_dev": [_serialize_devolucao(d) for d in pedido.devolucoes.order_by("-data", "-id")],
+        },
         mensagem_sucesso="Pedido salvo com sucesso!",
     ))
 
@@ -410,7 +426,10 @@ def pedidos_cadastro_cons_view(request):
             form_id=nome_form,
             estado="visualizar",
             campos=_serialize_pedido_form(pedido),
-            extra_payload={"registros_mov": [_serialize_tentativa(t) for t in pedido.tentativas.select_related("motorista").order_by("-data_tentativa", "-id")]},
+            extra_payload={
+                "registros_mov": [_serialize_tentativa(t) for t in pedido.tentativas.select_related("motorista").order_by("-data_tentativa", "-id")],
+                "registros_dev": [_serialize_devolucao(d) for d in pedido.devolucoes.order_by("-data", "-id")],
+            },
         ))
 
     qs = Pedido.objects.filter(filial_id__in=filiais_ids).select_related("filial", "cliente", "motorista").order_by("-atualizacao", "-id")
@@ -526,6 +545,62 @@ def pedido_mov_del_view(request):
         return JsonResponse(build_error_payload("Movimentação não encontrada."), status=404)
     mov.delete()
     return JsonResponse(build_success_payload("Movimentação excluída com sucesso!"))
+
+
+@permission_required(PERMISSOES_PEDIDO["consultar"], raise_exception=True)
+def pedido_dev_list_view(request):
+    if request.method != "POST":
+        return JsonResponse(build_error_payload("Método não permitido."), status=405)
+    pedido_id = request.sisvar_front.get("pedido_id")
+    regs = Devolucao.objects.filter(pedido_id=pedido_id).order_by("-data", "-id")
+    return JsonResponse(build_records_response([_serialize_devolucao(r) for r in regs]))
+
+
+@permission_required(PERMISSOES_PEDIDO["editar"], raise_exception=True)
+def pedido_dev_save_view(request):
+    if request.method != "POST":
+        return JsonResponse(build_error_payload("Método não permitido."), status=405)
+    data = request.sisvar_front
+    pedido_id = _parse_int(data.get("pedido_id"))
+    dev_id = _parse_int(data.get("id"))
+    pedido = Pedido.objects.filter(id=pedido_id).first()
+    if not pedido:
+        return JsonResponse(build_error_payload("Pedido não encontrado."), status=404)
+
+    dt_data = _parse_date(data.get("data"))
+    if not dt_data:
+        return JsonResponse(build_error_payload("Data é obrigatória."), status=400)
+
+    motivo = (data.get("motivo") or "").strip()
+    if not motivo or motivo not in {codigo for codigo, _ in MOTIVO_CHOICES}:
+        return JsonResponse(build_error_payload("Motivo inválido."), status=400)
+
+    if dev_id:
+        dev = Devolucao.objects.filter(id=dev_id, pedido=pedido).first()
+        if not dev:
+            return JsonResponse(build_error_payload("Devolução não encontrada."), status=404)
+    else:
+        dev = Devolucao(pedido=pedido)
+
+    dev.data = dt_data
+    dev.palete = _parse_int(data.get("palete"))
+    dev.volume = _parse_int(data.get("volume"))
+    dev.motivo = motivo
+    dev.obs = (data.get("obs") or "").strip() or None
+    dev.save()
+    return JsonResponse(build_success_payload("Devolução salva com sucesso!", extra_payload={"dev": _serialize_devolucao(dev)}))
+
+
+@permission_required(PERMISSOES_PEDIDO["excluir"], raise_exception=True)
+def pedido_dev_del_view(request):
+    if request.method != "POST":
+        return JsonResponse(build_error_payload("Método não permitido."), status=405)
+    dev_id = _parse_int(request.sisvar_front.get("id"))
+    dev = Devolucao.objects.filter(id=dev_id).first()
+    if not dev:
+        return JsonResponse(build_error_payload("Devolução não encontrada."), status=404)
+    dev.delete()
+    return JsonResponse(build_success_payload("Devolução excluída com sucesso!"))
 
 
 @permission_required(PERMISSOES_PEDIDO["consultar"], raise_exception=True)

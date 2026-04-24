@@ -18,6 +18,9 @@
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="tab-mov" data-bs-toggle="tab" data-bs-target="#mov" type="button" role="tab">MOVIMENTAÇÕES</button>
     </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-dev" data-bs-toggle="tab" data-bs-target="#dev" type="button" role="tab">DEVOLUÇÕES</button>
+    </li>
   </ul>
 
   <form id="cadPedido" data-form-lock="cadPedido" method="POST">
@@ -180,6 +183,32 @@
           </div>
         </div>
       </div>
+
+      <div class="tab-pane fade" id="dev" role="tabpanel">
+        <div class="container-xl my-3 mx-auto">
+          <div class="d-flex gap-2 mb-3">
+            <button id="btn-dev-novo" type="button" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-plus-circle"></i> Nova Devolução
+            </button>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover table-sm border">
+              <thead class="table-dark">
+                <tr>
+                  <th>ID</th>
+                  <th>Data</th>
+                  <th>Palete</th>
+                  <th>Volume</th>
+                  <th>Motivo</th>
+                  <th>Obs</th>
+                  <th class="text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-dev-corpo"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="btn-actions">
@@ -308,6 +337,50 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
         <button type="button" id="btn-mov-salvar" class="btn btn-primary">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalDev" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="modalDevTitulo">Devolução</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formDev">
+          <input type="hidden" id="dev_id">
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0" for="dev_data">Data *</label>
+              <input id="dev_data" class="form-control" type="date" required>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0" for="dev_palete">Palete</label>
+              <input id="dev_palete" class="form-control" type="number" min="0" step="1" inputmode="numeric">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0" for="dev_volume">Volume</label>
+              <input id="dev_volume" class="form-control" type="number" min="0" step="1" inputmode="numeric">
+            </div>
+            <div class="col-12">
+              <label class="form-label mb-0" for="dev_motivo">Motivo *</label>
+              <select id="dev_motivo" class="form-select" required>
+                <option value="">Selecione</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label mb-0" for="dev_obs">Observações</label>
+              <textarea id="dev_obs" class="form-control" rows="3"></textarea>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="btn-dev-salvar" class="btn btn-primary">Salvar</button>
       </div>
     </div>
   </div>

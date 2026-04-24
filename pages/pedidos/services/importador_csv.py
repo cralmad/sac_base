@@ -433,6 +433,7 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
                                 estado=p.estado,
                                 motorista_id=p.motorista_id,
                                 dt_entrega=p.dt_entrega,
+                                periodo="MANHA",
                             )
                         )
                         tentativas += 1

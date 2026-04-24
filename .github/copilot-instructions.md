@@ -142,6 +142,14 @@ O layout deve seguir rigorosamente a abordagem Mobile-First:
 | `REDIS_URL` | URL do Redis. Necessário para WebSockets em ambientes multi-dyno (addon Heroku Redis). Sem ela, usa `InMemoryChannelLayer` (não funciona com mais de um dyno). |
 | `DJANGO_DB_SSL_REQUIRE` | `true` por padrão em produção. Forçar SSL na conexão com o banco. |
 
+### Integrações externas
+| Variável | Descrição |
+|---|---|
+| `BULKGATE_APP_ID` | Application ID gerado no portal BulkGate (`portal.bulkgate.com` → Modules & APIs → Create API). Obrigatório para envio de SMS. |
+| `BULKGATE_APP_TOKEN` | Application Token gerado no portal BulkGate. Nunca versionar. Obrigatório para envio de SMS. |
+
+> **SMS — padrão de números:** A função `sac_base/sms_service.py::normalizar_numero()` aceita qualquer formato (`+351...`, `00351...`, `912...`). Números sem DDI são tratados como pertencentes ao país de atuação da Filial (`Filial.pais_atuacao.codigo_tel`). O fallback hardcoded é `351` (Portugal).
+
 ### Exemplo mínimo para o Heroku
 ```bash
 heroku config:set BANCO_DE_DADOS="postgres://..." \
@@ -149,7 +157,9 @@ heroku config:set BANCO_DE_DADOS="postgres://..." \
   DJANGO_ALLOWED_HOSTS="meuapp.herokuapp.com" \
   DJANGO_CSRF_TRUSTED_ORIGINS="https://meuapp.herokuapp.com" \
   DJANGO_USE_X_FORWARDED_PROTO=true \
-  DJANGO_SECURE_SSL_REDIRECT=true
+  DJANGO_SECURE_SSL_REDIRECT=true \
+  BULKGATE_APP_ID="12345" \
+  BULKGATE_APP_TOKEN="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
 ### Após o deploy

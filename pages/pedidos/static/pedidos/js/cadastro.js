@@ -25,9 +25,12 @@ const nomeCons = 'consPedido';
 const form = document.getElementById(nomeForm);
 const formCons = document.getElementById(nomeCons);
 const tabelaMovCorpo = document.getElementById('tabela-mov-corpo');
+const tabelaDevCorpo = document.getElementById('tabela-dev-corpo');
 const tabelaPedidoCorpo = document.getElementById('tabela-pedido-corpo');
 const modalMovEl = document.getElementById('modalMov');
 const modalMov = new bootstrap.Modal(modalMovEl);
+const modalDevEl = document.getElementById('modalDev');
+const modalDev = new bootstrap.Modal(modalDevEl);
 
 const CAMPOS_TRAVADOS_IMPORTADO = ['filial_id', 'origem', 'id_vonzu', 'pedido', 'tipo', 'criado', 'cliente_id'];
 
@@ -103,6 +106,128 @@ function preencherOrigens() {
   preencherSelect('origem_cons', origens, 'Todas', o => ({ value: o.value, label: o.label }));
 }
 
+function preencherMotivosDev() {
+  const motivos = getOptions('motivos_dev', []);
+  preencherSelect('dev_motivo', motivos, 'Selecione', m => ({ value: m.value, label: m.label }));
+}
+
+function renderDevolucoes(registros = []) {
+  tabelaDevCorpo.innerHTML = '';
+  if (!registros.length) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 7;
+    td.className = 'text-center text-muted';
+    td.textContent = 'Nenhuma devolução';
+    tr.appendChild(td);
+    tabelaDevCorpo.appendChild(tr);
+    aplicarTravasDevolucoes();
+    return;
+  }
+
+  registros.forEach(d => {
+    const tr = document.createElement('tr');
+
+    const colunas = [d.id, d.data, d.palete, d.volume, d.motivo, d.obs];
+    colunas.forEach(valor => {
+      const td = document.createElement('td');
+      td.textContent = String(valor ?? '');
+      tr.appendChild(td);
+    });
+
+    const tdAcoes = document.createElement('td');
+    tdAcoes.className = 'text-center';
+
+    const btnEditar = document.createElement('button');
+    btnEditar.type = 'button';
+    btnEditar.className = 'btn btn-sm btn-outline-warning me-1 btn-dev-editar';
+    btnEditar.textContent = 'Editar';
+    btnEditar.dataset.id = String(d.id ?? '');
+    btnEditar.dataset.data = String(d.data ?? '');
+    btnEditar.dataset.palete = String(d.palete ?? '');
+    btnEditar.dataset.volume = String(d.volume ?? '');
+    btnEditar.dataset.motivo = String(d.motivo ?? '');
+    btnEditar.dataset.obs = String(d.obs ?? '');
+
+    const btnExcluir = document.createElement('button');
+    btnExcluir.type = 'button';
+    btnExcluir.className = 'btn btn-sm btn-outline-danger btn-dev-excluir';
+    btnExcluir.textContent = 'Excluir';
+    btnExcluir.dataset.id = String(d.id ?? '');
+
+    tdAcoes.appendChild(btnEditar);
+    tdAcoes.appendChild(btnExcluir);
+    tr.appendChild(tdAcoes);
+    tabelaDevCorpo.appendChild(tr);
+  });
+
+  aplicarTravasDevolucoes();
+}
+
+async function carregarDevolucoes() {
+  const pedidoId = getForm(nomeForm)?.campos?.id;
+  if (!pedidoId) {
+    renderDevolucoes([]);
+    return;
+  }
+  const resp = await fazerRequisicao('/app/logistica/pedidos/dev/list', { pedido_id: pedidoId });
+  if (!resp.success) return;
+  renderDevolucoes(resp.data.registros || []);
+}
+
+function abrirModalDev(reg = null) {
+  document.getElementById('dev_id').value = reg?.id || '';
+  document.getElementById('dev_data').value = reg?.data || '';
+  document.getElementById('dev_palete').value = reg?.palete ?? '';
+  document.getElementById('dev_volume').value = reg?.volume ?? '';
+  document.getElementById('dev_motivo').value = reg?.motivo || '';
+  document.getElementById('dev_obs').value = reg?.obs || '';
+  modalDev.show();
+}
+
+async function salvarDevolucao() {
+  if (formEmVisualizacao()) {
+    definirMensagem('erro', 'Devoluções estão bloqueadas no modo visualização.', false);
+    return;
+  }
+
+  const pedidoId = getForm(nomeForm)?.campos?.id;
+  if (!pedidoId) {
+    definirMensagem('erro', 'Salve o pedido antes de adicionar devoluções.', false);
+    return;
+  }
+
+  const payload = {
+    id: document.getElementById('dev_id').value || null,
+    pedido_id: pedidoId,
+    data: document.getElementById('dev_data').value,
+    palete: document.getElementById('dev_palete').value,
+    volume: document.getElementById('dev_volume').value,
+    motivo: document.getElementById('dev_motivo').value,
+    obs: document.getElementById('dev_obs').value,
+  };
+
+  const resp = await fazerRequisicao('/app/logistica/pedidos/dev/save', payload);
+  if (!resp.success) {
+    if (resp.data) updateState(resp.data);
+    return;
+  }
+
+  if (resp.data) updateState(resp.data);
+  modalDev.hide();
+  await carregarDevolucoes();
+}
+
+async function excluirDevolucao(id) {
+  const resp = await fazerRequisicao('/app/logistica/pedidos/dev/del', { id });
+  if (!resp.success) {
+    if (resp.data) updateState(resp.data);
+    return;
+  }
+  if (resp.data) updateState(resp.data);
+  await carregarDevolucoes();
+}
+
 function formEmVisualizacao() {
   return (getForm(nomeForm)?.estado || 'visualizar') === 'visualizar';
 }
@@ -121,6 +246,20 @@ function aplicarTravasMovimentacoes() {
   if (btnSalvarMov) btnSalvarMov.disabled = bloqueado;
 
   tabelaMovCorpo.querySelectorAll('.btn-mov-editar, .btn-mov-excluir').forEach(btn => {
+    btn.disabled = bloqueado;
+  });
+}
+
+function aplicarTravasDevolucoes() {
+  const bloqueado = formEmVisualizacao();
+  const semPedidoSalvo = !pedidoEstaSalvo();
+  const btnNovoDev = document.getElementById('btn-dev-novo');
+  const btnSalvarDev = document.getElementById('btn-dev-salvar');
+
+  if (btnNovoDev) btnNovoDev.disabled = bloqueado || semPedidoSalvo;
+  if (btnSalvarDev) btnSalvarDev.disabled = bloqueado;
+
+  tabelaDevCorpo.querySelectorAll('.btn-dev-editar, .btn-dev-excluir').forEach(btn => {
     btn.disabled = bloqueado;
   });
 }
@@ -357,6 +496,7 @@ async function resetarFormularioAposCancelamento() {
   hidratarFormulario(nomeForm);
   preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
   await carregarMovimentacoes();
+  await carregarDevolucoes();
   aplicarPermissoesNaInterface();
 }
 
@@ -428,6 +568,7 @@ function aplicarPermissoesNaInterface() {
 
   aplicarTravasImportados();
   aplicarTravasMovimentacoes();
+  aplicarTravasDevolucoes();
 }
 
 const updater = criarAtualizadorForm({ formId: nomeForm, setter: updateFormField, form });
@@ -450,11 +591,13 @@ document.addEventListener('DOMContentLoaded', () => {
   preencherEstados();
   preencherPeriodosMov();
   preencherOrigens();
+  preencherMotivosDev();
 
   hidratarFormulario(nomeForm);
   aplicarPermissoesNaInterface();
   preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
   carregarMovimentacoes();
+  carregarDevolucoes();
 
   const areaCadastro = document.getElementById('area-cadastro');
   const divPesquisa = document.getElementById('div-pesquisa');
@@ -477,6 +620,7 @@ document.addEventListener('DOMContentLoaded', () => {
     form.reset();
     updateState({ form: { [nomeForm]: { estado: 'novo', campos: { ...getForm(nomeForm).campos, id: null, origem: 'MANUAL' } } } });
     carregarMovimentacoes();
+    carregarDevolucoes();
     aplicarPermissoesNaInterface();
   });
 
@@ -505,6 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateState(resultado.data);
     hidratarFormulario(nomeForm);
     await carregarMovimentacoes();
+    await carregarDevolucoes();
     aplicarPermissoesNaInterface();
   });
 
@@ -550,6 +695,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hidratarFormulario(nomeForm);
     preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
     await carregarMovimentacoes();
+    await carregarDevolucoes();
     alternar();
     aplicarPermissoesNaInterface();
   });
@@ -574,6 +720,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hidratarFormulario(nomeForm);
     preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
     await carregarMovimentacoes();
+    await carregarDevolucoes();
     updateFormField(nomeCons, 'id_selecionado', null);
     alternar();
     aplicarPermissoesNaInterface();
@@ -632,5 +779,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('motorista_id').addEventListener('change', e => {
     updateFormField(nomeForm, 'motorista_id', e.target.value || null);
+  });
+
+  document.getElementById('btn-dev-novo').addEventListener('click', () => {
+    if (formEmVisualizacao()) return;
+    if (!pedidoEstaSalvo()) {
+      definirMensagem('aviso', 'Salve o pedido antes de adicionar devoluções.');
+      return;
+    }
+    abrirModalDev(null);
+  });
+
+  document.getElementById('btn-dev-salvar').addEventListener('click', salvarDevolucao);
+
+  tabelaDevCorpo.addEventListener('click', (e) => {
+    if (e.target.closest('.btn-dev-editar, .btn-dev-excluir')) {
+      e.preventDefault();
+    }
+
+    if (formEmVisualizacao()) return;
+
+    const btnEditar = e.target.closest('.btn-dev-editar');
+    if (btnEditar) {
+      abrirModalDev({
+        id: Number(btnEditar.dataset.id),
+        data: btnEditar.dataset.data,
+        palete: btnEditar.dataset.palete,
+        volume: btnEditar.dataset.volume,
+        motivo: btnEditar.dataset.motivo,
+        obs: btnEditar.dataset.obs,
+      });
+      return;
+    }
+
+    const btnExcluir = e.target.closest('.btn-dev-excluir');
+    if (btnExcluir) {
+      const id = Number(btnExcluir.dataset.id);
+      confirmar({
+        titulo: 'Excluir devolução',
+        mensagem: 'Deseja excluir esta devolução?',
+        onConfirmar: async () => excluirDevolucao(id),
+      });
+    }
   });
 });

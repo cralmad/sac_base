@@ -2,6 +2,9 @@
 from django.urls import path, include
 
 from .views import (
+    pedido_dev_del_view,
+    pedido_dev_list_view,
+    pedido_dev_save_view,
     pedido_motoristas_view,
     pedido_mov_del_view,
     pedido_mov_list_view,
@@ -22,6 +25,9 @@ urlpatterns = [
     path("logistica/pedidos/motoristas", pedido_motoristas_view, name="pedidos_motoristas"),
     path("logistica/pedidos/mov/save", pedido_mov_save_view, name="pedidos_mov_save"),
     path("logistica/pedidos/mov/del", pedido_mov_del_view, name="pedidos_mov_del"),
+    path("logistica/pedidos/dev/list", pedido_dev_list_view, name="pedidos_dev_list"),
+    path("logistica/pedidos/dev/save", pedido_dev_save_view, name="pedidos_dev_save"),
+    path("logistica/pedidos/dev/del", pedido_dev_del_view, name="pedidos_dev_del"),
     path("logistica/pedidos/importacao/", pedidos_importacao_view, name="pedidos_importacao"),
     path("logistica/pedidos/importar", pedidos_importar_view, name="pedidos_importar"),
     path("logistica/pedidos/relatorio-volumes/", pedidos_relatorio_volumes_view, name="pedidos_relatorio_volumes"),

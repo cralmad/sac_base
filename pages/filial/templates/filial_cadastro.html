@@ -9,104 +9,175 @@
   <form id="cadFilial" data-form-lock="cadFilial" method="POST">
     {% csrf_token %}
     <div class="container-xl my-3 mx-auto">
-      <div class="row g-3">
-        <div class="col-12 col-sm-3">
-          <label class="form-label mb-0">Código</label>
-          <input type="text" name="codigo" class="form-control smart-input" data-textcase="upper" maxlength="20" minlength="2" required>
-        </div>
 
-        <div class="col-12 col-sm-6">
-          <label class="form-label mb-0">Nome</label>
-          <input type="text" name="nome" class="form-control smart-input" data-textcase="upper" maxlength="100" minlength="3" required>
-        </div>
+      <ul class="nav nav-tabs" id="filialTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="tab-dados" data-bs-toggle="tab" data-bs-target="#filial-dados" type="button" role="tab">DADOS</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-config" data-bs-toggle="tab" data-bs-target="#filial-config" type="button" role="tab">CONFIGURAÇÕES</button>
+        </li>
+      </ul>
 
-        <div class="col-12 col-sm-6">
-          <label class="form-label mb-0" for="pais_endereco_id">País do Endereço</label>
-          <select name="pais_endereco_id" id="pais_endereco_id" class="form-select" required>
-            <option value="">Selecione</option>
-          </select>
-        </div>
+      <div class="tab-content border border-top-0 p-3" id="filialTabsContent">
 
-        <div class="col-12 col-sm-6">
-          <label class="form-label mb-0" for="pais_atuacao_id">País de Atuação</label>
-          <select name="pais_atuacao_id" id="pais_atuacao_id" class="form-select" required>
-            <option value="">Selecione</option>
-          </select>
-        </div>
+        <div class="tab-pane fade show active" id="filial-dados" role="tabpanel">
+          <div class="row g-3">
+            <div class="col-12 col-sm-3">
+              <label class="form-label mb-0">Código</label>
+              <input type="text" name="codigo" class="form-control smart-input" data-textcase="upper" maxlength="20" minlength="2" required>
+            </div>
 
-        <div class="col-12 col-sm-3 d-flex flex-column justify-content-end">
-          <div class="form-check mb-2">
-            <input id="is_matriz" type="checkbox" name="is_matriz" class="form-check-input">
-            <label for="is_matriz" class="form-check-label">É matriz</label>
+            <div class="col-12 col-sm-6">
+              <label class="form-label mb-0">Nome</label>
+              <input type="text" name="nome" class="form-control smart-input" data-textcase="upper" maxlength="100" minlength="3" required>
+            </div>
+
+            <div class="col-12 col-sm-6">
+              <label class="form-label mb-0" for="pais_endereco_id">País do Endereço</label>
+              <select name="pais_endereco_id" id="pais_endereco_id" class="form-select" required>
+                <option value="">Selecione</option>
+              </select>
+            </div>
+
+            <div class="col-12 col-sm-6">
+              <label class="form-label mb-0" for="pais_atuacao_id">País de Atuação</label>
+              <select name="pais_atuacao_id" id="pais_atuacao_id" class="form-select" required>
+                <option value="">Selecione</option>
+              </select>
+            </div>
+
+            <div class="col-12 col-sm-3 d-flex flex-column justify-content-end">
+              <div class="form-check mb-2">
+                <input id="is_matriz" type="checkbox" name="is_matriz" class="form-check-input">
+                <label for="is_matriz" class="form-check-label">É matriz</label>
+              </div>
+              <div class="form-check mb-2">
+                <input id="ativa" type="checkbox" name="ativa" class="form-check-input">
+                <label for="ativa" class="form-check-label">Ativa</label>
+              </div>
+              <div class="form-check">
+                <input id="sms_confirm" type="checkbox" name="sms_confirm" class="form-check-input">
+                <label for="sms_confirm" class="form-check-label">Confirmação por SMS</label>
+              </div>
+            </div>
+
+            <div class="col-12 col-sm-3">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="numero">
+                <span>Número</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="Número de telefone ou identificação da filial para envio de SMS.">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <input id="numero" name="numero" type="text" class="form-control smart-input" maxlength="15">
+            </div>
           </div>
-          <div class="form-check">
-            <input id="ativa" type="checkbox" name="ativa" class="form-check-input">
-            <label for="ativa" class="form-check-label">Ativa</label>
+
+          <div class="row g-3 mt-1">
+            <div class="col-12">
+              <h6 class="text-muted">Localização do Depósito</h6>
+            </div>
+            <div class="col-12 col-sm-7">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="busca_deposito">
+                <span>Endereço</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="Digite o endereço do depósito e clique em Localizar para preencher automaticamente as coordenadas.">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <input id="busca_deposito" type="text" class="form-control"
+                placeholder="Ex: Rua das Flores, 100, Lisboa"
+                autocomplete="off">
+            </div>
+            <div class="col-12 col-sm-3 d-flex align-items-end">
+              <button id="btn-localizar-deposito" type="button" class="btn btn-outline-secondary w-100">
+                <i class="bi bi-geo-alt"></i> Localizar
+              </button>
+            </div>
+            <div class="col-12 col-sm-3">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="lat_deposito">
+                <span>Latitude</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="Latitude do depósito (preenchida automaticamente ao localizar o endereço ou informada manualmente).">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <input id="lat_deposito" name="lat_deposito" type="text" class="form-control smart-input"
+                placeholder="-23.550520" autocomplete="off">
+            </div>
+            <div class="col-12 col-sm-3">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="lng_deposito">
+                <span>Longitude</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="Longitude do depósito (preenchida automaticamente ao localizar o endereço ou informada manualmente).">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <input id="lng_deposito" name="lng_deposito" type="text" class="form-control smart-input"
+                placeholder="-46.633308" autocomplete="off">
+            </div>
+            <div id="busca-deposito-status" class="col-12 d-none">
+              <small class="text-muted" id="busca-deposito-msg"></small>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="row g-3 mt-1">
-        <div class="col-12">
-          <h6 class="text-muted">Localização do Depósito</h6>
+        <div class="tab-pane fade" id="filial-config" role="tabpanel">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="sms_padrao_1">
+                <span>Padrão SMS 1</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="Texto padrão utilizado no primeiro SMS enviado ao destinatário.">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <textarea id="sms_padrao_1" name="sms_padrao_1" class="form-control" rows="4"></textarea>
+            </div>
+            <div class="col-12">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="sms_padrao_2">
+                <span>Padrão SMS 2</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="Texto padrão utilizado no segundo SMS enviado ao destinatário.">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <textarea id="sms_padrao_2" name="sms_padrao_2" class="form-control" rows="4"></textarea>
+            </div>
+          </div>
         </div>
-        <div class="col-12 col-sm-7">
-          <label class="form-label mb-0 d-flex align-items-center gap-1" for="busca_deposito">
-            <span>Endereço</span>
-            <span
-              class="text-primary"
-              role="button"
-              tabindex="0"
-              data-bs-toggle="tooltip"
-              data-bs-placement="top"
-              data-bs-title="Digite o endereço do depósito e clique em Localizar para preencher automaticamente as coordenadas.">
-              <i class="bi bi-question-circle"></i>
-            </span>
-          </label>
-          <input id="busca_deposito" type="text" class="form-control"
-            placeholder="Ex: Rua das Flores, 100, Lisboa"
-            autocomplete="off">
-        </div>
-        <div class="col-12 col-sm-3 d-flex align-items-end">
-          <button id="btn-localizar-deposito" type="button" class="btn btn-outline-secondary w-100">
-            <i class="bi bi-geo-alt"></i> Localizar
-          </button>
-        </div>
-        <div class="col-12 col-sm-3">
-          <label class="form-label mb-0 d-flex align-items-center gap-1" for="lat_deposito">
-            <span>Latitude</span>
-            <span
-              class="text-primary"
-              role="button"
-              tabindex="0"
-              data-bs-toggle="tooltip"
-              data-bs-placement="top"
-              data-bs-title="Latitude do depósito (preenchida automaticamente ao localizar o endereço ou informada manualmente).">
-              <i class="bi bi-question-circle"></i>
-            </span>
-          </label>
-          <input id="lat_deposito" name="lat_deposito" type="text" class="form-control smart-input"
-            placeholder="-23.550520" autocomplete="off">
-        </div>
-        <div class="col-12 col-sm-3">
-          <label class="form-label mb-0 d-flex align-items-center gap-1" for="lng_deposito">
-            <span>Longitude</span>
-            <span
-              class="text-primary"
-              role="button"
-              tabindex="0"
-              data-bs-toggle="tooltip"
-              data-bs-placement="top"
-              data-bs-title="Longitude do depósito (preenchida automaticamente ao localizar o endereço ou informada manualmente).">
-              <i class="bi bi-question-circle"></i>
-            </span>
-          </label>
-          <input id="lng_deposito" name="lng_deposito" type="text" class="form-control smart-input"
-            placeholder="-46.633308" autocomplete="off">
-        </div>
-        <div id="busca-deposito-status" class="col-12 d-none">
-          <small class="text-muted" id="busca-deposito-msg"></small>
-        </div>
+
       </div>
     </div>
 

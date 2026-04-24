@@ -17,9 +17,14 @@ const btnMostrarRotas = document.getElementById('btn-mostrar-rotas');
 const btnLimparRotas  = document.getElementById('btn-limpar-rotas');
 const legendaWrapper  = document.getElementById('mapa-legenda');
 const legendaItens    = document.getElementById('mapa-legenda-itens');
-const avisoGeocoding  = document.getElementById('mapa-aviso-geocoding');
-const avisoTexto      = document.getElementById('mapa-aviso-texto');
-const painel          = document.getElementById('mapa-painel');
+const avisoGeocoding      = document.getElementById('mapa-aviso-geocoding');
+const avisoTexto          = document.getElementById('mapa-aviso-texto');
+const mapaInfo            = document.getElementById('mapa-info');
+const mapaContagemLabel   = document.getElementById('mapa-contagem-label');
+const mapaProgressoLabel  = document.getElementById('mapa-progresso-label');
+const mapaProgressoWrapper = document.getElementById('mapa-progresso-wrapper');
+const mapaProgressoBarra  = document.getElementById('mapa-progresso-barra');
+const painel              = document.getElementById('mapa-painel');
 const painelTitulo    = document.getElementById('mapa-painel-titulo');
 const painelCorpo     = document.getElementById('mapa-painel-corpo');
 
@@ -276,6 +281,7 @@ async function carregarPontos(data) {
   rotasLayer.clearLayers();
   btnMostrarRotas.disabled = true;
   btnLimparRotas.classList.add('d-none');
+  mapaInfo.classList.add('d-none');
 
   try {
     const resp = await fetch(URL_PONTOS, {
@@ -300,7 +306,20 @@ async function carregarPontos(data) {
     const coords = geojsonData.features.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]]);
     if (coords.length > 0) mapaLeaflet.fitBounds(L.latLngBounds(coords), { padding: [40, 40] });
 
+    const totalComCoord = result.total ?? 0;
     const totalSemCoord = result.sem_coord ?? 0;
+    const totalGeral    = totalComCoord + totalSemCoord;
+    const pct           = totalGeral > 0 ? Math.round((totalComCoord / totalGeral) * 100) : 0;
+
+    mapaContagemLabel.textContent  = `${totalComCoord} endereço(s) exibido(s) no mapa`;
+    mapaProgressoLabel.textContent = `${totalComCoord}/${totalGeral} com coordenadas (${pct}%)`;
+    mapaProgressoBarra.style.width = `${pct}%`;
+    mapaProgressoWrapper.setAttribute('aria-valuenow', pct);
+    mapaProgressoBarra.className   = pct === 100 ? 'progress-bar bg-success'
+                                   : pct > 0    ? 'progress-bar bg-warning'
+                                                : 'progress-bar bg-danger';
+    mapaInfo.classList.remove('d-none');
+
     if (totalSemCoord > 0) {
       avisoTexto.textContent = `${totalSemCoord} endereço(s) não foram geocodificados e não aparecem no mapa.`;
     } else {

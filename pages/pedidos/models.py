@@ -11,6 +11,20 @@ TIPO_CHOICES = [
     ("RECOLHA", "Recolha"),
 ]
 
+MOTIVO_CHOICES = [
+    ("Pedido Cancelado p/ Cliente", "Pedido Cancelado p/ Cliente"),
+    ("Entrega Recusada", "Entrega Recusada"),
+    ("Artigos Danificados", "Artigos Danificados"),
+    ("Cliente Ausente", "Cliente Ausente"),
+    ("Tipologia de Entrega Errada (Passeio/Domicilio/Grua)", "Tipologia de Entrega Errada (Passeio/Domicilio/Grua)"),
+    ("Morada Errada", "Morada Errada"),
+    ("Pedido Adiado", "Pedido Adiado"),
+    ("Artigos Errados", "Artigos Errados"),
+    ("Transportadora Errada", "Transportadora Errada"),
+    ("Outros", "Outros"),
+    ("Pedido cancelado", "Pedido cancelado"),
+]
+
 ORIGEM_CHOICES = [
     ("IMPORTADO", "Importado"),
     ("MANUAL", "Manual"),
@@ -159,6 +173,7 @@ class TentativaEntrega(models.Model):
     periodo = models.CharField(max_length=5, choices=PERIODO_CHOICES, null=True, blank=True)
     faturado = models.BooleanField(default=False)
     interno = models.BooleanField(default=False)
+    sms_enviado = models.BooleanField(default=False)
     dt_entrega = models.DateField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -166,6 +181,7 @@ class TentativaEntrega(models.Model):
         db_table = "tentativa_entrega"
         permissions = [
             ("change_carro_tentativaentrega", "Pode alterar o campo Carro na conferência de volumes"),
+            ("send_sms_tentativaentrega", "Pode enviar SMS de notificação de entrega"),
         ]
         indexes = [
             models.Index(fields=["pedido", "data_tentativa"]),
@@ -174,3 +190,28 @@ class TentativaEntrega(models.Model):
 
     def __str__(self):
         return f"Tentativa {self.data_tentativa} — Pedido {self.pedido_id}"
+
+
+class Devolucao(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    pedido = models.ForeignKey(
+        Pedido,
+        on_delete=models.CASCADE,
+        db_column="pedido_id",
+        related_name="devolucoes",
+    )
+    data = models.DateField()
+    palete = models.SmallIntegerField(null=True, blank=True)
+    volume = models.SmallIntegerField(null=True, blank=True)
+    motivo = models.CharField(max_length=100, choices=MOTIVO_CHOICES)
+    obs = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "devolucao"
+        indexes = [
+            models.Index(fields=["pedido"]),
+            models.Index(fields=["data"]),
+        ]
+
+    def __str__(self):
+        return f"Devolução {self.data} — Pedido {self.pedido_id}"

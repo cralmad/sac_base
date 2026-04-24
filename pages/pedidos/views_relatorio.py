@@ -12,6 +12,7 @@ from itertools import groupby
 from pages.pedidos.models import TentativaEntrega, Pedido, ESTADOS_SEGUE_PARA_ENTREGA
 from sac_base.permissions_utils import build_action_permissions
 from sac_base.sisvar_builders import build_sisvar_payload
+from sac_base.sms_service import montar_mensagem, enviar_sms_bulkgate, HORARIO_PERIODO as _SMS_HORARIO_PERIODO
 
 PERMISSOES_RELATORIO = {
     "acessar": "pedidos.view_tentativaentrega",
@@ -254,3 +255,224 @@ def relatorio_rotas_view(request):
         "grupos": grupos,
         "data_fmt": dt.strftime("%d/%m/%Y"),
     })
+
+
+# ─── Relatório de Envio de SMS ────────────────────────────────────────────────
+
+PERMISSOES_SMS = {
+    "acessar": "pedidos.view_tentativaentrega",
+    "enviar": "pedidos.send_sms_tentativaentrega",
+}
+
+
+@login_required
+@permission_required(PERMISSOES_SMS["acessar"], raise_exception=True)
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def relatorio_sms_view(request):
+    if request.method == "GET":
+        request.sisvar_extra = build_sisvar_payload(
+            permissions={"sms": build_action_permissions(request.user, PERMISSOES_SMS)}
+        )
+        return render(request, "relatorio_sms.html")
+
+    # POST: busca tentativas de entrega por data
+    data = request.sisvar_front or {}
+    filtros = data.get("filtros", {})
+    data_tentativa = filtros.get("data_tentativa", "").strip()
+
+    if not data_tentativa:
+        return JsonResponse({"success": False, "mensagem": "A data é obrigatória."}, status=400)
+
+    try:
+        dt = datetime.strptime(data_tentativa, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"success": False, "mensagem": "Data inválida."}, status=400)
+
+    qs = (
+        TentativaEntrega.objects
+        .select_related("pedido")
+        .filter(data_tentativa=dt)
+        .order_by("pedido__codpost_dest", "pedido__pedido")
+    )
+
+    registros = []
+    for mov in qs:
+        pedido = mov.pedido
+        fones = [f for f in [pedido.fone_dest or "", pedido.fone_dest2 or ""] if f]
+        registros.append({
+            "id": mov.id,
+            "sms_enviado": mov.sms_enviado,
+            "referencia": pedido.pedido or str(pedido.id_vonzu),
+            "tipo": pedido.tipo or "",
+            "fones": fones,
+            "codpost_dest": pedido.codpost_dest or "",
+            "volume": pedido.volume,
+            "peso": str(pedido.peso) if pedido.peso is not None else "",
+            "periodo": mov.periodo or "",
+        })
+
+    return JsonResponse({"success": True, "registros": registros, "data_fmt": dt.strftime("%d/%m/%Y")})
+
+
+@login_required
+@permission_required(PERMISSOES_SMS["enviar"], raise_exception=True)
+@csrf_protect
+@require_POST
+def relatorio_sms_enviar_view(request):
+    data = request.sisvar_front or {}
+    ids = data.get("ids", [])
+    data_tentativa = data.get("data_tentativa", "").strip()
+
+    if not ids:
+        return JsonResponse({"success": False, "mensagem": "Nenhum registro selecionado."}, status=400)
+
+    if not data_tentativa:
+        return JsonResponse({"success": False, "mensagem": "Data não informada."}, status=400)
+
+    try:
+        dt = datetime.strptime(data_tentativa, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"success": False, "mensagem": "Data inválida."}, status=400)
+
+    qs = (
+        TentativaEntrega.objects
+        .select_related(
+            "pedido",
+            "pedido__filial",
+            "pedido__filial__config",
+            "pedido__filial__pais_atuacao",
+        )
+        .filter(id__in=ids, sms_enviado=False)
+        .exclude(periodo__isnull=True)
+        .exclude(periodo="")
+    )
+
+    # Carrega configuração da filial a partir do primeiro registro
+    tentativas = list(qs)
+    if not tentativas:
+        return JsonResponse({"success": False, "mensagem": "Nenhum registro elegível encontrado."}, status=400)
+
+    filial = tentativas[0].pedido.filial
+    try:
+        template_msg = filial.config.sms_padrao_1 or ""
+    except Exception:
+        template_msg = ""
+
+    if not template_msg:
+        return JsonResponse(
+            {"success": False, "mensagem": "Mensagem padrão (sms_padrao_1) não configurada para esta filial."},
+            status=400,
+        )
+
+    sigla_pais = ""
+    ddi_padrao = "351"  # fallback: Portugal
+    if filial.pais_atuacao:
+        sigla_pais = filial.pais_atuacao.sigla or ""
+        # codigo_tel armazenado como "+351", "+55", etc.
+        codigo_tel = (filial.pais_atuacao.codigo_tel or "").strip().lstrip("+")
+        if codigo_tel:
+            ddi_padrao = codigo_tel
+
+    enviados = 0
+    erros = 0
+    ids_enviados = []
+    erros_detalhe: list[str] = []
+    contagem_periodo: dict[str, int] = {}
+
+    for mov in tentativas:
+        pedido = mov.pedido
+        referencia = pedido.pedido or str(pedido.id_vonzu)
+        fones = [f.strip() for f in [pedido.fone_dest or "", pedido.fone_dest2 or ""] if f.strip()]
+        if not fones:
+            erros += 1
+            erros_detalhe.append(f"{referencia}: sem número de telefone.")
+            continue
+
+        try:
+            mensagem = montar_mensagem(template_msg, dt, mov.periodo, sigla_pais)
+        except Exception as exc:
+            erros += 1
+            erros_detalhe.append(f"{referencia}: erro na montagem da mensagem — {exc}")
+            continue
+
+        sucesso_algum = False
+        for fone in fones:
+            resultado = enviar_sms_bulkgate(fone, mensagem, ddi_padrao)
+            if resultado.get("sucesso"):
+                sucesso_algum = True
+            else:
+                erros += 1
+                erros_detalhe.append(f"{referencia} ({fone}): {resultado.get('erro', 'Erro desconhecido.')}")
+
+        if sucesso_algum:
+            mov.sms_enviado = True
+            mov.save(update_fields=["sms_enviado"])
+            enviados += 1
+            ids_enviados.append(mov.id)
+            contagem_periodo[mov.periodo] = contagem_periodo.get(mov.periodo, 0) + 1
+
+    # Resumo para a filial (sms_confirm)
+    if filial.sms_confirm and filial.numero and enviados > 0:
+        partes_resumo = [f"SMS enviados em {dt.strftime('%d/%m/%Y')}:"]
+        for periodo, qtd in sorted(contagem_periodo.items()):
+            horario = _SMS_HORARIO_PERIODO.get(periodo, periodo)
+            partes_resumo.append(f"  {periodo} ({horario}): {qtd}")
+        partes_resumo.append(f"Total: {enviados}")
+        resumo = "\n".join(partes_resumo)
+        enviar_sms_bulkgate(filial.numero, resumo, ddi_padrao)
+
+    return JsonResponse({
+        "success": True,
+        "enviados": enviados,
+        "erros": erros,
+        "erros_detalhe": erros_detalhe,
+        "ids_enviados": ids_enviados,
+        "mensagem": f"{enviados} SMS enviado(s) com sucesso." + (f" {erros} erro(s)." if erros else ""),
+    })
+
+
+@login_required
+@permission_required(PERMISSOES_SMS["acessar"], raise_exception=True)
+@csrf_protect
+@require_POST
+def relatorio_sms_preview_view(request):
+    """Retorna um preview das mensagens MANHÃ/TARDE para a data informada."""
+    data = request.sisvar_front or {}
+    data_tentativa = data.get("data_tentativa", "").strip()
+
+    if not data_tentativa:
+        return JsonResponse({"success": False, "mensagem": "Data não informada."}, status=400)
+
+    try:
+        dt = datetime.strptime(data_tentativa, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"success": False, "mensagem": "Data inválida."}, status=400)
+
+    filial = getattr(request, "filial_ativa", None)
+
+    if not filial:
+        return JsonResponse({"success": False, "mensagem": "Nenhuma filial ativa na sessão."}, status=400)
+
+    template_msg = ""
+    sigla_pais = ""
+    try:
+        template_msg = filial.config.sms_padrao_1 or ""
+        if filial.pais_atuacao:
+            sigla_pais = filial.pais_atuacao.sigla or ""
+    except Exception:
+        pass
+
+    if not template_msg:
+        return JsonResponse({"success": False, "mensagem": "Mensagem padrão (sms_padrao_1) não configurada para a filial ativa."}, status=400)
+
+    previews = {}
+    for periodo in ("MANHA", "TARDE"):
+        try:
+            previews[periodo] = montar_mensagem(template_msg, dt, periodo, sigla_pais)
+        except Exception as exc:
+            previews[periodo] = f"[Erro: {exc}]"
+
+    return JsonResponse({"success": True, "previews": previews})
+
+
