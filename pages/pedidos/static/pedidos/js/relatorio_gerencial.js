@@ -22,11 +22,14 @@ const loader      = document.getElementById('rg-loader');
 const vazio       = document.getElementById('rg-vazio');
 const tituloData  = document.getElementById('rg-titulo-data');
 const totalBar    = document.getElementById('rg-total-bar');
-const btnImprimir = document.getElementById('rg-btn-imprimir');
-const btnSelTodos = document.getElementById('rg-btn-sel-todos');
-const btnDesTodos = document.getElementById('rg-btn-des-todos');
-const erroVonzu   = document.getElementById('rg-id-vonzu-erro');
-const erroRef     = document.getElementById('rg-referencia-erro');
+const btnImprimir      = document.getElementById('rg-btn-imprimir');
+const btnSelTodos      = document.getElementById('rg-btn-sel-todos');
+const btnDesTodos      = document.getElementById('rg-btn-des-todos');
+const selArmazem       = document.getElementById('rg-armazem');
+const colBtnDev        = document.getElementById('rg-col-btn-dev');
+const btnRegistrarDev  = document.getElementById('rg-btn-registrar-dev');
+const erroVonzu        = document.getElementById('rg-id-vonzu-erro');
+const erroRef          = document.getElementById('rg-referencia-erro');
 
 // ─── Popula select de estados a partir da sisVar ──────────────────────────────
 function preencherEstados() {
@@ -37,6 +40,22 @@ function preencherEstados() {
     opt.value = e.value;
     opt.textContent = e.label;
     selEstados.appendChild(opt);
+  });
+}
+
+function preencherMotivos() {
+  const motivos = getOptions('motivos_dev') || [];
+  const sel = document.getElementById('rgm-motivo');
+  sel.replaceChildren();
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = 'Selecione…';
+  sel.appendChild(placeholder);
+  motivos.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.value;
+    opt.textContent = m.label;
+    sel.appendChild(opt);
   });
 }
 
@@ -82,11 +101,144 @@ function _esc(v) {
     .replace(/"/g, '&quot;');
 }
 
+// ─── Fila de devoluções pendentes ─────────────────────────────────────────────
+let _devQueue    = [];   // [{pedido_id, pedido, tipo, volumes}, ...]
+let _devIndex    = 0;
+let _bsModal     = null;
+
+function _coletarFilaDev(grupos) {
+  _devQueue = [];
+  grupos.forEach(g => {
+    g.linhas.forEach(l => {
+      if (l.armazem === 'SIM') {
+        _devQueue.push({
+          pedido_id: l.pedido_id,
+          pedido:    l.pedido,
+          tipo:      l.tipo,
+          volumes:   l.volumes,
+        });
+      }
+    });
+  });
+}
+
+function _abrirModal(index) {
+  if (index >= _devQueue.length) {
+    _bsModal?.hide();
+    definirMensagem('sucesso', 'Todas as devoluções foram registradas.', false);
+    return;
+  }
+  _devIndex = index;
+  const item = _devQueue[index];
+
+  document.getElementById('rgm-referencia').textContent = item.pedido;
+  document.getElementById('rgm-tipo').textContent       = item.tipo === 'R' ? 'Recolha' : 'Entrega';
+  document.getElementById('rgm-volumes').textContent    = item.volumes;
+  document.getElementById('rgm-pedido-id').value        = item.pedido_id;
+  document.getElementById('rgm-progresso').textContent  =
+    `Pedido ${index + 1} de ${_devQueue.length}`;
+
+  // Limpa form
+  document.getElementById('rgm-data').value   = new Date().toISOString().slice(0, 10);
+  document.getElementById('rgm-motivo').value = '';
+  document.getElementById('rgm-palete').value = '';
+  document.getElementById('rgm-volume').value = '';
+  document.getElementById('rgm-obs').value    = '';
+  const erroEl = document.getElementById('rgm-erro');
+  erroEl.classList.add('d-none');
+  erroEl.textContent = '';
+
+  const btnSalvar = document.getElementById('rgm-btn-salvar');
+  btnSalvar.disabled = false;
+
+  if (!_bsModal) {
+    _bsModal = new bootstrap.Modal(document.getElementById('rg-modal-dev'));
+  }
+  _bsModal.show();
+}
+
+async function _salvarDevolucao() {
+  const pedidoId = document.getElementById('rgm-pedido-id').value;
+  const data     = document.getElementById('rgm-data').value;
+  const motivo   = document.getElementById('rgm-motivo').value;
+  const palete   = document.getElementById('rgm-palete').value;
+  const volume   = document.getElementById('rgm-volume').value;
+  const obs      = document.getElementById('rgm-obs').value;
+  const erroEl   = document.getElementById('rgm-erro');
+  const btnSalvar = document.getElementById('rgm-btn-salvar');
+
+  erroEl.classList.add('d-none');
+
+  if (!data) {
+    erroEl.textContent = 'A data é obrigatória.';
+    erroEl.classList.remove('d-none');
+    return;
+  }
+  if (!motivo) {
+    erroEl.textContent = 'O motivo é obrigatório.';
+    erroEl.classList.remove('d-none');
+    return;
+  }
+
+  const paleteNum = palete !== '' ? parseInt(palete, 10) : null;
+  const volumeNum = volume !== '' ? parseInt(volume, 10) : null;
+
+  if (palete !== '' && (!Number.isInteger(paleteNum) || paleteNum < 0 || paleteNum > 999)) {
+    erroEl.textContent = 'Palete deve ser um número inteiro entre 0 e 999.';
+    erroEl.classList.remove('d-none');
+    return;
+  }
+  if (volume !== '' && (!Number.isInteger(volumeNum) || volumeNum < 0 || volumeNum > 999)) {
+    erroEl.textContent = 'Volume deve ser um número inteiro entre 0 e 999.';
+    erroEl.classList.remove('d-none');
+    return;
+  }
+  if ((paleteNum ?? 0) === 0 && (volumeNum ?? 0) === 0) {
+    erroEl.textContent = 'Pelo menos Palete ou Volume deve ser maior que 0.';
+    erroEl.classList.remove('d-none');
+    return;
+  }
+
+  btnSalvar.disabled = true;
+  AppLoader.show();
+  try {
+    const resp = await fetch('/app/logistica/pedidos/dev/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+      body: JSON.stringify({
+        pedido_id: parseInt(pedidoId, 10),
+        data,
+        motivo,
+        palete: paleteNum,
+        volume: volumeNum,
+        obs: obs || null,
+      }),
+    });
+    const json = await resp.json();
+    if (!json.success) {
+      erroEl.textContent = json.mensagem || 'Erro ao salvar.';
+      erroEl.classList.remove('d-none');
+      btnSalvar.disabled = false;
+      return;
+    }
+    // Avança para o próximo
+    _abrirModal(_devIndex + 1);
+  } catch {
+    erroEl.textContent = 'Erro de comunicação com o servidor.';
+    erroEl.classList.remove('d-none');
+    btnSalvar.disabled = false;
+  } finally {
+    AppLoader.hide();
+  }
+}
+
 // ─── Renderizar grupos ────────────────────────────────────────────────────────
 function renderizarGrupos(grupos, dataFmt, totalPedidos) {
   resultado.replaceChildren();
   vazio.classList.add('d-none');
   totalBar.classList.add('d-none');
+  colBtnDev.classList.add('d-none');
+  _devQueue = [];
 
   if (!grupos.length) {
     vazio.classList.remove('d-none');
@@ -120,7 +272,7 @@ function renderizarGrupos(grupos, dataFmt, totalPedidos) {
 
     const thead = document.createElement('thead');
     const trHead = document.createElement('tr');
-    ['Data', 'Referência', 'ID Vonzu', 'T', 'Destinatário', 'Telefone(s)', 'Endereço', 'Cidade', 'C. Postal', 'Vol', 'Peso', 'Per.', 'Estado', 'Obs. Rota'].forEach(h => {
+    ['Data', 'Referência', 'ID Vonzu', 'T', 'Cidade', 'C. Postal', 'Vol', 'Peso', 'Estado', 'Mov', 'Dev', 'Armazém'].forEach(h => {
       const th = document.createElement('th');
       th.textContent = h;
       trHead.appendChild(th);
@@ -140,16 +292,14 @@ function renderizarGrupos(grupos, dataFmt, totalPedidos) {
         { val: linha.pedido },
         { val: linha.id_vonzu },
         { val: linha.tipo, cls: linha.tipo === 'R' ? 'rg-tipo-r' : 'rg-tipo-e' },
-        { val: linha.nome_dest },
-        { val: linha.fones },
-        { val: linha.endereco_dest },
         { val: linha.cidade_dest },
         { val: linha.codpost_dest },
         { val: linha.volumes, bold: volNegrito },
         { val: linha.peso },
-        { val: linha.periodo, cls: linha.periodo ? `rg-periodo-${linha.periodo}` : '' },
         { val: linha.estado },
-        { val: linha.obs_rota, cls: 'rg-obs' },
+        { val: linha.mov },
+        { val: linha.dev },
+        { val: linha.armazem },
       ];
 
       campos.forEach(({ val, cls, bold }) => {
@@ -178,6 +328,14 @@ function renderizarGrupos(grupos, dataFmt, totalPedidos) {
   });
 
   btnImprimir.disabled = false;
+
+  // Mostra botão de devoluções apenas quando filtro Armazém=Sim e há itens
+  if (selArmazem.value === 'sim') {
+    _coletarFilaDev(grupos);
+    if (_devQueue.length > 0) {
+      colBtnDev.classList.remove('d-none');
+    }
+  }
 }
 
 // ─── Buscar ───────────────────────────────────────────────────────────────────
@@ -209,6 +367,7 @@ async function buscar() {
         id_vonzu:     inpIdVonzu.value.trim(),
         referencia:   inpRef.value.trim(),
         estados:      getMultiSelectValues(selEstados),
+        armazem:      selArmazem.value,
       },
     };
 
@@ -251,6 +410,7 @@ inpRef.addEventListener('input', () => {
 // ─── Inicialização ────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   preencherEstados();
+  preencherMotivos();
 
   // Inicializar tooltips Bootstrap
   document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
@@ -261,3 +421,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // ─── Eventos ─────────────────────────────────────────────────────────────────
 form.addEventListener('submit', e => { e.preventDefault(); buscar(); });
 btnImprimir.addEventListener('click', () => window.print());
+btnRegistrarDev.addEventListener('click', () => _abrirModal(0));
+document.getElementById('rgm-btn-salvar').addEventListener('click', _salvarDevolucao);
+document.getElementById('rgm-btn-pular').addEventListener('click', () => _abrirModal(_devIndex + 1));

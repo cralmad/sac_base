@@ -1,6 +1,6 @@
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.paginator import Paginator
-from django.db.models import F
+from django.db.models import F, Count
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
@@ -9,7 +9,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from datetime import datetime
 from itertools import groupby
 
-from pages.pedidos.models import TentativaEntrega, Pedido, ESTADOS_SEGUE_PARA_ENTREGA, ESTADO_DEFINITIONS
+from pages.pedidos.models import TentativaEntrega, Pedido, Devolucao, ESTADOS_SEGUE_PARA_ENTREGA, ESTADO_DEFINITIONS, ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA, MOTIVO_CHOICES
 from sac_base.permissions_utils import build_action_permissions
 from sac_base.sisvar_builders import build_sisvar_payload
 from sac_base.sms_service import montar_mensagem, enviar_sms_bulkgate, HORARIO_PERIODO as _SMS_HORARIO_PERIODO
@@ -494,9 +494,10 @@ def relatorio_gerencial_view(request):
             {"value": v, "label": l}
             for v, l, *_ in ESTADO_DEFINITIONS
         ]
+        motivos_choices = [{"value": v, "label": l} for v, l in MOTIVO_CHOICES]
         request.sisvar_extra = build_sisvar_payload(
             permissions={"gerencial": build_action_permissions(request.user, PERMISSOES_GERENCIAL)},
-            options={"estados": estados_choices},
+            options={"estados": estados_choices, "motivos_dev": motivos_choices},
         )
         return render(request, "relatorio_gerencial.html")
 
@@ -509,6 +510,7 @@ def relatorio_gerencial_view(request):
     id_vonzu_str   = filtros.get("id_vonzu", "").strip()
     referencia_str = filtros.get("referencia", "").strip()
     estados_lista  = filtros.get("estados", [])
+    armazem_filtro = filtros.get("armazem", "").strip().lower()
     if not isinstance(estados_lista, list):
         estados_lista = []
 
@@ -543,36 +545,69 @@ def relatorio_gerencial_view(request):
 
     qs = qs.order_by("carro", "data_tentativa", "pedido__codpost_dest", "pedido__pedido")
 
+    movs = list(qs)
+    pedido_ids = {m.pedido_id for m in movs}
+
+    mov_counts = {}
+    dev_counts = {}
+    if pedido_ids:
+        mov_counts = dict(
+            TentativaEntrega.objects
+            .filter(pedido_id__in=pedido_ids)
+            .values("pedido_id")
+            .annotate(cnt=Count("id"))
+            .values_list("pedido_id", "cnt")
+        )
+        dev_counts = dict(
+            Devolucao.objects
+            .filter(pedido_id__in=pedido_ids)
+            .values("pedido_id")
+            .annotate(cnt=Count("id"))
+            .values_list("pedido_id", "cnt")
+        )
+
     grupos = []
-    for carro_val, items in groupby(qs, key=lambda m: m.carro):
+    for carro_val, items in groupby(movs, key=lambda m: m.carro):
         linhas = []
         for mov in items:
             p = mov.pedido
             tipo_abrev = "R" if (p.tipo or "").upper() == "RECOLHA" else "E"
-            fones = " / ".join(f for f in [p.fone_dest or "", p.fone_dest2 or ""] if f)
             peso_str = ""
             if p.peso is not None:
                 try:
                     peso_str = str(int(p.peso))
                 except Exception:
                     peso_str = str(p.peso)
+            dev_count = dev_counts.get(p.id, 0)
+            mov_count = mov_counts.get(p.id, 0)
+            tipo_upper = (p.tipo or "").upper()
+            estado_concluido = p.estado in ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA
+            if tipo_upper == "ENTREGA":
+                armazem = "SIM" if (not estado_concluido and (p.volume_conf or 0) > 0 and dev_count == 0) else ""
+            elif tipo_upper == "RECOLHA":
+                armazem = "SIM" if (estado_concluido and dev_count == 0) else ""
+            else:
+                armazem = ""
             linhas.append({
+                "pedido_id":      p.id,
                 "pedido":         p.pedido or str(p.id_vonzu),
                 "id_vonzu":       p.id_vonzu,
                 "tipo":           tipo_abrev,
                 "data_tentativa": mov.data_tentativa.strftime("%d/%m/%Y"),
-                "nome_dest":      p.nome_dest or "",
-                "fones":          fones,
-                "endereco_dest":  p.endereco_dest or "",
                 "cidade_dest":    p.cidade_dest or "",
                 "codpost_dest":   p.codpost_dest or "",
                 "volumes":        f"{p.volume_conf or 0}/{p.volume or 0}",
                 "peso":           peso_str,
-                "periodo":        mov.periodo or "",
                 "estado":         p.estado or "",
-                "obs_rota":       p.obs_rota or "",
+                "mov":            mov_count,
+                "dev":            dev_count,
+                "armazem":        armazem,
                 "segue_para_entrega": p.estado in ESTADOS_SEGUE_PARA_ENTREGA,
             })
+            if armazem_filtro == "sim" and armazem != "SIM":
+                linhas.pop()
+            elif armazem_filtro == "nao" and armazem == "SIM":
+                linhas.pop()
         grupos.append({
             "carro": str(carro_val) if carro_val is not None else "—",
             "total": len(linhas),

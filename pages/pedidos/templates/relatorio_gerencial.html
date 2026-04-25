@@ -31,7 +31,7 @@
 
 /* ── Tabela ── */
 .rg-tabela-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-table.rg-tabela   { width: 100%; border-collapse: collapse; font-size: 9pt; min-width: 900px; }
+table.rg-tabela   { width: 100%; border-collapse: collapse; font-size: 9pt; min-width: 700px; }
 table.rg-tabela th {
   background: #e9f0f7;
   color: #1a3a5c;
@@ -104,6 +104,7 @@ table.rg-tabela tr.rg-nao-segue td { background: #e0e0e0 !important; }
   .rg-total-bar { border: none; background: none !important; padding: 0; font-size: 7.5pt; }
   h1 { font-size: .85rem !important; margin-bottom: .15rem !important; }
   #rg-titulo-data { font-size: 7.5pt; }
+  #rg-col-btn-dev, #rg-modal-dev { display: none !important; }
 }
 </style>
 {% endblock %}
@@ -195,6 +196,27 @@ table.rg-tabela tr.rg-nao-segue td { background: #e0e0e0 !important; }
         </div>
       </div>
 
+      <!-- Armazém -->
+      <div class="col-6 col-sm-4 col-md-2">
+        <label class="form-label mb-0 d-flex align-items-center gap-1" for="rg-armazem">
+          <span>Armazém</span>
+          <span
+            class="text-primary"
+            role="button"
+            tabindex="0"
+            data-bs-toggle="tooltip"
+            data-bs-placement="top"
+            data-bs-title="Filtra pedidos pelo campo Armazém calculado. Vazio = todos.">
+            <i class="bi bi-question-circle"></i>
+          </span>
+        </label>
+        <select id="rg-armazem" class="form-select">
+          <option value="">Todos</option>
+          <option value="sim">Sim</option>
+          <option value="nao">Não</option>
+        </select>
+      </div>
+
       <!-- Botões -->
       <div class="col-12 col-sm-12 col-md-2 d-flex gap-2 align-items-end">
         <button type="submit" class="btn btn-primary w-100">
@@ -202,6 +224,13 @@ table.rg-tabela tr.rg-nao-segue td { background: #e0e0e0 !important; }
         </button>
         <button type="button" id="rg-btn-imprimir" class="btn btn-outline-secondary w-100" disabled title="Imprimir">
           <i class="bi bi-printer"></i>
+        </button>
+      </div>
+
+      <!-- Registrar Devoluções (visível apenas quando Armazém=Sim) -->
+      <div class="col-12 d-none" id="rg-col-btn-dev">
+        <button type="button" id="rg-btn-registrar-dev" class="btn btn-warning">
+          <i class="bi bi-box-arrow-in-left me-1"></i>Registrar Devoluções
         </button>
       </div>
 
@@ -221,6 +250,69 @@ table.rg-tabela tr.rg-nao-segue td { background: #e0e0e0 !important; }
   </div>
 
   <div id="rg-vazio" class="text-center text-muted d-none">Nenhum registro encontrado para os filtros informados.</div>
+</div>
+
+<!-- ── Modal Devolução ──────────────────────────────────────────────────── -->
+<div class="modal fade" id="rg-modal-dev" tabindex="-1" aria-labelledby="rg-modal-dev-label" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="rg-modal-dev-label">
+          <i class="bi bi-box-arrow-in-left me-2"></i>Registrar Devolução
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Identificação do pedido (somente leitura) -->
+        <div class="mb-3 p-2 bg-light rounded border">
+          <div class="row g-1 small">
+            <div class="col-6"><span class="text-muted">Referência:</span> <strong id="rgm-referencia"></strong></div>
+            <div class="col-3"><span class="text-muted">Tipo:</span> <strong id="rgm-tipo"></strong></div>
+            <div class="col-3"><span class="text-muted">Vol:</span> <strong id="rgm-volumes"></strong></div>
+          </div>
+        </div>
+        <!-- Progresso -->
+        <p class="text-muted small mb-3" id="rgm-progresso"></p>
+        <!-- Campos da devolução -->
+        <form id="rgm-form" novalidate>
+          <input type="hidden" id="rgm-pedido-id">
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label mb-0" for="rgm-data">Data *</label>
+              <input type="date" id="rgm-data" class="form-control" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label mb-0" for="rgm-motivo">Motivo *</label>
+              <select id="rgm-motivo" class="form-select" required>
+                <option value="">Selecione…</option>
+              </select>
+            </div>
+            <div class="col-4">
+              <label class="form-label mb-0" for="rgm-palete">Palete</label>
+              <input type="number" id="rgm-palete" class="form-control" min="0" max="999" step="1" placeholder="—">
+            </div>
+            <div class="col-4">
+              <label class="form-label mb-0" for="rgm-volume">Volume</label>
+              <input type="number" id="rgm-volume" class="form-control" min="0" max="999" step="1" placeholder="—">
+            </div>
+            <div class="col-12">
+              <label class="form-label mb-0" for="rgm-obs">Obs.</label>
+              <textarea id="rgm-obs" class="form-control" rows="2"></textarea>
+            </div>
+          </div>
+          <div id="rgm-erro" class="text-danger small mt-2 d-none"></div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" id="rgm-btn-pular">
+          <i class="bi bi-skip-forward me-1"></i>Pular
+        </button>
+        <button type="button" class="btn btn-success" id="rgm-btn-salvar">
+          <i class="bi bi-check-lg me-1"></i>Salvar
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
