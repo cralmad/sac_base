@@ -1,6 +1,9 @@
+import base64
+import os
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
+import requests
 from django.contrib.auth.decorators import login_required, permission_required
 from django.db import transaction
 from django.http import JsonResponse
@@ -132,6 +135,10 @@ def _serialize_tentativa(reg):
 
 
 def _serialize_devolucao(reg):
+    fotos_publicas = [
+        {"id": f["id"], "url": f["url"], "thumb_url": f.get("thumb_url", f["url"])}
+        for f in (reg.fotos or [])
+    ]
     return {
         "id": reg.id,
         "pedido_id": reg.pedido_id,
@@ -140,6 +147,8 @@ def _serialize_devolucao(reg):
         "volume": reg.volume,
         "motivo": reg.motivo or "",
         "obs": reg.obs or "",
+        "fotos": fotos_publicas,
+        "fotos_count": len(fotos_publicas),
     }
 
 
@@ -599,8 +608,126 @@ def pedido_dev_del_view(request):
     dev = Devolucao.objects.filter(id=dev_id).first()
     if not dev:
         return JsonResponse(build_error_payload("Devolução não encontrada."), status=404)
+    # Excluir imagens do imgbb antes de remover o registro
+    for foto in (dev.fotos or []):
+        delete_url = foto.get("delete_url", "")
+        if delete_url:
+            try:
+                requests.get(delete_url, timeout=10)
+            except Exception:
+                pass
     dev.delete()
     return JsonResponse(build_success_payload("Devolução excluída com sucesso!"))
+
+
+_IMGBB_MAX_BYTES = 2 * 1024 * 1024  # 2 MB
+
+
+@permission_required(PERMISSOES_PEDIDO["editar"], raise_exception=True)
+def pedido_dev_foto_add_view(request):
+    """Recebe base64 comprimida do frontend, faz upload no imgbb e persiste metadados."""
+    if request.method != "POST":
+        return JsonResponse(build_error_payload("Método não permitido."), status=405)
+
+    data = request.sisvar_front
+    dev_id = _parse_int(data.get("dev_id"))
+    imagem_b64 = data.get("imagem_b64", "")
+
+    if not dev_id or not imagem_b64:
+        return JsonResponse(build_error_payload("Dados insuficientes."), status=400)
+
+    dev = Devolucao.objects.filter(id=dev_id).first()
+    if not dev:
+        return JsonResponse(build_error_payload("Devolução não encontrada."), status=404)
+
+    # Validar tamanho do base64 (raw bytes estimados)
+    try:
+        raw_bytes = base64.b64decode(imagem_b64, validate=True)
+    except Exception:
+        return JsonResponse(build_error_payload("Imagem inválida."), status=400)
+
+    if len(raw_bytes) > _IMGBB_MAX_BYTES:
+        return JsonResponse(
+            build_error_payload("A imagem excede 2 MB mesmo após compressão."), status=400
+        )
+
+    api_key = os.environ.get("IMGBB_API_KEY", "")
+    if not api_key:
+        return JsonResponse(
+            build_error_payload("Serviço de imagens não configurado."), status=500
+        )
+
+    try:
+        resp = requests.post(
+            "https://api.imgbb.com/1/upload",
+            data={"key": api_key, "image": imagem_b64},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        resultado = resp.json()
+    except Exception:
+        return JsonResponse(
+            build_error_payload("Falha ao enviar imagem para o serviço de hospedagem."), status=502
+        )
+
+    if not resultado.get("success"):
+        return JsonResponse(build_error_payload("O serviço de hospedagem recusou a imagem."), status=502)
+
+    img_data = resultado["data"]
+    nova_foto = {
+        "id": img_data["id"],
+        "url": img_data["url"],
+        "thumb_url": img_data.get("thumb", {}).get("url", img_data["url"]),
+        "delete_url": img_data.get("delete_url", ""),
+    }
+
+    fotos = list(dev.fotos or [])
+    fotos.append(nova_foto)
+    dev.fotos = fotos
+    dev.save(update_fields=["fotos"])
+
+    foto_publica = {
+        "id": nova_foto["id"],
+        "url": nova_foto["url"],
+        "thumb_url": nova_foto["thumb_url"],
+    }
+    return JsonResponse(build_success_payload("Foto adicionada.", extra_payload={"foto": foto_publica}))
+
+
+@permission_required(PERMISSOES_PEDIDO["editar"], raise_exception=True)
+def pedido_dev_foto_del_view(request):
+    """Remove uma foto da devolução e notifica o imgbb via delete_url."""
+    if request.method != "POST":
+        return JsonResponse(build_error_payload("Método não permitido."), status=405)
+
+    data = request.sisvar_front
+    dev_id = _parse_int(data.get("dev_id"))
+    imgbb_id = (data.get("imgbb_id") or "").strip()
+
+    if not dev_id or not imgbb_id:
+        return JsonResponse(build_error_payload("Dados insuficientes."), status=400)
+
+    dev = Devolucao.objects.filter(id=dev_id).first()
+    if not dev:
+        return JsonResponse(build_error_payload("Devolução não encontrada."), status=404)
+
+    fotos = list(dev.fotos or [])
+    alvo = next((f for f in fotos if f.get("id") == imgbb_id), None)
+    if not alvo:
+        return JsonResponse(build_error_payload("Foto não encontrada."), status=404)
+
+    # Tenta excluir no imgbb (falha silenciosa — registro local é sempre removido)
+    delete_url = alvo.get("delete_url", "")
+    if delete_url:
+        try:
+            requests.get(delete_url, timeout=10)
+        except Exception:
+            pass
+
+    dev.fotos = [f for f in fotos if f.get("id") != imgbb_id]
+    dev.save(update_fields=["fotos"])
+
+    return JsonResponse(build_success_payload("Foto removida."))
 
 
 @permission_required(PERMISSOES_PEDIDO["consultar"], raise_exception=True)

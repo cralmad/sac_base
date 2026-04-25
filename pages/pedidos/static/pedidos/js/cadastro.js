@@ -31,6 +31,8 @@ const modalMovEl = document.getElementById('modalMov');
 const modalMov = new bootstrap.Modal(modalMovEl);
 const modalDevEl = document.getElementById('modalDev');
 const modalDev = new bootstrap.Modal(modalDevEl);
+const modalFotosEl = document.getElementById('modalFotos');
+const modalFotos = new bootstrap.Modal(modalFotosEl);
 
 const CAMPOS_TRAVADOS_IMPORTADO = ['filial_id', 'origem', 'id_vonzu', 'pedido', 'tipo', 'criado', 'cliente_id'];
 
@@ -116,7 +118,7 @@ function renderDevolucoes(registros = []) {
   if (!registros.length) {
     const tr = document.createElement('tr');
     const td = document.createElement('td');
-    td.colSpan = 7;
+    td.colSpan = 8;
     td.className = 'text-center text-muted';
     td.textContent = 'Nenhuma devolução';
     tr.appendChild(td);
@@ -138,6 +140,21 @@ function renderDevolucoes(registros = []) {
     const tdAcoes = document.createElement('td');
     tdAcoes.className = 'text-center';
 
+    const btnFotos = document.createElement('button');
+    btnFotos.type = 'button';
+    btnFotos.className = 'btn btn-sm btn-outline-info me-1 btn-dev-fotos';
+    const iconeFotos = document.createElement('i');
+    iconeFotos.className = 'bi bi-images';
+    btnFotos.appendChild(iconeFotos);
+    if (d.fotos_count > 0) {
+      const badge = document.createElement('span');
+      badge.className = 'badge text-bg-info ms-1';
+      badge.textContent = String(d.fotos_count);
+      btnFotos.appendChild(badge);
+    }
+    btnFotos.dataset.id = String(d.id ?? '');
+    btnFotos.dataset.fotos = JSON.stringify(d.fotos || []);
+
     const btnEditar = document.createElement('button');
     btnEditar.type = 'button';
     btnEditar.className = 'btn btn-sm btn-outline-warning me-1 btn-dev-editar';
@@ -155,6 +172,7 @@ function renderDevolucoes(registros = []) {
     btnExcluir.textContent = 'Excluir';
     btnExcluir.dataset.id = String(d.id ?? '');
 
+    tdAcoes.appendChild(btnFotos);
     tdAcoes.appendChild(btnEditar);
     tdAcoes.appendChild(btnExcluir);
     tr.appendChild(tdAcoes);
@@ -162,6 +180,199 @@ function renderDevolucoes(registros = []) {
   });
 
   aplicarTravasDevolucoes();
+}
+
+// ── Fotos ──────────────────────────────────────────────────────────────────
+
+const _MAX_FOTO_BYTES = 2 * 1024 * 1024; // 2 MB
+const _MAX_DIM = 1920;
+
+async function comprimirImagem(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > _MAX_DIM || height > _MAX_DIM) {
+          const ratio = Math.min(_MAX_DIM / width, _MAX_DIM / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+
+        let qualidade = 0.85;
+        let b64 = '';
+        while (qualidade >= 0.40) {
+          const dataUrl = canvas.toDataURL('image/jpeg', qualidade);
+          b64 = dataUrl.split(',')[1];
+          const bytes = Math.ceil((b64.length * 3) / 4);
+          if (bytes <= _MAX_FOTO_BYTES) break;
+          qualidade -= 0.10;
+        }
+        if (!b64) {
+          reject(new Error('Não foi possível comprimir a imagem para menos de 2 MB.'));
+          return;
+        }
+        resolve(b64);
+      };
+      img.onerror = () => reject(new Error('Arquivo inválido.'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('Erro ao ler arquivo.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderFotosGrid(fotos = []) {
+  const grid = document.getElementById('fotos-grid');
+  grid.innerHTML = '';
+  if (!fotos.length) {
+    const p = document.createElement('p');
+    p.className = 'text-muted col-12';
+    p.textContent = 'Nenhuma foto adicionada.';
+    grid.appendChild(p);
+    return;
+  }
+  fotos.forEach(foto => {
+    const col = document.createElement('div');
+    col.className = 'col-6 col-md-3 position-relative';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'position-relative';
+
+    const img = document.createElement('img');
+    img.src = foto.thumb_url || foto.url;
+    img.alt = '';
+    img.className = 'img-fluid rounded border';
+    img.style.width = '100%';
+    img.style.height = '120px';
+    img.style.objectFit = 'cover';
+    img.setAttribute('data-bs-toggle', 'tooltip');
+    img.setAttribute('data-bs-title', 'Ver em tamanho real');
+    img.style.cursor = 'pointer';
+    img.addEventListener('click', () => window.open(foto.url, '_blank', 'noopener,noreferrer'));
+
+    const btnDel = document.createElement('button');
+    btnDel.type = 'button';
+    btnDel.className = 'btn btn-danger btn-sm position-absolute top-0 end-0 m-1 btn-foto-del';
+    btnDel.dataset.imgbbId = foto.id;
+    const icone = document.createElement('i');
+    icone.className = 'bi bi-trash';
+    btnDel.appendChild(icone);
+
+    wrapper.appendChild(img);
+    wrapper.appendChild(btnDel);
+    col.appendChild(wrapper);
+    grid.appendChild(col);
+  });
+
+  // Reinicializar tooltips no grid
+  grid.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+    new bootstrap.Tooltip(el, { trigger: 'hover' });
+  });
+}
+
+let _fotosAtuais = [];
+
+function abrirModalFotos(devId, fotos) {
+  document.getElementById('fotos_dev_id').value = String(devId);
+  _fotosAtuais = fotos ? [...fotos] : [];
+  renderFotosGrid(_fotosAtuais);
+  document.getElementById('fotos-progresso').classList.add('d-none');
+  document.getElementById('fotos-input').value = '';
+  document.getElementById('fotos-camera').value = '';
+  // Ocultar upload em modo visualização
+  document.getElementById('fotos-upload-area').classList.toggle('d-none', formEmVisualizacao());
+  modalFotos.show();
+}
+
+async function adicionarFotos(files) {
+  const devId = document.getElementById('fotos_dev_id').value;
+  if (!devId) return;
+
+  const progresso = document.getElementById('fotos-progresso');
+  const barra = document.getElementById('fotos-barra');
+  const status = document.getElementById('fotos-status');
+  progresso.classList.remove('d-none');
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    status.textContent = `Processando ${i + 1}/${files.length}: ${file.name}…`;
+    barra.style.width = `${Math.round(((i) / files.length) * 100)}%`;
+
+    let b64;
+    try {
+      b64 = await comprimirImagem(file);
+    } catch (err) {
+      definirMensagem('erro', err.message, false);
+      continue;
+    }
+
+    const resp = await fazerRequisicao('/app/logistica/pedidos/dev/foto/add', {
+      dev_id: Number(devId),
+      imagem_b64: b64,
+    });
+
+    if (!resp.success) {
+      if (resp.data) updateState(resp.data);
+      continue;
+    }
+
+    const novaFoto = resp.data?.foto;
+    if (novaFoto) {
+      _fotosAtuais.push(novaFoto);
+      renderFotosGrid(_fotosAtuais);
+      _atualizarBotaoFotosNaTabela(Number(devId), _fotosAtuais);
+    }
+  }
+
+  barra.style.width = '100%';
+  status.textContent = 'Concluído.';
+  setTimeout(() => progresso.classList.add('d-none'), 1500);
+  document.getElementById('fotos-input').value = '';
+}
+
+async function removerFoto(imgbbId) {
+  const devId = document.getElementById('fotos_dev_id').value;
+  if (!devId) return;
+
+  const resp = await fazerRequisicao('/app/logistica/pedidos/dev/foto/del', {
+    dev_id: Number(devId),
+    imgbb_id: imgbbId,
+  });
+
+  if (!resp.success) {
+    if (resp.data) updateState(resp.data);
+    return;
+  }
+
+  _fotosAtuais = _fotosAtuais.filter(f => f.id !== imgbbId);
+  renderFotosGrid(_fotosAtuais);
+  _atualizarBotaoFotosNaTabela(Number(devId), _fotosAtuais);
+}
+
+function _atualizarBotaoFotosNaTabela(devId, fotos) {
+  const btn = tabelaDevCorpo.querySelector(`.btn-dev-fotos[data-id="${devId}"]`);
+  if (!btn) return;
+  btn.dataset.fotos = JSON.stringify(fotos);
+  // Atualizar badge
+  const badge = btn.querySelector('.badge');
+  if (fotos.length > 0) {
+    if (badge) {
+      badge.textContent = String(fotos.length);
+    } else {
+      const novoBadge = document.createElement('span');
+      novoBadge.className = 'badge text-bg-info ms-1';
+      novoBadge.textContent = String(fotos.length);
+      btn.appendChild(novoBadge);
+    }
+  } else if (badge) {
+    badge.remove();
+  }
 }
 
 async function carregarDevolucoes() {
@@ -261,6 +472,10 @@ function aplicarTravasDevolucoes() {
 
   tabelaDevCorpo.querySelectorAll('.btn-dev-editar, .btn-dev-excluir').forEach(btn => {
     btn.disabled = bloqueado;
+  });
+  // Botão de fotos: visível sempre que o pedido estiver salvo (leitura livre)
+  tabelaDevCorpo.querySelectorAll('.btn-dev-fotos').forEach(btn => {
+    btn.disabled = semPedidoSalvo;
   });
 }
 
@@ -803,8 +1018,17 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-dev-salvar').addEventListener('click', salvarDevolucao);
 
   tabelaDevCorpo.addEventListener('click', (e) => {
-    if (e.target.closest('.btn-dev-editar, .btn-dev-excluir')) {
+    if (e.target.closest('.btn-dev-editar, .btn-dev-excluir, .btn-dev-fotos')) {
       e.preventDefault();
+    }
+
+    const btnFotos = e.target.closest('.btn-dev-fotos');
+    if (btnFotos) {
+      const id = Number(btnFotos.dataset.id);
+      let fotos = [];
+      try { fotos = JSON.parse(btnFotos.dataset.fotos || '[]'); } catch (_) {}
+      abrirModalFotos(id, fotos);
+      return;
     }
 
     if (formEmVisualizacao()) return;
@@ -831,5 +1055,25 @@ document.addEventListener('DOMContentLoaded', () => {
         onConfirmar: async () => excluirDevolucao(id),
       });
     }
+  });
+
+  document.getElementById('fotos-input').addEventListener('change', (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length) adicionarFotos(files);
+  });
+
+  document.getElementById('fotos-camera').addEventListener('change', (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length) adicionarFotos(files);
+  });
+
+  document.getElementById('fotos-grid').addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-foto-del');
+    if (!btn) return;
+    confirmar({
+      titulo: 'Remover foto',
+      mensagem: 'Deseja remover esta foto?',
+      onConfirmar: async () => removerFoto(btn.dataset.imgbbId),
+    });
   });
 });

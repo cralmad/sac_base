@@ -153,6 +153,7 @@ O layout deve seguir rigorosamente a abordagem Mobile-First:
 |---|---|
 | `BULKGATE_APP_ID` | Application ID gerado no portal BulkGate (`portal.bulkgate.com` → Modules & APIs → Create API). Obrigatório para envio de SMS. |
 | `BULKGATE_APP_TOKEN` | Application Token gerado no portal BulkGate. Nunca versionar. Obrigatório para envio de SMS. |
+| `IMGBB_API_KEY` | API Key gerada em [api.imgbb.com](https://api.imgbb.com/). Obrigatória para upload de fotos em devoluções de pedidos. Lida em `pages/pedidos/views.py` via `os.environ.get("IMGBB_API_KEY")`. |
 
 > **SMS — padrão de números:** A função `sac_base/sms_service.py::normalizar_numero()` aceita qualquer formato (`+351...`, `00351...`, `912...`). Números sem DDI são tratados como pertencentes ao país de atuação da Filial (`Filial.pais_atuacao.codigo_tel`). O fallback hardcoded é `351` (Portugal).
 
@@ -165,7 +166,8 @@ heroku config:set BANCO_DE_DADOS="postgres://..." \
   DJANGO_USE_X_FORWARDED_PROTO=true \
   DJANGO_SECURE_SSL_REDIRECT=true \
   BULKGATE_APP_ID="12345" \
-  BULKGATE_APP_TOKEN="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  BULKGATE_APP_TOKEN="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  IMGBB_API_KEY="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
 ### Após o deploy

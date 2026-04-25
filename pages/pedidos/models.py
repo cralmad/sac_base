@@ -206,6 +206,7 @@ class Devolucao(models.Model):
     volume = models.SmallIntegerField(null=True, blank=True)
     motivo = models.CharField(max_length=100, choices=MOTIVO_CHOICES)
     obs = models.TextField(null=True, blank=True)
+    fotos = models.JSONField(default=list, blank=True)
 
     class Meta:
         db_table = "devolucao"
