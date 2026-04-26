@@ -40,8 +40,9 @@ export const PERMISSOES_SCHEMA = {
     { codename: "pedidos.change_pedido", label: "Editar Pedido" },
     { codename: "pedidos.delete_pedido", label: "Excluir Pedido" },
     // --- Conferência de Volumes ---
-    { codename: "pedidos.view_tentativaentrega",   label: "Acessar Conferência de Volumes" },
-    { codename: "pedidos.change_tentativaentrega", label: "Editar Conferência de Volumes" },
+    { codename: "pedidos.view_tentativaentrega",          label: "Acessar Mapa / Conferência de Volumes" },
+    { codename: "pedidos.change_tentativaentrega",        label: "Editar Conferência de Volumes" },
+    { codename: "pedidos.change_carro_tentativaentrega",  label: "Alterar Carro no Mapa / Conferência" },
     // --- Relatório Gerencial de Pedidos ---
     { codename: "pedidos.view_relatorio_gerencial", label: "Acessar Relatório Gerencial de Pedidos" },
     // --- Motoristas ---
@@ -90,8 +91,9 @@ export const PERMISSOES_SCHEMA = {
     { codename: "pedidos.change_pedido", label: "Editar Pedido" },
     { codename: "pedidos.delete_pedido", label: "Excluir Pedido" },
     // --- Conferência de Volumes ---
-    { codename: "pedidos.view_tentativaentrega",   label: "Acessar Conferência de Volumes" },
-    { codename: "pedidos.change_tentativaentrega", label: "Editar Conferência de Volumes" },
+    { codename: "pedidos.view_tentativaentrega",          label: "Acessar Mapa / Conferência de Volumes" },
+    { codename: "pedidos.change_tentativaentrega",        label: "Editar Conferência de Volumes" },
+    { codename: "pedidos.change_carro_tentativaentrega",  label: "Alterar Carro no Mapa / Conferência" },
     // --- Relatório Gerencial de Pedidos ---
     { codename: "pedidos.view_relatorio_gerencial", label: "Acessar Relatório Gerencial de Pedidos" },
     // --- Motoristas ---

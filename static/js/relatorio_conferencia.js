@@ -575,8 +575,8 @@ function gerarHtmlRelatorio(grupos, filtros) {
     <div class="cabecalho-relatorio">
       <h2>Conferência de Volumes</h2>
       <p>Data: <strong>${dataExib}</strong>
-        ${filtros.tipo ? ` &nbsp;|&nbsp; Tipo: <strong>${filtros.tipo}</strong>` : ''}
-        ${filtros.conferido ? ` &nbsp;|&nbsp; Conferido: <strong>${filtros.conferido.toUpperCase()}</strong>` : ''}
+        ${filtros.tipo ? ` &nbsp;|&nbsp; Tipo: <strong>${_esc(filtros.tipo)}</strong>` : ''}
+        ${filtros.conferido ? ` &nbsp;|&nbsp; Conferido: <strong>${_esc(filtros.conferido.toUpperCase())}</strong>` : ''}
       </p>
     </div>`;
 
@@ -585,8 +585,8 @@ function gerarHtmlRelatorio(grupos, filtros) {
     // Linha de cabeçalho do grupo
     corpo += `
     <div class="grupo-header">
-      <span>Carro: <strong>${grupo.carro}</strong></span>
-      <span>Data: <strong>${grupo.data_tentativa}</strong></span>
+      <span>Carro: <strong>${_esc(String(grupo.carro))}</strong></span>
+      <span>Data: <strong>${_esc(grupo.data_tentativa)}</strong></span>
     </div>
     <table>
       <thead>

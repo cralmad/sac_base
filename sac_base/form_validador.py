@@ -33,7 +33,14 @@ class SchemaValidator:
                 if not re.match(r"[^@]+@[^@]+\.[^@]+", str(value)):
                     self._add_error(field, "E-mail inválido")
 
-            # 5. Booleans (Ex: "ativo")
+            # 5. Integer Type
+            if rules.get('type') == 'integer':
+                try:
+                    int(value)
+                except (TypeError, ValueError):
+                    self._add_error(field, "Valor inteiro inválido")
+
+            # 6. Booleans (Ex: "ativo")
             if rules.get('type') == 'boolean' and not isinstance(value, bool):
                 self._add_error(field, "Valor booleano inválido")
 

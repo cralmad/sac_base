@@ -1,5 +1,6 @@
 import json
 from django.conf import settings
+from django.core.cache import cache
 from django.http import JsonResponse
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import authenticate, get_user_model, update_session_auth_hash
@@ -51,6 +52,19 @@ def login_view(request):
         return render(request, "login.html")
 
     # ---------- POST ----------
+    # Rate limiting: max 5 tentativas por IP num janela de 5 minutos
+    ip = (
+        request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", ""))
+        .split(",")[0].strip()
+    )
+    cache_key = f"login_attempts_{ip}"
+    tentativas = cache.get(cache_key, 0)
+    if tentativas >= 5:
+        return JsonResponse(
+            build_error_payload("Muitas tentativas de login. Aguarde alguns minutos."),
+            status=429,
+        )
+
     try:
         payload = request.sisvar_front
         form = payload["form"]["loginForm"].get("campos")
@@ -61,7 +75,11 @@ def login_view(request):
 
     user = authenticate(username=username, password=password)
     if not user:
+        cache.set(cache_key, tentativas + 1, 5 * 60)
         return JsonResponse(build_error_payload("Credenciais inválidas"), status=401)
+
+    # Sucesso: zera contador
+    cache.delete(cache_key)
 
     refresh = RefreshToken.for_user(user)
 
@@ -113,6 +131,14 @@ def login_view(request):
     return response
 
 def logout_view(request):
+    # Invalida o refresh token no servidor antes de apagar os cookies
+    refresh_token_str = request.COOKIES.get("refresh_token")
+    if refresh_token_str:
+        try:
+            from rest_framework_simplejwt.tokens import RefreshToken as _RT
+            _RT(refresh_token_str).blacklist()
+        except Exception:
+            pass  # Token já inválido ou blacklist não configurado — seguro ignorar
     response = redirect("/app/usuario/login/")
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
@@ -368,6 +394,16 @@ def alterar_senha_view(request):
     user.set_password(nova_senha)
     user.save()
     update_session_auth_hash(request, user)
+
+    # Invalida o refresh token vigente (força novo login após troca de senha)
+    refresh_token_str = request.COOKIES.get("refresh_token")
+    if refresh_token_str:
+        try:
+            from rest_framework_simplejwt.tokens import RefreshToken as _RT
+            _RT(refresh_token_str).blacklist()
+        except Exception:
+            pass
+
     registrar_auditoria(
         actor=request.user,
         action=AuditEvent.ACTION_PASSWORD_CHANGE,

@@ -104,6 +104,8 @@ class FilialConfig(models.Model):
     )
     sms_padrao_1 = models.TextField(null=True, blank=True)
     sms_padrao_2 = models.TextField(null=True, blank=True)
+    gsheets_spreadsheet_id = models.CharField(max_length=200, null=True, blank=True)
+    gsheets_sheet_name = models.CharField(max_length=100, null=True, blank=True)
 
     class Meta:
         db_table = "filial_config"

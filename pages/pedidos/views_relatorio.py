@@ -3,7 +3,6 @@ from django.core.paginator import Paginator
 from django.db.models import F, Count
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods, require_POST
 from datetime import datetime
@@ -40,11 +39,13 @@ def relatorio_conferencia_view(request):
     referencia = filtros.get("referencia", "").strip()
     tipo = filtros.get("tipo", "").strip()
     conferido = filtros.get("conferido", "").strip().lower()
-    pagina = int(data.get("pagina", 1))
-    page_size = int(data.get("page_size", 30))
+    pagina = max(1, int(data.get("pagina", 1)))
+    page_size = max(1, min(int(data.get("page_size", 30)), 200))
 
     if not data_tentativa:
         return JsonResponse({"success": False, "mensagem": "A data de entrega é obrigatória."}, status=400)
+
+    filial_ativa = getattr(request, "filial_ativa", None)
 
     qs = TentativaEntrega.objects.select_related("pedido", "motorista")
     try:
@@ -52,6 +53,8 @@ def relatorio_conferencia_view(request):
         qs = qs.filter(data_tentativa=dt)
     except ValueError:
         return JsonResponse({"success": False, "mensagem": "Data inválida."}, status=400)
+    if filial_ativa:
+        qs = qs.filter(pedido__filial=filial_ativa)
     if referencia:
         qs = qs.filter(pedido__pedido__icontains=referencia)
     if tipo:
@@ -93,7 +96,7 @@ def relatorio_conferencia_view(request):
 
 # ─── Relatório de impressão ───────────────────────────────────────────────────
 
-def _build_qs_relatorio(filtros):
+def _build_qs_relatorio(filtros, filial=None):
     """Constrói e retorna o queryset com os filtros do relatório."""
     data_tentativa = filtros.get("data_tentativa")
     referencia = filtros.get("referencia", "").strip()
@@ -109,6 +112,9 @@ def _build_qs_relatorio(filtros):
         qs = qs.filter(data_tentativa=dt)
     except ValueError:
         return None, "Data inválida."
+
+    if filial is not None:
+        qs = qs.filter(pedido__filial=filial)
 
     if referencia:
         qs = qs.filter(pedido__pedido__icontains=referencia)
@@ -132,7 +138,7 @@ def relatorio_conferencia_imprimir_view(request):
     data = request.sisvar_front or {}
     filtros = data.get("filtros", {})
 
-    qs, erro = _build_qs_relatorio(filtros)
+    qs, erro = _build_qs_relatorio(filtros, filial=getattr(request, "filial_ativa", None))
     if erro:
         return JsonResponse({"success": False, "mensagem": erro}, status=400)
 
@@ -206,6 +212,9 @@ def relatorio_rotas_view(request):
         .select_related("pedido")
         .filter(data_tentativa=dt)
     )
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if filial_ativa:
+        qs = qs.filter(pedido__filial=filial_ativa)
     if carro_filtro:
         try:
             qs = qs.filter(carro=int(carro_filtro))
@@ -296,6 +305,9 @@ def relatorio_sms_view(request):
         .filter(data_tentativa=dt)
         .order_by("pedido__codpost_dest", "pedido__pedido")
     )
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if filial_ativa:
+        qs = qs.filter(pedido__filial=filial_ativa)
 
     registros = []
     for mov in qs:
@@ -348,6 +360,9 @@ def relatorio_sms_enviar_view(request):
         .exclude(periodo__isnull=True)
         .exclude(periodo="")
     )
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if filial_ativa:
+        qs = qs.filter(pedido__filial=filial_ativa)
 
     # Carrega configuração da filial a partir do primeiro registro
     tentativas = list(qs)
@@ -624,3 +639,171 @@ def relatorio_gerencial_view(request):
         "data_fmt": data_fmt,
         "total_pedidos": sum(g["total"] for g in grupos),
     })
+
+
+# ─── Relatório de Devoluções ──────────────────────────────────────────────────
+
+PERMISSOES_DEVOLUCAO = {
+    "acessar": "pedidos.view_relatorio_devolucao",
+    "editar":  "pedidos.change_pedido",
+    "excluir": "pedidos.delete_pedido",
+}
+
+
+@login_required
+@permission_required(PERMISSOES_DEVOLUCAO["acessar"], raise_exception=True)
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def relatorio_devolucao_view(request):
+    if request.method == "GET":
+        motivos_choices = [{"value": v, "label": l} for v, l in MOTIVO_CHOICES]
+        request.sisvar_extra = build_sisvar_payload(
+            permissions={"devolucao": build_action_permissions(request.user, PERMISSOES_DEVOLUCAO)},
+            options={"motivos_dev": motivos_choices},
+        )
+        return render(request, "relatorio_devolucao.html")
+
+    # POST: aplica filtros e retorna lista de devoluções
+    data = request.sisvar_front or {}
+    filtros = data.get("filtros", {})
+
+    data_inicial   = filtros.get("data_inicial", "").strip()
+    data_final     = filtros.get("data_final", "").strip()
+    referencia_str = filtros.get("referencia", "").strip()
+
+    if not data_inicial:
+        return JsonResponse({"success": False, "mensagem": "A data inicial é obrigatória."}, status=400)
+    if not data_final:
+        return JsonResponse({"success": False, "mensagem": "A data final é obrigatória."}, status=400)
+
+    try:
+        dt_ini = datetime.strptime(data_inicial, "%Y-%m-%d").date()
+        dt_fim = datetime.strptime(data_final, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"success": False, "mensagem": "Data inválida."}, status=400)
+
+    if dt_ini > dt_fim:
+        return JsonResponse({"success": False, "mensagem": "A data inicial não pode ser maior que a data final."}, status=400)
+
+    if (dt_fim - dt_ini).days > 365:
+        return JsonResponse({"success": False, "mensagem": "O período máximo é de 365 dias."}, status=400)
+
+    qs = (
+        Devolucao.objects
+        .select_related("pedido")
+        .filter(data__range=(dt_ini, dt_fim))
+    )
+
+    qs = apply_smart_text_filter(qs, "pedido__pedido", referencia_str)
+
+    qs = qs.order_by("-data", "pedido__pedido", "id")
+
+    registros = []
+    for dev in qs:
+        p = dev.pedido
+        fotos_publicas = [
+            {"id": f["id"], "url": f["url"], "thumb_url": f.get("thumb_url", f["url"])}
+            for f in (dev.fotos or [])
+        ]
+        registros.append({
+            "id":         dev.id,
+            "pedido_id":  p.id,
+            "referencia": p.pedido or str(p.id_vonzu),
+            "tipo":       p.tipo or "",
+            "motivo":     dev.motivo or "",
+            "palete":     dev.palete,
+            "volume":     dev.volume,
+            "data":       dev.data.strftime("%d/%m/%Y") if dev.data else "",
+            "obs":        dev.obs or "",
+            "driver":     dev.driver,
+            "fotos":      fotos_publicas,
+            "fotos_count": len(fotos_publicas),
+        })
+
+    data_fmt = dt_ini.strftime("%d/%m/%Y")
+    if dt_ini != dt_fim:
+        data_fmt = f"{dt_ini.strftime('%d/%m/%Y')} a {dt_fim.strftime('%d/%m/%Y')}"
+
+    return JsonResponse({
+        "success": True,
+        "registros": registros,
+        "data_fmt": data_fmt,
+        "total": len(registros),
+    })
+
+
+@login_required
+@permission_required(PERMISSOES_DEVOLUCAO["acessar"], raise_exception=True)
+@csrf_protect
+@require_POST
+def relatorio_devolucao_gsheets_view(request):
+    """Envia devoluções selecionadas para o Google Sheets e marca driver=True."""
+    data = request.sisvar_front or {}
+    ids = data.get("ids", [])
+
+    if not ids or not isinstance(ids, list):
+        return JsonResponse({"success": False, "mensagem": "Nenhum registro selecionado."}, status=400)
+
+    filial = getattr(request, "filial_ativa", None)
+    if not filial:
+        return JsonResponse({"success": False, "mensagem": "Nenhuma filial ativa na sessão."}, status=400)
+
+    try:
+        cfg = filial.config
+        spreadsheet_id = (cfg.gsheets_spreadsheet_id or "").strip()
+        sheet_name = (cfg.gsheets_sheet_name or "").strip()
+    except Exception:
+        spreadsheet_id = ""
+        sheet_name = ""
+
+    if not spreadsheet_id or not sheet_name:
+        return JsonResponse(
+            {"success": False, "mensagem": "Google Sheets não configurado para esta filial. Acesse Cadastro → Filial → aba Configurações."},
+            status=400,
+        )
+
+    devs = list(
+        Devolucao.objects
+        .select_related("pedido")
+        .filter(id__in=ids)
+    )
+
+    if not devs:
+        return JsonResponse({"success": False, "mensagem": "Nenhum registro encontrado."}, status=404)
+
+    rows = []
+    for dev in devs:
+        p = dev.pedido
+        rows.append([
+            None,
+            p.pedido or str(p.id_vonzu),
+            p.tipo or "",
+            dev.motivo or "",
+            dev.palete if dev.palete is not None else "",
+            dev.volume if dev.volume is not None else "",
+            dev.data.strftime("%d/%m/%Y") if dev.data else "",
+            dev.obs or "",
+        ])
+
+    try:
+        from sac_base.gsheets_service import append_devolucao_rows
+        append_devolucao_rows(spreadsheet_id, sheet_name, rows)
+    except Exception as exc:
+        msg = str(exc)
+        if "not supported for this document" in msg:
+            msg = (
+                "O ficheiro indicado não é uma planilha nativa do Google Sheets. "
+                "Crie uma nova planilha em sheets.google.com (não faça upload de um ficheiro Excel) "
+                "e use o ID dessa nova planilha nas configurações da filial."
+            )
+        return JsonResponse({"success": False, "mensagem": msg}, status=500)
+
+    ids_enviados = [dev.id for dev in devs]
+    Devolucao.objects.filter(id__in=ids_enviados).update(driver=True)
+
+    return JsonResponse({
+        "success": True,
+        "ids_enviados": ids_enviados,
+        "mensagem": f"{len(ids_enviados)} devolução(ões) enviada(s) com sucesso.",
+    })
+

@@ -46,8 +46,8 @@ USANDO_SETTINGS_TESTE_LOCAL = SETTINGS_MODULE == 'sac_base.settings_test'
 DEFAULT_DEV_SECRET_KEY = 'django-dev-sac-base-insecure-key'
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', DEFAULT_DEV_SECRET_KEY)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env_bool('DJANGO_DEBUG', default=not USANDO_SETTINGS_TESTE_LOCAL)
+_prod_like = not USANDO_SETTINGS_TESTE_LOCAL and SECRET_KEY != DEFAULT_DEV_SECRET_KEY
+DEBUG = env_bool('DJANGO_DEBUG', default=not _prod_like)
 
 ALLOWED_HOSTS = env_list(
     'DJANGO_ALLOWED_HOSTS',
@@ -62,6 +62,8 @@ SECURE_SSL_REDIRECT = env_bool('DJANGO_SECURE_SSL_REDIRECT', default=False)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https') if env_bool('DJANGO_USE_X_FORWARDED_PROTO', default=False) else None
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = 'same-origin'
+SECURE_HSTS_SECONDS = int(os.environ.get('DJANGO_SECURE_HSTS_SECONDS', 0 if DEBUG else 31536000))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool('DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS', default=not DEBUG)
 X_FRAME_OPTIONS = 'DENY'
 
 AUTH_COOKIE_HTTPONLY = True
@@ -90,7 +92,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'channels',  # WebSocket via Django Channels
     'rest_framework', # Necessário para o app de usuário/autenticação
-    'rest_framework_simplejwt', # Necessário para o app de usuário/autenticação
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',  # JWT blacklist para invalidar tokens no logout
     'pages.cad_cliente',
     'pages.cad_grupo_cli',
     'pages.usuario',
@@ -107,6 +110,8 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    'sac_base.csp_middleware.CSPMiddleware',  # Content-Security-Policy
+    'sac_base.csp_middleware.CSPMiddleware',  # Content-Security-Policy
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -124,8 +129,8 @@ REST_FRAMEWORK = {# Necessário para o app de usuário/autenticação
 SIMPLE_JWT = {# Necessário para o app de usuário/autenticação
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': False,
-    'BLACKLIST_AFTER_ROTATION': False,
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
 }
 
 ROOT_URLCONF = 'sac_base.urls'
@@ -183,7 +188,7 @@ LOGGING = {
     'loggers': {
         'pages.usuario.middleware': {
             'handlers': ['console'],
-            'level': 'DEBUG',
+            'level': 'WARNING',
             'propagate': False,
         },
     },
@@ -237,7 +242,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'pt-br'
 
 TIME_ZONE = 'UTC'
 
@@ -257,3 +262,6 @@ STATICFILES_DIRS = [
 ]
 
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+MEDIA_URL = 'media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

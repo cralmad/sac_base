@@ -175,3 +175,104 @@ heroku config:set BANCO_DE_DADOS="postgres://..." \
 heroku run python manage.py migrate
 heroku run python manage.py collectstatic --noinput  # executado automaticamente no build
 ```
+
+---
+
+## 8. PADRÕES DE SEGURANÇA (OBRIGATÓRIOS)
+
+### 8.1 IDOR — Filtro por Filial Ativa
+**Toda view que acessa Pedido, TentativaEntrega, Devolucao ou qualquer dado multi-tenant DEVE filtrar por `request.filial_ativa`.**
+
+```python
+# Padrão obrigatório no início de cada view de POST multi-tenant:
+filial_ativa = getattr(request, 'filial_ativa', None)
+if not filial_ativa:
+    return JsonResponse(build_error_payload("Filial ativa não encontrada."), status=403)
+
+# Filtrar queryset sempre com filial_ativa:
+Pedido.objects.filter(filial=filial_ativa, ...)
+TentativaEntrega.objects.filter(pedido__filial=filial_ativa, ...)
+Devolucao.objects.filter(pedido__filial=filial_ativa, ...)
+```
+
+* `request.filial_ativa` é injetado pelo `JWTAuthMiddleware._resolve_filial_context()` (`pages/usuario/middleware.py`).
+* Nunca confiar em IDs vindos do cliente sem verificar contra a filial ativa.
+* Endpoints públicos (ex.: mapa público com token de URL) são a única exceção autorizada — devem estar documentados no código.
+
+### 8.2 DRY — Helpers de Filial
+As funções `get_filiais_escrita_queryset(usuario)` e `obter_filial_escrita(filial_id, usuario)` vivem **exclusivamente** em `pages/filial/services.py`. Nunca duplicar em outros apps.
+
+```python
+from pages.filial.services import get_filiais_escrita_queryset, obter_filial_escrita
+```
+
+### 8.3 JWT Blacklist — Logout e Troca de Senha
+Ao fazer logout ou alterar senha, invalidar o refresh token antes de apagar o cookie:
+
+```python
+refresh_token_str = request.COOKIES.get("refresh_token")
+if refresh_token_str:
+    try:
+        from rest_framework_simplejwt.tokens import RefreshToken as _RT
+        _RT(refresh_token_str).blacklist()
+    except Exception:
+        pass
+```
+
+Requer `rest_framework_simplejwt.token_blacklist` em `INSTALLED_APPS` e migrações aplicadas.
+
+### 8.4 Rate Limiting — Login
+O endpoint de login limita a **5 tentativas por IP em janela de 5 minutos** usando Django cache:
+
+```python
+ip = request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "")).split(",")[0].strip()
+cache_key = f"login_attempts_{ip}"
+tentativas = cache.get(cache_key, 0)
+if tentativas >= 5:
+    return JsonResponse(build_error_payload("Muitas tentativas de login. Aguarde alguns minutos."), status=429)
+# Em caso de falha: cache.set(cache_key, tentativas + 1, 5 * 60)
+# Em caso de sucesso: cache.delete(cache_key)
+```
+
+### 8.5 Paginação — Sanitizar Parâmetros
+Sempre sanitizar `pagina` e `page_size` vindos do cliente:
+
+```python
+pagina = max(1, int(data.get("pagina", 1)))
+page_size = max(1, min(int(data.get("page_size", 30)), 200))
+```
+
+O cap em 200 evita DoS; o `max(1, ...)` evita offsets negativos. Não altera a lógica de scroll infinito (o JS continua incrementando `pagina`).
+
+### 8.6 XSS — Escape em Template Literals JS
+Ao interpolar dados do backend em HTML via JS, **sempre usar `_esc()`** (helper global em `static/js/html.js`):
+
+```js
+// ❌ Proibido:
+el.innerHTML = `<td>${dado.valor}</td>`;
+
+// ✅ Correto:
+el.innerHTML = `<td>${_esc(dado.valor)}</td>`;
+
+// ✅ Melhor ainda (sem innerHTML):
+const td = document.createElement('td');
+td.textContent = dado.valor;
+```
+
+Aplicar a todos os valores dinâmicos em `insertAdjacentHTML`, `innerHTML`, `outerHTML`.
+
+### 8.7 Content-Security-Policy
+O middleware `sac_base.csp_middleware.CSPMiddleware` injeta o header `Content-Security-Policy` em todas as respostas. Está posicionado após `WhiteNoiseMiddleware` no `MIDDLEWARE`. Para adicionar novas origens (CDN, API externa), editar `sac_base/csp_middleware.py` — nunca usar `unsafe-inline` ou `unsafe-eval` sem justificativa documentada.
+
+### 8.8 SchemaValidator — Tipos Suportados
+`sac_base/form_validador.py::SchemaValidator` valida os tipos: `string`, `password`, `email`, `integer`, `boolean`. Para campos numéricos do formulário, declarar `'type': 'integer'` no schema.
+
+### 8.9 SoftDeleteMixin — Manager Padrão
+Models com `SoftDeleteMixin` têm `objects` como `ActiveManager` (filtra `is_deleted=False` automaticamente). Para acessar registros deletados, usar `Model.all_objects`. Nunca presumir que `objects.all()` retorna deletados.
+
+### 8.10 `_build_qs_relatorio` — Sempre Passar Filial
+A função `_build_qs_relatorio(filtros, filial=None)` em `pages/pedidos/views_relatorio.py` aceita `filial` como segundo argumento. Sempre passar:
+
+```python
+qs = _build_qs_relatorio(filtros, filial=getattr(request, 'filial_ativa', None))
+```

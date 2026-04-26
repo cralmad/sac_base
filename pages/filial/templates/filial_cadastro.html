@@ -6,7 +6,7 @@
 {% block page_title %}Cadastro de Matriz e Filiais{% endblock %}
 
 {% block content %}
-  <form id="cadFilial" data-form-lock="cadFilial" method="POST">
+  <form id="cadFilial" data-form-lock="cadFilial" method="POST" novalidate>
     {% csrf_token %}
     <div class="container-xl my-3 mx-auto">
 
@@ -175,6 +175,43 @@
               </label>
               <textarea id="sms_padrao_2" name="sms_padrao_2" class="form-control" rows="4"></textarea>
             </div>
+
+            <div class="col-12 col-md-8">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="gsheets_spreadsheet_id">
+                <span>ID da Planilha Google Sheets</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="O ID da planilha está na URL do Google Sheets: docs.google.com/spreadsheets/d/&lt;ID&gt;/edit">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <input type="text" id="gsheets_spreadsheet_id" name="gsheets_spreadsheet_id"
+                     class="form-control font-monospace" maxlength="200"
+                     placeholder="Ex: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms">
+            </div>
+
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="gsheets_sheet_name">
+                <span>Nome da Aba</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="Nome exato da aba (guia) dentro da planilha onde as devoluções serão registadas.">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <input type="text" id="gsheets_sheet_name" name="gsheets_sheet_name"
+                     class="form-control" maxlength="100"
+                     placeholder="Ex: Devoluções">
+            </div>
+
           </div>
         </div>
 

@@ -132,6 +132,8 @@ class Pedido(AuditFieldsMixin, models.Model):
     expresso = models.BooleanField(default=False)
     lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    geocoding_display = models.CharField(max_length=300, null=True, blank=True)
+    geocoding_precision = models.CharField(max_length=20, null=True, blank=True)
 
     class Meta:
         db_table = "pedido"
@@ -206,10 +208,14 @@ class Devolucao(models.Model):
     volume = models.SmallIntegerField(null=True, blank=True)
     motivo = models.CharField(max_length=100, choices=MOTIVO_CHOICES)
     obs = models.TextField(null=True, blank=True)
+    driver = models.BooleanField(default=False)
     fotos = models.JSONField(default=list, blank=True)
 
     class Meta:
         db_table = "devolucao"
+        permissions = [
+            ("view_relatorio_devolucao", "Pode acessar o Relatório de Devoluções"),
+        ]
         indexes = [
             models.Index(fields=["pedido"]),
             models.Index(fields=["data"]),

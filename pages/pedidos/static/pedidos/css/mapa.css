@@ -76,6 +76,26 @@
   min-height: 1.2em;
 }
 
+/* Indicador de precisão de geocodificação (círculo colorido no popup) */
+.mapa-prec-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.2);
+  flex-shrink: 0;
+  cursor: help;
+}
+
+/* Endereço geocodificado (display_name) — texto auxiliar pequeno */
+.mapa-geocoding-display {
+  font-size: 0.71em;
+  color: #6c757d;
+  line-height: 1.3;
+  display: block;
+  margin-bottom: 2px;
+}
+
 /* Barra de progresso de geocodificação */
 .mapa-progresso {
   height: 8px;

@@ -1,6 +1,7 @@
 import json
 import time
 import logging
+import unicodedata
 
 import jwt
 import requests as http_requests
@@ -49,6 +50,131 @@ def _cor_carro(carro):
         return "#6c757d"
 
 
+_GEOCODING_TIPOS_MUITO_IMPRECISOS = frozenset({
+    "postcode", "city", "town", "village", "county",
+    "municipality", "state", "country", "region",
+})
+_GEOCODING_CLASSES_IMPRECISAS = frozenset({"highway", "place"})
+_GEOCODING_CLASSES_MUITO_IMPRECISAS = frozenset({"landuse", "boundary", "natural"})
+
+# Palavras genéricas de endereço que não ajudam a identificar a rua
+_PALAVRAS_GENERICAS_END = frozenset({
+    "rua", "avenida", "av", "travessa", "largo", "praca", "praceta",
+    "alameda", "beco", "calcada", "estrada", "est", "lugar", "quinta",
+    "lote", "bloco", "andar", "esq", "dto", "dir", "apartamento", "apt",
+    "edificio", "edif", "portugal", "loja", "zona", "urbanizacao", "urb",
+    "bairro", "s/n", "sem", "numero", "casa", "fracao", "fraccao",
+})
+
+
+def _normalizar_texto(texto):
+    """Lowercase, remove acentos, mantém apenas alfanumérico."""
+    nfkd = unicodedata.normalize("NFKD", (texto or "").lower())
+    return "".join(c for c in nfkd if not unicodedata.combining(c))
+
+
+def _palavras_significativas(texto):
+    """Extrai palavras com ≥4 chars que não sejam genéricas de endereço."""
+    partes = _normalizar_texto(texto).split()
+    return {p for p in partes if len(p) >= 4 and not p.isdigit() and p not in _PALAVRAS_GENERICAS_END}
+
+
+def _determinar_precisao(resultado, codpost_original, cidade_original=None, endereco_original=None):
+    """
+    Classifica a precisão do resultado Nominatim.
+    Retorna: 'ok' | 'impreciso' | 'muito_impreciso'
+
+    Fluxo:
+    A) Nominatim devolveu CP:
+       A1. CPs iguais  → verifica rua; sem overlap → 'impreciso'.
+       A2. CPs divergem → combina magnitude da divergência com cidade.
+    B) Nominatim NÃO devolveu CP:
+       B1. Tipo muito genérico  → 'muito_impreciso'.
+       B2. Rua sem overlap      → 'impreciso'.
+       B3. Cidade sem overlap   → 'impreciso'.
+       B4. Caso contrário       → 'ok'.
+    """
+    tipo = resultado.get("type", "")
+    classe = resultado.get("class", "")
+    address = resultado.get("address", {})
+    display_name_norm = _normalizar_texto(resultado.get("display_name") or "")
+
+    logger.debug(
+        "geocoding precision check | tipo=%s classe=%s postcode=%s road=%s city=%s display=%s",
+        tipo, classe,
+        address.get("postcode"),
+        address.get("road") or address.get("pedestrian") or address.get("path"),
+        address.get("city") or address.get("town") or address.get("village") or address.get("municipality"),
+        resultado.get("display_name", "")[:80],
+    )
+
+    # ── Helpers reutilizáveis ─────────────────────────────────────────────────
+    cp_ref = "".join(c for c in (codpost_original or "") if c.isdigit())[:4]
+    cp_geo = "".join(c for c in (address.get("postcode") or "") if c.isdigit())[:4]
+
+    road_geo = address.get("road") or address.get("pedestrian") or address.get("path") or ""
+    palavras_geo  = _palavras_significativas(road_geo)
+    palavras_ref  = _palavras_significativas(endereco_original or "")
+    rua_sem_match = bool(palavras_ref and palavras_geo and not palavras_ref & palavras_geo)
+
+    cidade_ref = _normalizar_texto(cidade_original or "").strip()
+    cidade_geo = _normalizar_texto(
+        address.get("city") or address.get("town") or
+        address.get("village") or address.get("municipality") or ""
+    ).strip()
+    cidade_no_display = bool(cidade_ref and cidade_ref in display_name_norm)
+    cidade_diverge = bool(
+        cidade_ref and not cidade_no_display and
+        cidade_geo and cidade_ref not in cidade_geo and cidade_geo not in cidade_ref
+    )
+
+    # ════ Ramo A: Nominatim devolveu CP ══════════════════════════════════════
+    if cp_geo:
+        # A1 — CPs iguais
+        if cp_ref == cp_geo:
+            # Se o resultado é genérico (apenas a área postal, sem rua específica)
+            # e o pedido tem rua especificada → não confirmável → impreciso
+            if tipo in _GEOCODING_TIPOS_MUITO_IMPRECISOS:
+                return "impreciso" if palavras_ref else "ok"
+            # Resultado tem rua mas pedido não → ok (sem base para comparar)
+            # Pedido tem rua mas resultado não → não confirmável → impreciso
+            if palavras_ref and not palavras_geo:
+                return "impreciso"
+            # Ambos têm rua mas sem palavras em comum → rua diferente
+            if rua_sem_match:
+                return "impreciso"
+            return "ok"
+
+        # A2 — CPs diferentes
+        cp_diverge = cp_ref != cp_geo if cp_ref else False
+        cp_muito_diverge = cp_diverge and bool(cp_ref) and cp_ref[0] != cp_geo[0]
+
+        if cp_muito_diverge or (cp_diverge and cidade_diverge):
+            return "muito_impreciso"
+        if cp_diverge or cidade_diverge:
+            return "impreciso"
+        if classe in _GEOCODING_CLASSES_IMPRECISAS:
+            return "impreciso"
+        return "ok"
+
+    # ════ Ramo B: Nominatim NÃO devolveu CP ══════════════════════════════════
+    # Sem CP não podemos confirmar a localização; usamos rua + cidade + tipo.
+    if tipo in _GEOCODING_TIPOS_MUITO_IMPRECISOS or classe == "boundary":
+        return "muito_impreciso"
+    if classe in _GEOCODING_CLASSES_MUITO_IMPRECISAS:
+        return "muito_impreciso"
+    # Se o pedido tem rua mas Nominatim não devolveu nenhuma → impreciso
+    if palavras_ref and not palavras_geo:
+        return "impreciso"
+    if rua_sem_match:
+        return "impreciso"
+    if cidade_diverge:
+        return "impreciso"
+    if classe in _GEOCODING_CLASSES_IMPRECISAS:
+        return "impreciso"
+    return "ok"
+
+
 def _geocodificar(endereco, codpost, cidade):
     """
     Chama Nominatim para geocodificar. Respeita rate-limit (1 req/s).
@@ -56,10 +182,11 @@ def _geocodificar(endereco, codpost, cidade):
     Retorna (lat, lng) como float ou (None, None) em caso de falha.
     """
     consultas = []
-    if codpost and cidade:
-        consultas.append(f"{codpost} {cidade} Portugal")
+    # Mais específico primeiro: rua + cidade aumenta chance de acertar
     if endereco and cidade:
         consultas.append(f"{endereco}, {cidade}, Portugal")
+    if codpost and cidade:
+        consultas.append(f"{codpost} {cidade} Portugal")
     if codpost:
         consultas.append(f"{codpost} Portugal")
 
@@ -68,18 +195,21 @@ def _geocodificar(endereco, codpost, cidade):
             time.sleep(1.1)  # Nominatim: máx 1 req/s
             resp = http_requests.get(
                 NOMINATIM_URL,
-                params={"q": q, "format": "json", "limit": 1, "countrycodes": "pt"},
+                params={"q": q, "format": "json", "limit": 1, "countrycodes": "pt", "addressdetails": 1},
                 headers=NOMINATIM_HEADERS,
                 timeout=10,
             )
             resp.raise_for_status()
             resultados = resp.json()
             if resultados:
-                return float(resultados[0]["lat"]), float(resultados[0]["lon"])
+                r = resultados[0]
+                display_name = r.get("display_name", "")
+                precision = _determinar_precisao(r, codpost, cidade, endereco)
+                return float(r["lat"]), float(r["lon"]), display_name, precision
         except Exception as exc:
             logger.warning("Geocoding falhou para '%s': %s", q, exc)
 
-    return None, None
+    return None, None, None, None
 
 
 @login_required
@@ -126,9 +256,13 @@ def mapa_pontos_view(request):
     except ValueError:
         return JsonResponse({"success": False, "mensagem": "Data inválida."}, status=400)
 
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse({"success": False, "mensagem": "Filial ativa não encontrada."}, status=403)
+
     movs = (
         TentativaEntrega.objects
-        .filter(data_tentativa=dt)
+        .filter(data_tentativa=dt, pedido__filial=filial_ativa)
         .select_related("pedido")
         .order_by("carro", "pedido__codpost_dest")
     )
@@ -150,7 +284,7 @@ def mapa_pontos_view(request):
     # Geocodifica em lote os que ainda não têm coordenadas
     geocoding_falhou = 0
     for mov, pedido in pedidos_sem_coord:
-        lat, lng = _geocodificar(
+        lat, lng, display_name, precision = _geocodificar(
             pedido.endereco_dest,
             pedido.codpost_dest,
             pedido.cidade_dest,
@@ -158,14 +292,16 @@ def mapa_pontos_view(request):
         if lat is not None:
             pedido.lat = lat
             pedido.lng = lng
-            pedido.save(update_fields=["lat", "lng"])
+            pedido.geocoding_display = display_name or ""
+            pedido.geocoding_precision = precision or ""
+            pedido.save(update_fields=["lat", "lng", "geocoding_display", "geocoding_precision"])
         else:
             geocoding_falhou += 1
 
     # Re-carrega com coordenadas atualizadas
     movs = (
         TentativaEntrega.objects
-        .filter(data_tentativa=dt)
+        .filter(data_tentativa=dt, pedido__filial=filial_ativa)
         .select_related("pedido")
         .order_by("carro", "pedido__codpost_dest")
     )
@@ -200,6 +336,8 @@ def mapa_pontos_view(request):
                 "carro": mov.carro,
                 "periodo": mov.periodo or "",
                 "cor": _cor_carro(mov.carro),
+                "geocoding_display": pedido.geocoding_display or "",
+                "geocoding_precision": pedido.geocoding_precision or "",
                 "updated_at": mov.updated_at.isoformat(),
             },
         })
@@ -214,6 +352,51 @@ def mapa_pontos_view(request):
 
 
 @login_required
+@permission_required(PERMISSOES_MAPA["editar"], raise_exception=True)
+@csrf_protect
+@require_POST
+def mapa_regeocodificar_view(request):
+    """Re-executa o geocoding para um pedido já existente e atualiza os campos de precisão."""
+    try:
+        body = json.loads(request.body)
+        pedido_id = int(body["pedido_id"])
+    except Exception:
+        return JsonResponse({"success": False, "mensagem": "Dados inválidos."}, status=400)
+
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse({"success": False, "mensagem": "Filial ativa não encontrada."}, status=403)
+
+    try:
+        pedido = Pedido.objects.get(pk=pedido_id, filial=filial_ativa)
+    except Pedido.DoesNotExist:
+        return JsonResponse({"success": False, "mensagem": "Pedido não encontrado."}, status=404)
+
+    lat, lng, display_name, precision = _geocodificar(
+        pedido.endereco_dest,
+        pedido.codpost_dest,
+        pedido.cidade_dest,
+    )
+
+    if lat is None:
+        return JsonResponse({"success": False, "mensagem": "Não foi possível geocodificar o endereço."}, status=422)
+
+    pedido.lat = lat
+    pedido.lng = lng
+    pedido.geocoding_display = display_name or ""
+    pedido.geocoding_precision = precision or ""
+    pedido.save(update_fields=["lat", "lng", "geocoding_display", "geocoding_precision"])
+
+    return JsonResponse({
+        "success": True,
+        "lat": lat,
+        "lng": lng,
+        "geocoding_display": pedido.geocoding_display,
+        "geocoding_precision": pedido.geocoding_precision,
+    })
+
+
+@login_required
 @permission_required(PERMISSOES_MAPA["acessar"], raise_exception=True)
 @csrf_protect
 @require_POST
@@ -224,17 +407,25 @@ def mapa_salvar_coord_view(request):
         pedido_id = int(body["pedido_id"])
         lat = float(body["lat"])
         lng = float(body["lng"])
+        geocoding_display = str(body.get("geocoding_display", "") or "")[:300]
+        geocoding_precision = str(body.get("geocoding_precision", "") or "")[:20]
     except Exception:
         return JsonResponse({"success": False, "mensagem": "Dados inválidos."}, status=400)
 
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse({"success": False, "mensagem": "Filial ativa não encontrada."}, status=403)
+
     try:
-        pedido = Pedido.objects.get(pk=pedido_id)
+        pedido = Pedido.objects.get(pk=pedido_id, filial=filial_ativa)
     except Pedido.DoesNotExist:
         return JsonResponse({"success": False, "mensagem": "Pedido não encontrado."}, status=404)
 
     pedido.lat = lat
     pedido.lng = lng
-    pedido.save(update_fields=["lat", "lng"])
+    pedido.geocoding_display = geocoding_display
+    pedido.geocoding_precision = geocoding_precision
+    pedido.save(update_fields=["lat", "lng", "geocoding_display", "geocoding_precision"])
     return JsonResponse({"success": True})
 
 

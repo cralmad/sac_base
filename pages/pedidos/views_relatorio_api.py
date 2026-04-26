@@ -16,6 +16,10 @@ from pages.pedidos.consumers import GRUPO_RELATORIO
 @login_required
 @permission_required('pedidos.change_tentativaentrega', raise_exception=True)
 def relatorio_conferencia_salvar_view(request):
+    filial_ativa = getattr(request, 'filial_ativa', None)
+    if not filial_ativa:
+        return JsonResponse({'success': False, 'mensagem': 'Filial ativa não encontrada.'}, status=403)
+
     data = request.sisvar_front or {}
     try:
         mov_id = int(data.get('id'))
@@ -29,7 +33,9 @@ def relatorio_conferencia_salvar_view(request):
 
     try:
         with transaction.atomic():
-            mov = TentativaEntrega.objects.select_for_update().select_related('pedido').filter(id=mov_id).first()
+            mov = TentativaEntrega.objects.select_for_update().select_related('pedido').filter(
+                id=mov_id, pedido__filial=filial_ativa
+            ).first()
             if not mov:
                 return JsonResponse({'success': False, 'mensagem': 'Movimentação não encontrada.'}, status=404)
             # Optimistic locking: rejeita se outro usuário salvou depois

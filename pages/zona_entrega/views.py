@@ -7,6 +7,7 @@ from django.shortcuts import render
 from pages.auditoria.models import AuditEvent
 from pages.auditoria.utils import diff_snapshots, registrar_auditoria, snapshot_instance
 from pages.filial.models import Filial, UsuarioFilial
+from pages.filial.services import get_filiais_escrita_queryset
 from sac_base.form_validador import SchemaValidator
 from sac_base.permissions_utils import build_action_permissions, extract_validation_messages, permission_denied_response
 from sac_base.sisvar_builders import build_error_payload, build_form_response, build_form_state, build_records_response, build_sisvar_payload, build_success_payload
@@ -21,22 +22,6 @@ PERMISSOES_ZONA_ENTREGA = {
     "editar": "zona_entrega.change_zonaentrega",
     "excluir": "zona_entrega.delete_zonaentrega",
 }
-
-
-def get_filiais_escrita_queryset(usuario):
-    queryset = Filial.objects.filter(ativa=True, pais_atuacao__isnull=False).select_related("pais_atuacao")
-
-    if not usuario or not getattr(usuario, "is_authenticated", False):
-        return queryset.none()
-
-    if getattr(usuario, "is_superuser", False):
-        return queryset
-
-    return queryset.filter(
-        usuarios_vinculados__usuario=usuario,
-        usuarios_vinculados__ativo=True,
-        usuarios_vinculados__pode_escrever=True,
-    ).distinct()
 
 
 def listar_filiais_logisticas(usuario):

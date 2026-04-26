@@ -11,7 +11,8 @@ from django.shortcuts import render
 from django.utils import timezone
 
 from pages.cad_cliente.models import Cliente
-from pages.filial.models import Filial, UsuarioFilial
+from pages.filial.models import Filial
+from pages.filial.services import get_filiais_escrita_queryset, obter_filial_escrita
 from pages.motorista.models import Motorista
 from sac_base.form_validador import SchemaValidator
 from sac_base.permissions_utils import build_action_permissions
@@ -200,32 +201,11 @@ def _listar_motoristas_filial(filial_id):
     ]
 
 
-def get_filiais_escrita_queryset(usuario):
-    queryset = Filial.objects.filter(ativa=True, pais_atuacao__isnull=False).select_related("pais_atuacao")
-    if not usuario or not getattr(usuario, "is_authenticated", False):
-        return queryset.none()
-    if getattr(usuario, "is_superuser", False):
-        return queryset
-    return queryset.filter(
-        usuarios_vinculados__usuario=usuario,
-        usuarios_vinculados__ativo=True,
-        usuarios_vinculados__pode_escrever=True,
-    ).distinct()
-
-
 def listar_filiais_escrita(usuario):
     return [
         {"id": f.id, "codigo": f.codigo, "nome": f.nome}
         for f in get_filiais_escrita_queryset(usuario).order_by("nome")
     ]
-
-
-def obter_filial_escrita(filial_id, usuario):
-    try:
-        filial_id = int(filial_id)
-    except (TypeError, ValueError):
-        return None
-    return get_filiais_escrita_queryset(usuario).filter(id=filial_id).first()
 
 
 @permission_required(PERMISSOES_PEDIDO["acessar"], raise_exception=True)
@@ -390,7 +370,7 @@ def pedidos_cadastro_view(request):
 
             if estado_form == "editar" and pedido.origem == "IMPORTADO":
                 for chave in TRAVAS_IMPORTADOS:
-                    parsed[chave] = getattr(pedido, chave if chave != "filial_id" else "filial_id")
+                    parsed[chave] = getattr(pedido, chave)
 
             if parsed["id_vonzu"] is None:
                 return JsonResponse(build_error_payload("ID Vonzu é obrigatório e numérico."), status=400)
@@ -492,8 +472,13 @@ def pedidos_cadastro_del_view(request):
 def pedido_mov_list_view(request):
     if request.method != "POST":
         return JsonResponse(build_error_payload("Método não permitido."), status=405)
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse(build_error_payload("Filial ativa não encontrada."), status=403)
     pedido_id = request.sisvar_front.get("pedido_id")
-    regs = TentativaEntrega.objects.filter(pedido_id=pedido_id).select_related("motorista").order_by("-data_tentativa", "-id")
+    regs = TentativaEntrega.objects.filter(
+        pedido_id=pedido_id, pedido__filial=filial_ativa
+    ).select_related("motorista").order_by("-data_tentativa", "-id")
     return JsonResponse(build_records_response([_serialize_tentativa(r) for r in regs]))
 
 
@@ -501,10 +486,13 @@ def pedido_mov_list_view(request):
 def pedido_mov_save_view(request):
     if request.method != "POST":
         return JsonResponse(build_error_payload("Método não permitido."), status=405)
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse(build_error_payload("Filial ativa não encontrada."), status=403)
     data = request.sisvar_front
     pedido_id = _parse_int(data.get("pedido_id"))
     mov_id = _parse_int(data.get("id"))
-    pedido = Pedido.objects.filter(id=pedido_id).first()
+    pedido = Pedido.objects.filter(id=pedido_id, filial=filial_ativa).first()
     if not pedido:
         return JsonResponse(build_error_payload("Pedido não encontrado."), status=404)
 
@@ -548,8 +536,11 @@ def pedido_mov_save_view(request):
 def pedido_mov_del_view(request):
     if request.method != "POST":
         return JsonResponse(build_error_payload("Método não permitido."), status=405)
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse(build_error_payload("Filial ativa não encontrada."), status=403)
     mov_id = _parse_int(request.sisvar_front.get("id"))
-    mov = TentativaEntrega.objects.filter(id=mov_id).first()
+    mov = TentativaEntrega.objects.filter(id=mov_id, pedido__filial=filial_ativa).first()
     if not mov:
         return JsonResponse(build_error_payload("Movimentação não encontrada."), status=404)
     mov.delete()
@@ -560,8 +551,13 @@ def pedido_mov_del_view(request):
 def pedido_dev_list_view(request):
     if request.method != "POST":
         return JsonResponse(build_error_payload("Método não permitido."), status=405)
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse(build_error_payload("Filial ativa não encontrada."), status=403)
     pedido_id = request.sisvar_front.get("pedido_id")
-    regs = Devolucao.objects.filter(pedido_id=pedido_id).order_by("-data", "-id")
+    regs = Devolucao.objects.filter(
+        pedido_id=pedido_id, pedido__filial=filial_ativa
+    ).order_by("-data", "-id")
     return JsonResponse(build_records_response([_serialize_devolucao(r) for r in regs]))
 
 
@@ -569,10 +565,13 @@ def pedido_dev_list_view(request):
 def pedido_dev_save_view(request):
     if request.method != "POST":
         return JsonResponse(build_error_payload("Método não permitido."), status=405)
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse(build_error_payload("Filial ativa não encontrada."), status=403)
     data = request.sisvar_front
     pedido_id = _parse_int(data.get("pedido_id"))
     dev_id = _parse_int(data.get("id"))
-    pedido = Pedido.objects.filter(id=pedido_id).first()
+    pedido = Pedido.objects.filter(id=pedido_id, filial=filial_ativa).first()
     if not pedido:
         return JsonResponse(build_error_payload("Pedido não encontrado."), status=404)
 
@@ -604,8 +603,11 @@ def pedido_dev_save_view(request):
 def pedido_dev_del_view(request):
     if request.method != "POST":
         return JsonResponse(build_error_payload("Método não permitido."), status=405)
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse(build_error_payload("Filial ativa não encontrada."), status=403)
     dev_id = _parse_int(request.sisvar_front.get("id"))
-    dev = Devolucao.objects.filter(id=dev_id).first()
+    dev = Devolucao.objects.filter(id=dev_id, pedido__filial=filial_ativa).first()
     if not dev:
         return JsonResponse(build_error_payload("Devolução não encontrada."), status=404)
     # Excluir imagens do imgbb antes de remover o registro
@@ -629,6 +631,10 @@ def pedido_dev_foto_add_view(request):
     if request.method != "POST":
         return JsonResponse(build_error_payload("Método não permitido."), status=405)
 
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse(build_error_payload("Filial ativa não encontrada."), status=403)
+
     data = request.sisvar_front
     dev_id = _parse_int(data.get("dev_id"))
     imagem_b64 = data.get("imagem_b64", "")
@@ -636,7 +642,7 @@ def pedido_dev_foto_add_view(request):
     if not dev_id or not imagem_b64:
         return JsonResponse(build_error_payload("Dados insuficientes."), status=400)
 
-    dev = Devolucao.objects.filter(id=dev_id).first()
+    dev = Devolucao.objects.filter(id=dev_id, pedido__filial=filial_ativa).first()
     if not dev:
         return JsonResponse(build_error_payload("Devolução não encontrada."), status=404)
 
@@ -700,6 +706,10 @@ def pedido_dev_foto_del_view(request):
     if request.method != "POST":
         return JsonResponse(build_error_payload("Método não permitido."), status=405)
 
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse(build_error_payload("Filial ativa não encontrada."), status=403)
+
     data = request.sisvar_front
     dev_id = _parse_int(data.get("dev_id"))
     imgbb_id = (data.get("imgbb_id") or "").strip()
@@ -707,7 +717,7 @@ def pedido_dev_foto_del_view(request):
     if not dev_id or not imgbb_id:
         return JsonResponse(build_error_payload("Dados insuficientes."), status=400)
 
-    dev = Devolucao.objects.filter(id=dev_id).first()
+    dev = Devolucao.objects.filter(id=dev_id, pedido__filial=filial_ativa).first()
     if not dev:
         return JsonResponse(build_error_payload("Devolução não encontrada."), status=404)
 
@@ -734,8 +744,13 @@ def pedido_dev_foto_del_view(request):
 def pedido_motoristas_view(request):
     if request.method != "POST":
         return JsonResponse(build_error_payload("Método não permitido."), status=405)
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse(build_error_payload("Filial ativa não encontrada."), status=403)
     filial_id = _parse_int(request.sisvar_front.get("filial_id"))
-    return JsonResponse(build_records_response(_listar_motoristas_filial(filial_id)))
+    if filial_id != filial_ativa.id:
+        return JsonResponse(build_error_payload("Filial inválida."), status=403)
+    return JsonResponse(build_records_response(_listar_motoristas_filial(filial_ativa.id)))
 
 
 @permission_required(PERMISSOES_PEDIDO["importar"], raise_exception=True)

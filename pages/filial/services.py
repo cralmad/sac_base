@@ -2,6 +2,29 @@ from pages.filial.models import Filial, UsuarioFilial
 
 
 ACTIVE_FILIAL_COOKIE = "active_filial_id"
+
+
+def get_filiais_escrita_queryset(usuario):
+    """Retorna QuerySet de filiais ativas com vínculo de escrita para o usuário."""
+    queryset = Filial.objects.filter(ativa=True, pais_atuacao__isnull=False).select_related("pais_atuacao")
+    if not usuario or not getattr(usuario, "is_authenticated", False):
+        return queryset.none()
+    if getattr(usuario, "is_superuser", False):
+        return queryset
+    return queryset.filter(
+        usuarios_vinculados__usuario=usuario,
+        usuarios_vinculados__ativo=True,
+        usuarios_vinculados__pode_escrever=True,
+    ).distinct()
+
+
+def obter_filial_escrita(filial_id, usuario):
+    """Retorna a filial se o usuário tiver vínculo de escrita, ou None."""
+    try:
+        filial_id = int(filial_id)
+    except (TypeError, ValueError):
+        return None
+    return get_filiais_escrita_queryset(usuario).filter(id=filial_id).first()
 FILIAL_SELECT_PATH = "/app/usuario/filial/selecionar/"
 FILIAL_ACTIVATE_PATH = "/app/usuario/filial/ativar/"
 FILIAL_NO_ACCESS_PATH = "/app/usuario/filial/sem-acesso/"

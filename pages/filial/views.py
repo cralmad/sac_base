@@ -49,6 +49,8 @@ def build_filial_campos_iniciais():
         "lng_deposito": "",
         "sms_padrao_1": "",
         "sms_padrao_2": "",
+        "gsheets_spreadsheet_id": "",
+        "gsheets_sheet_name": "",
     }
 
 
@@ -68,9 +70,13 @@ def serializar_form_filial(filial):
         config = filial.config
         sms_padrao_1 = config.sms_padrao_1 or ""
         sms_padrao_2 = config.sms_padrao_2 or ""
+        gsheets_spreadsheet_id = config.gsheets_spreadsheet_id or ""
+        gsheets_sheet_name = config.gsheets_sheet_name or ""
     except FilialConfig.DoesNotExist:
         sms_padrao_1 = ""
         sms_padrao_2 = ""
+        gsheets_spreadsheet_id = ""
+        gsheets_sheet_name = ""
     return {
         "id": filial.id,
         "codigo": filial.codigo,
@@ -85,6 +91,8 @@ def serializar_form_filial(filial):
         "lng_deposito": str(filial.lng_deposito) if filial.lng_deposito is not None else "",
         "sms_padrao_1": sms_padrao_1,
         "sms_padrao_2": sms_padrao_2,
+        "gsheets_spreadsheet_id": gsheets_spreadsheet_id,
+        "gsheets_sheet_name": gsheets_sheet_name,
     }
 
 
@@ -110,6 +118,8 @@ def cadastro_filial_view(request):
             "lng_deposito": {"type": "string", "required": False, "value": ""},
             "sms_padrao_1": {"type": "string", "required": False, "value": ""},
             "sms_padrao_2": {"type": "string", "required": False, "value": ""},
+            "gsheets_spreadsheet_id": {"type": "string", "maxlength": 200, "required": False, "value": ""},
+            "gsheets_sheet_name": {"type": "string", "maxlength": 100, "required": False, "value": ""},
         },
         nome_form_cons: {
             "codigo_cons": {"type": "string", "maxlength": 20, "required": False, "value": ""},
@@ -269,9 +279,16 @@ def cadastro_filial_view(request):
 
     sms_padrao_1 = (campos.get("sms_padrao_1") or "").strip() or None
     sms_padrao_2 = (campos.get("sms_padrao_2") or "").strip() or None
+    gsheets_spreadsheet_id = (campos.get("gsheets_spreadsheet_id") or "").strip() or None
+    gsheets_sheet_name = (campos.get("gsheets_sheet_name") or "").strip() or None
     FilialConfig.objects.update_or_create(
         filial=filial,
-        defaults={"sms_padrao_1": sms_padrao_1, "sms_padrao_2": sms_padrao_2},
+        defaults={
+            "sms_padrao_1": sms_padrao_1,
+            "sms_padrao_2": sms_padrao_2,
+            "gsheets_spreadsheet_id": gsheets_spreadsheet_id,
+            "gsheets_sheet_name": gsheets_sheet_name,
+        },
     )
 
     return JsonResponse(build_form_response(
