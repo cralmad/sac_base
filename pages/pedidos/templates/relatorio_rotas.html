@@ -47,7 +47,17 @@ table.rr-tabela td {
 .rr-periodo-TARDE { color: #0055a5; font-weight: 600; }
 table.rr-tabela tr.rr-nao-segue td { background: #e0e0e0 !important; }
 
-/* ── Impressão ── */
+/* ── Multi-select de motoristas ── */
+#rr-motoristas {
+  min-height: 6rem;
+  font-size: .875rem;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+.rr-select-actions { display: flex; gap: .25rem; margin-top: .25rem; }
+.rr-select-actions button { font-size: .75rem; padding: .1rem .4rem; }
 @media print {
   @page { size: A4 landscape; margin: 6mm 8mm; }
   body, .container-xl, .container-fluid { padding: 0 !important; margin: 0 !important; }
@@ -80,7 +90,7 @@ table.rr-tabela tr.rr-nao-segue td { background: #e0e0e0 !important; }
      data-url-link="{% url 'mapa_publico_gerar_link' %}">
 
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-    <h1 class="h4 mb-0"><i class="bi bi-truck me-2"></i>Rotas por Carro</h1>
+    <h1 class="h4 mb-0"><i class="bi bi-truck me-2"></i>Rotas por <span id="rr-titulo-agrup">Carro</span></h1>
     <span id="rr-titulo-data" class="text-muted small"></span>
   </div>
 
@@ -99,8 +109,38 @@ table.rr-tabela tr.rr-nao-segue td { background: #e0e0e0 !important; }
         <input type="date" id="rr-data" class="form-control" required>
       </div>
       <div class="col-6 col-md-2">
-        <label class="form-label mb-0" for="rr-carro">Carro</label>
-        <input type="number" id="rr-carro" class="form-control" min="1" placeholder="Todos">
+        <label class="form-label mb-0 d-flex align-items-center gap-1" for="rr-carro">
+          <span>Carro</span>
+          <span class="text-primary" role="button" tabindex="0"
+            data-bs-toggle="tooltip" data-bs-placement="top"
+            data-bs-title="Filtre por número(s) de carro. Ex: 1,3,5-10">
+            <i class="bi bi-question-circle"></i>
+          </span>
+        </label>
+        <input type="text" id="rr-carro" class="form-control font-monospace" placeholder="ex: 1,3,5-10">
+        <div id="rr-carro-erro" class="text-danger small d-none">Sintaxe inválida. Use: 1,3,5-10,11</div>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label mb-0" for="rr-agrupamento">Agrupar por</label>
+        <select id="rr-agrupamento" class="form-select">
+          <option value="carro" selected>Carro</option>
+          <option value="motorista">Motorista</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label mb-0 d-flex align-items-center gap-1" for="rr-motoristas">
+          <span>Motorista</span>
+          <span class="text-primary" role="button" tabindex="0"
+            data-bs-toggle="tooltip" data-bs-placement="top"
+            data-bs-title="Selecione um ou mais motoristas. Use Ctrl (ou Cmd) para múltiplos. Nenhum selecionado = todos.">
+            <i class="bi bi-question-circle"></i>
+          </span>
+        </label>
+        <select id="rr-motoristas" class="form-select" multiple></select>
+        <div class="rr-select-actions">
+          <button type="button" class="btn btn-outline-secondary" id="rr-btn-sel-todos">Todos</button>
+          <button type="button" class="btn btn-outline-secondary" id="rr-btn-des-todos">Limpar</button>
+        </div>
       </div>
       <div class="col-12 col-md-2 d-flex gap-2">
         <button type="submit" class="btn btn-primary w-100">

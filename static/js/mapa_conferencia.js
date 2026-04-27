@@ -10,6 +10,7 @@ const URL_REGEOCODIFICAR = root?.dataset?.urlRegeocodificar ?? '';
 const URL_ROTA         = root?.dataset?.urlRota ?? '';
 const URL_SALVAR       = root?.dataset?.urlSalvar ?? '';
 const DATA_INICIAL     = root?.dataset?.dataInicial ?? '';
+const MOV_ID_INICIAL   = new URLSearchParams(window.location.search).get('mov_id') ?? '';
 
 const podeEditar      = hasScreenPermission('mapa', 'editar');
 const podeEditarCarro = hasScreenPermission('mapa', 'editar_carro');
@@ -30,6 +31,10 @@ const mapaProgressoBarra  = document.getElementById('mapa-progresso-barra');
 const painel              = document.getElementById('mapa-painel');
 const painelTitulo    = document.getElementById('mapa-painel-titulo');
 const painelCorpo     = document.getElementById('mapa-painel-corpo');
+const listaWrapper    = document.getElementById('mapa-lista-wrapper');
+const listaBadge      = document.getElementById('mapa-lista-badge');
+const listaTbody      = document.getElementById('mapa-lista-tbody');
+const listaFiltro     = document.getElementById('mapa-lista-filtro');
 
 let mapaLeaflet   = null;
 let marcadores    = {};       // mov_id → marker
@@ -307,6 +312,102 @@ function renderizarMarcadores(geojson) {
   });
 }
 
+// ─── Lista de pedidos ─────────────────────────────────────────────────────────────
+
+function renderizarLista(geojson) {
+  listaTbody.replaceChildren();
+  const total = geojson.features.length;
+  listaBadge.textContent = String(total);
+
+  const featuresSorted = [...geojson.features].sort((a, b) => {
+    const ca = a.properties.carro, cb = b.properties.carro;
+    // Sem carro vai para o fim
+    const na = ca != null ? parseInt(ca, 10) : Infinity;
+    const nb = cb != null ? parseInt(cb, 10) : Infinity;
+    if (na !== nb) return na - nb;
+    return String(a.properties.codpost || '').localeCompare(String(b.properties.codpost || ''));
+  });
+
+  for (const feat of featuresSorted) {
+    const p = feat.properties;
+    const tr = document.createElement('tr');
+    tr.dataset.movId = p.mov_id;
+    tr.dataset.ref   = String(p.referencia).toLowerCase();
+
+    // Referência (botão que foca o pin)
+    const tdRef = document.createElement('td');
+    const btnRef = document.createElement('button');
+    btnRef.type = 'button';
+    btnRef.className = 'btn btn-link btn-sm p-0 fw-semibold text-decoration-none';
+    btnRef.textContent = p.referencia;
+    btnRef.title = 'Ver no mapa';
+    btnRef.addEventListener('click', () => focarMarcador(p.mov_id));
+    tdRef.appendChild(btnRef);
+    tr.appendChild(tdRef);
+
+    // Tipo
+    const tdTipo = document.createElement('td');
+    tdTipo.textContent = p.tipo ? p.tipo.charAt(0) : '—';
+    tr.appendChild(tdTipo);
+
+    // Destinatário / Endereço
+    const tdEnd = document.createElement('td');
+    const small = document.createElement('small');
+    small.className = 'text-muted';
+    small.textContent = [p.endereco, p.cidade].filter(Boolean).join(', ');
+    tdEnd.textContent = '';
+    tdEnd.appendChild(small);
+    tr.appendChild(tdEnd);
+
+    // Cód. Postal
+    const tdCodpost = document.createElement('td');
+    tdCodpost.textContent = p.codpost || '—';
+    tr.appendChild(tdCodpost);
+
+    // Carro
+    const tdCarro = document.createElement('td');
+    if (p.carro != null) {
+      const badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.style.background = p.cor;
+      badge.textContent = p.carro;
+      tdCarro.appendChild(badge);
+    } else {
+      tdCarro.textContent = '—';
+    }
+    tr.appendChild(tdCarro);
+
+    listaTbody.appendChild(tr);
+  }
+
+  listaWrapper.classList.toggle('d-none', total === 0);
+}
+
+function filtrarLista(termo) {
+  const t = termo.trim().toLowerCase();
+  listaTbody.querySelectorAll('tr').forEach(tr => {
+    tr.classList.toggle('d-none', t !== '' && !tr.dataset.ref.includes(t));
+  });
+}
+
+listaFiltro?.addEventListener('input', () => filtrarLista(listaFiltro.value));
+
+// ─── Focar marcador por mov_id ──────────────────────────────────────────────
+
+function focarMarcador(movId) {
+  const marker = marcadores[String(movId)];
+  if (!marker) return;
+  mapaLeaflet.setView(marker.getLatLng(), Math.max(mapaLeaflet.getZoom(), 15));
+  marker.openPopup();
+  // Destaca linha correspondente na lista
+  listaTbody.querySelectorAll('tr').forEach(tr => tr.classList.remove('table-primary'));
+  const linhaAtiva = listaTbody.querySelector(`tr[data-mov-id="${movId}"]`);
+  if (linhaAtiva) {
+    linhaAtiva.classList.add('table-primary');
+    linhaAtiva.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
 // ─── Legenda de carros ────────────────────────────────────────────────────────
 
 function renderizarLegenda(geojson) {
@@ -391,10 +492,11 @@ async function carregarPontos(data) {
     renderizarMarcadores(geojsonData);
     renderizarLegenda(geojsonData);
     renderizarDeposito();
+    renderizarLista(geojsonData);
 
-    // Ajusta o mapa aos marcadores
+    // Ajusta o mapa aos marcadores (salta fitBounds se veio com mov_id específico)
     const coords = geojsonData.features.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]]);
-    if (coords.length > 0) mapaLeaflet.fitBounds(L.latLngBounds(coords), { padding: [40, 40] });
+    if (coords.length > 0 && !MOV_ID_INICIAL) mapaLeaflet.fitBounds(L.latLngBounds(coords), { padding: [40, 40] });
 
     const totalComCoord = result.total ?? 0;
     const totalSemCoord = result.sem_coord ?? 0;
@@ -636,5 +738,7 @@ document.getElementById('mapa-painel-fechar')?.addEventListener('click', fecharP
 
 // Carrega automaticamente se veio com data da tela anterior
 if (DATA_INICIAL) {
-  carregarPontos(DATA_INICIAL);
+  carregarPontos(DATA_INICIAL).then(() => {
+    if (MOV_ID_INICIAL) setTimeout(() => focarMarcador(MOV_ID_INICIAL), 300);
+  });
 }

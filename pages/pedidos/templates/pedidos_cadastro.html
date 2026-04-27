@@ -21,6 +21,9 @@
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="tab-dev" data-bs-toggle="tab" data-bs-target="#dev" type="button" role="tab">DEVOLUÇÕES</button>
     </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-inc" data-bs-toggle="tab" data-bs-target="#inc" type="button" role="tab">INCIDÊNCIAS</button>
+    </li>
   </ul>
 
   <form id="cadPedido" data-form-lock="cadPedido" method="POST">
@@ -210,6 +213,34 @@
           </div>
         </div>
       </div>
+
+      <div class="tab-pane fade" id="inc" role="tabpanel">
+        <div class="container-xl my-3 mx-auto">
+          <div class="d-flex gap-2 mb-3">
+            <button id="btn-inc-novo" type="button" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-plus-circle"></i> Nova Incidência
+            </button>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover table-sm border">
+              <thead class="table-dark">
+                <tr>
+                  <th>ID</th>
+                  <th>Data</th>
+                  <th>Origem</th>
+                  <th>Tipo</th>
+                  <th>Artigo</th>
+                  <th>Valor</th>
+                  <th>Motorista</th>
+                  <th>Obs</th>
+                  <th class="text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-inc-corpo"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="btn-actions">
@@ -252,6 +283,36 @@
           <div class="col-12 col-md-2">
             <label class="form-label mb-0">Estado</label>
             <select id="estado_cons" name="estado_cons" class="form-select"><option value="">Todos</option></select>
+          </div>
+          <div class="col-12 col-md-2">
+            <label class="form-label mb-0 d-flex align-items-center gap-1" for="prev_entrega_ini">
+              <span>Prev. Entrega (de)</span>
+              <span
+                class="text-primary"
+                role="button"
+                tabindex="0"
+                data-bs-toggle="tooltip"
+                data-bs-placement="top"
+                data-bs-title="Data inicial do período de previsão de entrega (opcional).">
+                <i class="bi bi-question-circle"></i>
+              </span>
+            </label>
+            <input type="date" id="prev_entrega_ini" name="prev_entrega_ini" class="form-control">
+          </div>
+          <div class="col-12 col-md-2">
+            <label class="form-label mb-0 d-flex align-items-center gap-1" for="prev_entrega_fim">
+              <span>Prev. Entrega (até)</span>
+              <span
+                class="text-primary"
+                role="button"
+                tabindex="0"
+                data-bs-toggle="tooltip"
+                data-bs-placement="top"
+                data-bs-title="Data final do período de previsão de entrega (opcional).">
+                <i class="bi bi-question-circle"></i>
+              </span>
+            </label>
+            <input type="date" id="prev_entrega_fim" name="prev_entrega_fim" class="form-control">
           </div>
           <div class="col-12 d-grid gap-2 d-sm-flex align-items-end">
             <button type="submit" class="btn btn-success"><i class="bi bi-search"></i> Filtrar</button>
@@ -382,6 +443,75 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
         <button type="button" id="btn-dev-salvar" class="btn btn-primary">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalInc" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="modalIncTitulo">Incidência</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formInc">
+          <input type="hidden" id="inc_id">
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0" for="inc_data">Data *</label>
+              <input id="inc_data" class="form-control" type="date" required>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0" for="inc_origem">Origem *</label>
+              <select id="inc_origem" class="form-select" required>
+                <option value="">Selecione</option>
+                <option value="Cliente">Cliente</option>
+                <option value="Filial">Filial</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0" for="inc_tipo">Tipo *</label>
+              <select id="inc_tipo" class="form-select" required>
+                <option value="">Selecione</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label mb-0" for="inc_artigo">Artigo</label>
+              <input id="inc_artigo" class="form-control" maxlength="200">
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0" for="inc_valor">Valor</label>
+              <input id="inc_valor" class="form-control" type="number" min="0" step="0.01" inputmode="decimal">
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="inc_motorista">
+                <span>Motorista</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="Disponível apenas quando a origem for Filial.">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <select id="inc_motorista" class="form-select" disabled>
+                <option value="">Selecione</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label mb-0" for="inc_obs">Observações</label>
+              <textarea id="inc_obs" class="form-control" rows="3"></textarea>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="btn-inc-salvar" class="btn btn-primary">Salvar</button>
       </div>
     </div>
   </div>

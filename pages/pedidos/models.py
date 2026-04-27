@@ -11,6 +11,24 @@ TIPO_CHOICES = [
     ("RECOLHA", "Recolha"),
 ]
 
+INCIDENCIA_CHOICE = [
+    # (valor_tipo, filtro_origem)  filtro_origem="" → exibido para todas as origens
+    ("Acondicionamento/Embalagem", "cliente"),
+    ("Peso/Volume",               "cliente"),
+    ("Data/Horário",              "cliente"),
+    ("Outros",                    ""),
+    ("Artigo Danificado",         "filial"),
+    ("Artigo Extraviado",         "filial"),
+]
+
+INCIDENCIA_ORIG_CHOICE = [
+    ("Cliente", "Cliente"),
+    ("Filial",  "Filial"),
+]
+
+# Choices planos para o campo tipo (valor, label)
+INCIDENCIA_TIPO_CHOICES = [(v, v) for v, _ in INCIDENCIA_CHOICE]
+
 MOTIVO_CHOICES = [
     ("Pedido Cancelado p/ Cliente", "Pedido Cancelado p/ Cliente"),
     ("Entrega Recusada", "Entrega Recusada"),
@@ -223,3 +241,40 @@ class Devolucao(models.Model):
 
     def __str__(self):
         return f"Devolução {self.data} — Pedido {self.pedido_id}"
+
+
+class Incidencia(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    pedido = models.ForeignKey(
+        Pedido,
+        on_delete=models.CASCADE,
+        db_column="pedido_id",
+        related_name="incidencias",
+    )
+    data = models.DateField()
+    origem = models.CharField(max_length=10, choices=INCIDENCIA_ORIG_CHOICE)
+    tipo = models.CharField(max_length=50, choices=INCIDENCIA_TIPO_CHOICES)
+    artigo = models.CharField(max_length=200, null=True, blank=True)
+    valor = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    motorista = models.ForeignKey(
+        Motorista,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column="motorista_id",
+        related_name="incidencias",
+    )
+    obs = models.TextField(null=True, blank=True)
+    fotos = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "incidencia"
+        indexes = [
+            models.Index(fields=["pedido"]),
+            models.Index(fields=["data"]),
+            models.Index(fields=["origem"]),
+        ]
+
+    def __str__(self):
+        return f"Incidência {self.tipo} — Pedido {self.pedido_id}"

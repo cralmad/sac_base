@@ -1,5 +1,6 @@
-import { getCsrfToken, clearMessages, definirMensagem } from '/static/js/sisVar.js';
+import { getCsrfToken, clearMessages, definirMensagem, getOptions } from '/static/js/sisVar.js';
 import { AppLoader } from '/static/js/loader.js';
+import { validateSmartNumber, getMultiSelectValues } from '/static/js/smart_filter.js';
 
 const root       = document.getElementById('rr-root');
 const URL_BUSCAR = root?.dataset?.urlBuscar ?? '';
@@ -8,11 +9,40 @@ const URL_LINK   = root?.dataset?.urlLink   ?? '';
 const form       = document.getElementById('rr-form');
 const inpData    = document.getElementById('rr-data');
 const inpCarro   = document.getElementById('rr-carro');
+const selMotoristas = document.getElementById('rr-motoristas');
+const btnSelTodos   = document.getElementById('rr-btn-sel-todos');
+const btnDesTodos   = document.getElementById('rr-btn-des-todos');
+const erroCarroEl = document.getElementById('rr-carro-erro');
+const selAgrupamento = document.getElementById('rr-agrupamento');
+const tituloAgrup = document.getElementById('rr-titulo-agrup');
 const resultado  = document.getElementById('rr-resultado');
 const loader     = document.getElementById('rr-loader');
 const vazio      = document.getElementById('rr-vazio');
 const tituloData = document.getElementById('rr-titulo-data');
 const btnImprimir = document.getElementById('rr-btn-imprimir');
+
+// ─── Popula select de motoristas a partir da sisVar ───────────────────────────
+function preencherMotoristas() {
+  const motoristas = getOptions('motoristas') || [];
+  selMotoristas.replaceChildren();
+  motoristas.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.value;
+    opt.textContent = m.label;
+    selMotoristas.appendChild(opt);
+  });
+}
+
+btnSelTodos?.addEventListener('click', () => {
+  Array.from(selMotoristas.options).forEach(o => { o.selected = true; });
+});
+btnDesTodos?.addEventListener('click', () => {
+  Array.from(selMotoristas.options).forEach(o => { o.selected = false; });
+});
+
+selAgrupamento?.addEventListener('change', () => {
+  tituloAgrup.textContent = selAgrupamento.value === 'motorista' ? 'Motorista' : 'Carro';
+});
 
 // ─── Escape seguro ────────────────────────────────────────────────────────────
 function _esc(v) {
@@ -25,7 +55,7 @@ function _esc(v) {
 }
 
 // ─── Renderizar grupos ────────────────────────────────────────────────────────
-function renderizarGrupos(grupos, dataFmt) {
+function renderizarGrupos(grupos, dataFmt, agrupamento) {
   resultado.replaceChildren();
   vazio.classList.add('d-none');
 
@@ -41,8 +71,14 @@ function renderizarGrupos(grupos, dataFmt) {
     const header = document.createElement('div');
     header.className = 'rr-grupo-header';
 
-    const spanCarro = document.createElement('span');
-    spanCarro.textContent = grupo.carro !== '—' ? `Carro ${grupo.carro}` : 'Sem carro';
+    const spanLabel = document.createElement('span');
+    if (agrupamento === 'motorista') {
+      spanLabel.textContent = grupo.motorista_nome
+        ? `Motorista: ${grupo.motorista_nome}`
+        : 'Sem motorista';
+    } else {
+      spanLabel.textContent = grupo.carro !== '\u2014' ? `Carro ${grupo.carro}` : 'Sem carro';
+    }
 
     const spanData = document.createElement('span');
     spanData.textContent = grupo.data_tentativa;
@@ -53,11 +89,11 @@ function renderizarGrupos(grupos, dataFmt) {
     spanTotal.className = 'rr-badge ms-auto';
     spanTotal.textContent = `${grupo.total} pedido(s)`;
 
-    header.appendChild(spanCarro);
+    header.appendChild(spanLabel);
     header.appendChild(spanData);
     header.appendChild(spanTotal);
 
-    if (grupo.carro !== '\u2014') {
+    if (agrupamento !== 'motorista' && grupo.carro !== '\u2014') {
       const btnLink = document.createElement('button');
       btnLink.type = 'button';
       btnLink.className = 'btn btn-sm btn-light';
@@ -180,6 +216,14 @@ async function buscar() {
     return;
   }
 
+  if (!validateSmartNumber(inpCarro.value)) {
+    erroCarroEl.classList.remove('d-none');
+    inpCarro.classList.add('is-invalid');
+    return;
+  }
+  erroCarroEl.classList.add('d-none');
+  inpCarro.classList.remove('is-invalid');
+
   loader.classList.remove('d-none');
   resultado.replaceChildren();
   vazio.classList.add('d-none');
@@ -191,6 +235,8 @@ async function buscar() {
       filtros: {
         data_tentativa: data,
         carro: inpCarro.value.trim(),
+        motoristas: getMultiSelectValues(selMotoristas),
+        agrupamento: selAgrupamento.value || 'carro',
       },
     };
     const resp = await fetch(URL_BUSCAR, {
@@ -203,7 +249,7 @@ async function buscar() {
       definirMensagem('erro', json.mensagem || 'Erro ao buscar dados.', false);
       return;
     }
-    renderizarGrupos(json.grupos || [], json.data_fmt || '');
+    renderizarGrupos(json.grupos || [], json.data_fmt || '', json.agrupamento || 'carro');
   } catch {
     definirMensagem('erro', 'Erro de comunicação com o servidor.', false);
   } finally {
@@ -215,3 +261,4 @@ async function buscar() {
 // ─── Eventos ──────────────────────────────────────────────────────────────────
 form.addEventListener('submit', e => { e.preventDefault(); buscar(); });
 btnImprimir.addEventListener('click', () => window.print());
+preencherMotoristas();

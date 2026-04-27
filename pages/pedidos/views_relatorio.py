@@ -9,6 +9,7 @@ from datetime import datetime
 from itertools import groupby
 
 from pages.pedidos.models import TentativaEntrega, Pedido, Devolucao, ESTADOS_SEGUE_PARA_ENTREGA, ESTADO_DEFINITIONS, ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA, MOTIVO_CHOICES
+from pages.motorista.models import Motorista
 from sac_base.permissions_utils import build_action_permissions
 from sac_base.sisvar_builders import build_sisvar_payload
 from sac_base.sms_service import montar_mensagem, enviar_sms_bulkgate, HORARIO_PERIODO as _SMS_HORARIO_PERIODO
@@ -188,16 +189,31 @@ PERMISSOES_ROTAS = {
 @require_http_methods(["GET", "POST"])
 def relatorio_rotas_view(request):
     if request.method == "GET":
+        filial_ativa = getattr(request, "filial_ativa", None)
+        motoristas_choices = []
+        if filial_ativa:
+            motoristas_choices = [
+                {"value": m.id, "label": f"{m.codigo} - {m.nome}" if m.codigo else m.nome}
+                for m in Motorista.objects.filter(is_deleted=False, filial=filial_ativa).order_by("nome")
+            ]
         request.sisvar_extra = build_sisvar_payload(
-            permissions={"rotas": build_action_permissions(request.user, PERMISSOES_ROTAS)}
+            permissions={"rotas": build_action_permissions(request.user, PERMISSOES_ROTAS)},
+            options={"motoristas": motoristas_choices},
         )
         return render(request, "relatorio_rotas.html")
 
-    # POST: retorna grupos por carro
+    # POST: retorna grupos por carro ou motorista
     data = request.sisvar_front or {}
     filtros = data.get("filtros", {})
     data_tentativa = filtros.get("data_tentativa", "").strip()
     carro_filtro = filtros.get("carro", "").strip()
+    motorista_ids = filtros.get("motoristas", [])
+    if not isinstance(motorista_ids, list):
+        motorista_ids = []
+    motorista_ids = [int(v) for v in motorista_ids if str(v).isdigit()]
+    agrupamento = filtros.get("agrupamento", "carro").strip().lower()
+    if agrupamento not in ("carro", "motorista"):
+        agrupamento = "carro"
 
     if not data_tentativa:
         return JsonResponse({"success": False, "mensagem": "A data é obrigatória."}, status=400)
@@ -209,28 +225,39 @@ def relatorio_rotas_view(request):
 
     qs = (
         TentativaEntrega.objects
-        .select_related("pedido")
+        .select_related("pedido", "motorista")
         .filter(data_tentativa=dt)
     )
     filial_ativa = getattr(request, "filial_ativa", None)
     if filial_ativa:
         qs = qs.filter(pedido__filial=filial_ativa)
     if carro_filtro:
-        try:
-            qs = qs.filter(carro=int(carro_filtro))
-        except ValueError:
-            pass
+        qs = apply_smart_number_filter(qs, 'carro', carro_filtro)
+    if motorista_ids:
+        qs = qs.filter(motorista_id__in=motorista_ids)
 
-    qs = qs.order_by("carro", "pedido__codpost_dest", "pedido__pedido")
+    if agrupamento == "motorista":
+        qs = qs.order_by("motorista__nome", "pedido__codpost_dest", "pedido__pedido")
+        key_fn = lambda m: (m.motorista_id, m.motorista.nome if m.motorista_id else "")
+    else:
+        qs = qs.order_by("carro", "pedido__codpost_dest", "pedido__pedido")
+        key_fn = lambda m: m.carro
 
     grupos = []
-    for carro_val, items in groupby(qs, key=lambda m: m.carro):
+    for grupo_key, items in groupby(qs, key=key_fn):
         linhas = []
         data_str = None
+        motorista_nome = ""
+        carro_val = None
         for mov in items:
             p = mov.pedido
             if data_str is None:
                 data_str = mov.data_tentativa.strftime("%d/%m/%Y")
+            if agrupamento == "motorista":
+                motorista_nome = mov.motorista.nome if mov.motorista_id else ""
+                carro_val = None
+            else:
+                carro_val = mov.carro
             tipo_abrev = "R" if (p.tipo or "").upper() == "RECOLHA" else "E"
             fones = " / ".join(f for f in [p.fone_dest or "", p.fone_dest2 or ""] if f)
             peso_str = ""
@@ -255,6 +282,7 @@ def relatorio_rotas_view(request):
             })
         grupos.append({
             "carro": str(carro_val) if carro_val is not None else "—",
+            "motorista_nome": motorista_nome,
             "data_tentativa": data_str or dt.strftime("%d/%m/%Y"),
             "total": len(linhas),
             "linhas": linhas,
@@ -264,6 +292,7 @@ def relatorio_rotas_view(request):
         "success": True,
         "grupos": grupos,
         "data_fmt": dt.strftime("%d/%m/%Y"),
+        "agrupamento": agrupamento,
     })
 
 

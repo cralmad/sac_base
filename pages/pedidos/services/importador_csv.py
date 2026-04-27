@@ -183,10 +183,12 @@ def _deduplicar(linhas_norm):
     return dedup, ignoradas
 
 
-def _resolver_fks(filial, linhas_dedup):
+def _resolver_fks(filial, linhas_dedup, ids_sem_alteracao=None):
     """Resolve cliente e motorista pelo campo 'codigo' em lote.
 
     Retorna (linhas_com_ids, avisos). FKs não resolvidas são salvas como None.
+    Avisos só são emitidos para linhas que serão efetivamente escritas; linhas
+    cujo id_vonzu esteja em `ids_sem_alteracao` são ignoradas nos avisos.
     """
     codigos_cliente = {
         d["nome_cliente_csv"].upper()
@@ -217,17 +219,19 @@ def _resolver_fks(filial, linhas_dedup):
         if m.codigo
     }
 
+    ids_sem_alteracao = ids_sem_alteracao or set()
     avisos = []
     resultado = []
     for num_linha, dados in linhas_dedup:
         dados = dict(dados)
         nome_cli = dados.pop("nome_cliente_csv", None)
         nome_mot = dados.pop("nome_motorista_csv", None)
+        sera_escrito = dados["id_vonzu"] not in ids_sem_alteracao
 
         cliente_id = None
         if nome_cli:
             cliente_id = clientes_map.get(nome_cli.upper())
-            if cliente_id is None:
+            if cliente_id is None and sera_escrito:
                 avisos.append(
                     f"  Linha {num_linha:>4} | id_vonzu={dados['id_vonzu']:>10} | "
                     f"cliente \"{nome_cli}\" não localizado pelo código — salvo como null"
@@ -236,7 +240,7 @@ def _resolver_fks(filial, linhas_dedup):
         motorista_id = None
         if nome_mot:
             motorista_id = motoristas_map.get(nome_mot.upper())
-            if motorista_id is None:
+            if motorista_id is None and sera_escrito:
                 avisos.append(
                     f"  Linha {num_linha:>4} | id_vonzu={dados['id_vonzu']:>10} | "
                     f"motorista \"{nome_mot}\" não localizado pelo código — salvo como null"
@@ -317,7 +321,22 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
         return {"sucesso": False, "erros": todos_erros, "relatorio": "", "stats": {}}
 
     linhas_dedup, ignoradas = _deduplicar(linhas_norm)
-    linhas_resolvidas, avisos_fk = _resolver_fks(filial, linhas_dedup)
+
+    # Pré-identifica pedidos já existentes com mesmo atualizacao (sem_alteracao)
+    # para suprimir avisos de FK em linhas que não serão escritas.
+    id_vonzus_all = [d["id_vonzu"] for _, d in linhas_dedup]
+    ids_sem_alteracao = set()
+    for p in Pedido.objects.filter(filial=filial, id_vonzu__in=id_vonzus_all).only("id_vonzu", "atualizacao"):
+        atz = p.atualizacao
+        if atz is not None and atz.tzinfo is None:
+            atz = timezone.make_aware(atz)
+        # Encontra os dados normalizados para comparar
+        for _, d in linhas_dedup:
+            if d["id_vonzu"] == p.id_vonzu and d["atualizacao"] == atz:
+                ids_sem_alteracao.add(p.id_vonzu)
+                break
+
+    linhas_resolvidas, avisos_fk = _resolver_fks(filial, linhas_dedup, ids_sem_alteracao)
 
     criados = atualizados = sem_alteracao = tentativas = 0
 

@@ -78,7 +78,9 @@ function criarCampoNumerico(id, campo, valor, readonly) {
   input.type = 'text';
   input.className = 'form-control mov-editable input-num-xs';
   input.id = `${campo}-${id}`;
-  input.value = Math.max(0, parseInt(valor ?? 0, 10) || 0);
+  input.value = (campo === 'carro' && (valor == null || String(valor).trim() === ''))
+    ? ''
+    : Math.max(0, parseInt(valor ?? 0, 10) || 0);
   input.dataset.campo = campo;
   input.setAttribute('readonly', '');
   if (readonly) input.setAttribute('disabled', '');
@@ -139,11 +141,25 @@ function criarMovCard(mov) {
     const labelEl = document.createElement('span');
     labelEl.className = 'mov-field-label';
     labelEl.textContent = rotulo;
-    const span = document.createElement('span');
-    if (rotulo === 'Referência') span.className = 'fw-semibold';
-    span.textContent = valor;
+    let valueEl;
+    if (rotulo === 'Referência' && btnAbrirMapa && filtros.data_tentativa) {
+      const mapaUrl = new URL(btnAbrirMapa.href, window.location.origin);
+      mapaUrl.searchParams.set('data', filtros.data_tentativa);
+      mapaUrl.searchParams.set('mov_id', mov.id);
+      valueEl = document.createElement('a');
+      valueEl.className = 'fw-semibold text-decoration-none';
+      valueEl.href = mapaUrl.toString();
+      valueEl.target = '_blank';
+      valueEl.rel = 'noopener noreferrer';
+      valueEl.title = 'Ver pin no mapa';
+      valueEl.textContent = valor;
+    } else {
+      valueEl = document.createElement('span');
+      if (rotulo === 'Referência') valueEl.className = 'fw-semibold';
+      valueEl.textContent = valor;
+    }
     div.appendChild(labelEl);
-    div.appendChild(span);
+    div.appendChild(valueEl);
     leitura.appendChild(div);
   }
   if (mov.obs) {
@@ -184,7 +200,7 @@ function criarMovCard(mov) {
     toggleIcon.className = 'bi bi-chevron-down mov-sanfona-icon me-1';
     const toggleText = document.createElement('span');
     toggleText.className = 'small';
-    toggleText.textContent = 'Carro / Período / Obs.';
+    toggleText.textContent = 'Carro / Período / Obs_Rota';
     toggleBtn.appendChild(toggleIcon);
     toggleBtn.appendChild(toggleText);
     edicao.appendChild(toggleBtn);

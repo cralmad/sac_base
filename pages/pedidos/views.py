@@ -25,7 +25,7 @@ from sac_base.sisvar_builders import (
     build_success_payload,
 )
 
-from .models import ESTADO_CHOICES, MOTIVO_CHOICES, ORIGEM_CHOICES, PERIODO_CHOICES, TIPO_CHOICES, Devolucao, Pedido, TentativaEntrega
+from .models import ESTADO_CHOICES, INCIDENCIA_CHOICE, INCIDENCIA_ORIG_CHOICE, INCIDENCIA_TIPO_CHOICES, MOTIVO_CHOICES, ORIGEM_CHOICES, PERIODO_CHOICES, TIPO_CHOICES, Devolucao, Incidencia, Pedido, TentativaEntrega
 from .services.importador_csv import importar_csv
 
 
@@ -150,6 +150,21 @@ def _serialize_devolucao(reg):
         "obs": reg.obs or "",
         "fotos": fotos_publicas,
         "fotos_count": len(fotos_publicas),
+    }
+
+
+def _serialize_incidencia(reg):
+    return {
+        "id": reg.id,
+        "pedido_id": reg.pedido_id,
+        "data": reg.data.isoformat() if reg.data else "",
+        "origem": reg.origem or "",
+        "tipo": reg.tipo or "",
+        "artigo": reg.artigo or "",
+        "valor": str(reg.valor) if reg.valor is not None else "",
+        "motorista_id": reg.motorista_id,
+        "motorista_nome": reg.motorista.nome if reg.motorista_id else "",
+        "obs": reg.obs or "",
     }
 
 
@@ -434,6 +449,16 @@ def pedidos_cadastro_cons_view(request):
             qs = qs.filter(id_vonzu=id_v)
     if campos.get("estado_cons"):
         qs = qs.filter(estado=campos.get("estado_cons"))
+    if campos.get("prev_entrega_ini"):
+        try:
+            qs = qs.filter(prev_entrega__gte=datetime.strptime(campos["prev_entrega_ini"], "%Y-%m-%d").date())
+        except ValueError:
+            pass
+    if campos.get("prev_entrega_fim"):
+        try:
+            qs = qs.filter(prev_entrega__lte=datetime.strptime(campos["prev_entrega_fim"], "%Y-%m-%d").date())
+        except ValueError:
+            pass
 
     registros = [
         {
@@ -620,6 +645,102 @@ def pedido_dev_del_view(request):
                 pass
     dev.delete()
     return JsonResponse(build_success_payload("Devolução excluída com sucesso!"))
+
+
+# ─── Incidências ───────────────────────────────────────────────────────────────
+
+_INCIDENCIA_TIPOS_VALIDOS = {v for v, _ in INCIDENCIA_TIPO_CHOICES}
+_INCIDENCIA_ORIGENS_VALIDAS = {v for v, _ in INCIDENCIA_ORIG_CHOICE}
+
+
+@permission_required(PERMISSOES_PEDIDO["consultar"], raise_exception=True)
+def pedido_inc_list_view(request):
+    if request.method != "POST":
+        return JsonResponse(build_error_payload("Método não permitido."), status=405)
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse(build_error_payload("Filial ativa não encontrada."), status=403)
+    pedido_id = request.sisvar_front.get("pedido_id")
+    regs = (
+        Incidencia.objects
+        .filter(pedido_id=pedido_id, pedido__filial=filial_ativa)
+        .select_related("motorista")
+        .order_by("-data", "-id")
+    )
+    return JsonResponse(build_records_response([_serialize_incidencia(r) for r in regs]))
+
+
+@permission_required(PERMISSOES_PEDIDO["editar"], raise_exception=True)
+def pedido_inc_save_view(request):
+    if request.method != "POST":
+        return JsonResponse(build_error_payload("Método não permitido."), status=405)
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse(build_error_payload("Filial ativa não encontrada."), status=403)
+    data = request.sisvar_front
+    pedido_id = _parse_int(data.get("pedido_id"))
+    inc_id = _parse_int(data.get("id"))
+    pedido = Pedido.objects.filter(id=pedido_id, filial=filial_ativa).first()
+    if not pedido:
+        return JsonResponse(build_error_payload("Pedido não encontrado."), status=404)
+
+    dt_data = _parse_date(data.get("data"))
+    if not dt_data:
+        return JsonResponse(build_error_payload("Data é obrigatória."), status=400)
+
+    origem = (data.get("origem") or "").strip()
+    if not origem or origem not in _INCIDENCIA_ORIGENS_VALIDAS:
+        return JsonResponse(build_error_payload("Origem inválida."), status=400)
+
+    tipo = (data.get("tipo") or "").strip()
+    if not tipo or tipo not in _INCIDENCIA_TIPOS_VALIDOS:
+        return JsonResponse(build_error_payload("Tipo inválido."), status=400)
+
+    # Validar que tipo é compatível com a origem escolhida
+    filtro_origem = next(
+        (f for v, f in INCIDENCIA_CHOICE if v == tipo), None
+    )
+    if filtro_origem is not None and filtro_origem != "" and filtro_origem != origem.lower():
+        return JsonResponse(build_error_payload("Tipo incompatível com a origem selecionada."), status=400)
+
+    motorista_id = None
+    if origem.lower() == "filial":
+        motorista_id = _parse_int(data.get("motorista_id"))
+
+    if inc_id:
+        inc = Incidencia.objects.filter(id=inc_id, pedido=pedido).first()
+        if not inc:
+            return JsonResponse(build_error_payload("Incidência não encontrada."), status=404)
+    else:
+        inc = Incidencia(pedido=pedido)
+
+    inc.data = dt_data
+    inc.origem = origem
+    inc.tipo = tipo
+    inc.artigo = (data.get("artigo") or "").strip() or None
+    inc.valor = _parse_decimal(data.get("valor"))
+    inc.motorista_id = motorista_id
+    inc.obs = (data.get("obs") or "").strip() or None
+    inc.save()
+    return JsonResponse(build_success_payload(
+        "Incidência salva com sucesso!",
+        extra_payload={"inc": _serialize_incidencia(inc)},
+    ))
+
+
+@permission_required(PERMISSOES_PEDIDO["excluir"], raise_exception=True)
+def pedido_inc_del_view(request):
+    if request.method != "POST":
+        return JsonResponse(build_error_payload("Método não permitido."), status=405)
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse(build_error_payload("Filial ativa não encontrada."), status=403)
+    inc_id = _parse_int(request.sisvar_front.get("id"))
+    inc = Incidencia.objects.filter(id=inc_id, pedido__filial=filial_ativa).first()
+    if not inc:
+        return JsonResponse(build_error_payload("Incidência não encontrada."), status=404)
+    inc.delete()
+    return JsonResponse(build_success_payload("Incidência excluída com sucesso!"))
 
 
 _IMGBB_MAX_BYTES = 2 * 1024 * 1024  # 2 MB

@@ -76,6 +76,28 @@
     </div>
   </div>
 
+  {# Lista de pedidos (clicável → foca pin) #}
+  <div id="mapa-lista-wrapper" class="d-none mt-3">
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <h6 class="mb-0 me-auto">Pedidos <span id="mapa-lista-badge" class="badge bg-secondary ms-1">0</span></h6>
+      <input type="search" id="mapa-lista-filtro" class="form-control form-control-sm w-auto" placeholder="Filtrar referência…" style="max-width:180px">
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Referência</th>
+            <th>T</th>
+            <th>Destinatário / Endereço</th>
+            <th>C. Postal</th>
+            <th>Carro</th>
+          </tr>
+        </thead>
+        <tbody id="mapa-lista-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
   {# Painel lateral de detalhes #}
   <div id="mapa-painel" class="mapa-painel d-none">
     <div class="d-flex justify-content-between align-items-center mb-2">

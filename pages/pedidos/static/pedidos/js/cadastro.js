@@ -26,11 +26,14 @@ const form = document.getElementById(nomeForm);
 const formCons = document.getElementById(nomeCons);
 const tabelaMovCorpo = document.getElementById('tabela-mov-corpo');
 const tabelaDevCorpo = document.getElementById('tabela-dev-corpo');
+const tabelaIncCorpo = document.getElementById('tabela-inc-corpo');
 const tabelaPedidoCorpo = document.getElementById('tabela-pedido-corpo');
 const modalMovEl = document.getElementById('modalMov');
 const modalMov = new bootstrap.Modal(modalMovEl);
 const modalDevEl = document.getElementById('modalDev');
 const modalDev = new bootstrap.Modal(modalDevEl);
+const modalIncEl = document.getElementById('modalInc');
+const modalInc = new bootstrap.Modal(modalIncEl);
 const modalFotosEl = document.getElementById('modalFotos');
 const modalFotos = new bootstrap.Modal(modalFotosEl);
 
@@ -479,13 +482,200 @@ function aplicarTravasDevolucoes() {
   });
 }
 
+function aplicarTravasIncidencias() {
+  const bloqueado = formEmVisualizacao();
+  const semPedidoSalvo = !pedidoEstaSalvo();
+  const btnNovoInc = document.getElementById('btn-inc-novo');
+  const btnSalvarInc = document.getElementById('btn-inc-salvar');
+
+  if (btnNovoInc) btnNovoInc.disabled = bloqueado || semPedidoSalvo;
+  if (btnSalvarInc) btnSalvarInc.disabled = bloqueado;
+
+  tabelaIncCorpo.querySelectorAll('.btn-inc-editar, .btn-inc-excluir').forEach(btn => {
+    btn.disabled = bloqueado;
+  });
+}
+
+// ── Tipos de incidência filtrados por origem ──────────────────────────────────
+const _INCIDENCIA_CHOICE = [
+  { tipo: 'Acondicionamento/Embalagem', filtro: 'cliente' },
+  { tipo: 'Peso/Volume',               filtro: 'cliente' },
+  { tipo: 'Data/Horário',              filtro: 'cliente' },
+  { tipo: 'Outros',                    filtro: '' },
+  { tipo: 'Artigo Danificado',         filtro: 'filial' },
+  { tipo: 'Artigo Extraviado',         filtro: 'filial' },
+];
+
+function preencherTiposIncidencia(origem) {
+  const sel = document.getElementById('inc_tipo');
+  const valorAtual = sel.value;
+  sel.replaceChildren();
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = 'Selecione';
+  sel.appendChild(placeholder);
+
+  const origemNorm = (origem || '').toLowerCase();
+  _INCIDENCIA_CHOICE.forEach(({ tipo, filtro }) => {
+    if (filtro === '' || filtro === origemNorm) {
+      const opt = document.createElement('option');
+      opt.value = tipo;
+      opt.textContent = tipo;
+      sel.appendChild(opt);
+    }
+  });
+
+  if (valorAtual) sel.value = valorAtual;
+}
+
+function renderIncidencias(registros = []) {
+  tabelaIncCorpo.innerHTML = '';
+  if (!registros.length) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 9;
+    td.className = 'text-center text-muted';
+    td.textContent = 'Nenhuma incidência';
+    tr.appendChild(td);
+    tabelaIncCorpo.appendChild(tr);
+    aplicarTravasIncidencias();
+    return;
+  }
+
+  registros.forEach(inc => {
+    const tr = document.createElement('tr');
+
+    const colunas = [
+      inc.id,
+      inc.data,
+      inc.origem,
+      inc.tipo,
+      inc.artigo,
+      inc.valor !== null && inc.valor !== undefined ? inc.valor : '',
+      inc.motorista_nome,
+      inc.obs,
+    ];
+    colunas.forEach(valor => {
+      const td = document.createElement('td');
+      td.textContent = String(valor ?? '');
+      tr.appendChild(td);
+    });
+
+    const tdAcoes = document.createElement('td');
+    tdAcoes.className = 'text-center';
+
+    const btnEditar = document.createElement('button');
+    btnEditar.type = 'button';
+    btnEditar.className = 'btn btn-sm btn-outline-warning me-1 btn-inc-editar';
+    btnEditar.textContent = 'Editar';
+    btnEditar.dataset.id          = String(inc.id ?? '');
+    btnEditar.dataset.data        = String(inc.data ?? '');
+    btnEditar.dataset.origem      = String(inc.origem ?? '');
+    btnEditar.dataset.tipo        = String(inc.tipo ?? '');
+    btnEditar.dataset.artigo      = String(inc.artigo ?? '');
+    btnEditar.dataset.valor       = String(inc.valor ?? '');
+    btnEditar.dataset.motoristaId = String(inc.motorista_id ?? '');
+    btnEditar.dataset.obs         = String(inc.obs ?? '');
+
+    const btnExcluir = document.createElement('button');
+    btnExcluir.type = 'button';
+    btnExcluir.className = 'btn btn-sm btn-outline-danger btn-inc-excluir';
+    btnExcluir.textContent = 'Excluir';
+    btnExcluir.dataset.id = String(inc.id ?? '');
+
+    tdAcoes.appendChild(btnEditar);
+    tdAcoes.appendChild(btnExcluir);
+    tr.appendChild(tdAcoes);
+    tabelaIncCorpo.appendChild(tr);
+  });
+
+  aplicarTravasIncidencias();
+}
+
+async function carregarIncidencias() {
+  const pedidoId = getForm(nomeForm)?.campos?.id;
+  if (!pedidoId) {
+    renderIncidencias([]);
+    return;
+  }
+  const resp = await fazerRequisicao('/app/logistica/pedidos/inc/list', { pedido_id: pedidoId });
+  if (!resp.success) return;
+  renderIncidencias(resp.data.registros || []);
+}
+
+function abrirModalInc(reg = null) {
+  document.getElementById('inc_id').value       = reg?.id || '';
+  document.getElementById('inc_data').value     = reg?.data || '';
+  document.getElementById('inc_artigo').value   = reg?.artigo || '';
+  document.getElementById('inc_valor').value    = reg?.valor ?? '';
+  document.getElementById('inc_obs').value      = reg?.obs || '';
+
+  const selOrigem = document.getElementById('inc_origem');
+  selOrigem.value = reg?.origem || '';
+  preencherTiposIncidencia(reg?.origem || '');
+  document.getElementById('inc_tipo').value = reg?.tipo || '';
+
+  // Motorista: só ativo se origem = Filial
+  const selMotorista = document.getElementById('inc_motorista');
+  selMotorista.disabled = (reg?.origem || '').toLowerCase() !== 'filial';
+  selMotorista.value = reg?.motorista_id ? String(reg.motorista_id) : '';
+
+  modalInc.show();
+}
+
+async function salvarIncidencia() {
+  if (formEmVisualizacao()) {
+    definirMensagem('erro', 'Incidências estão bloqueadas no modo visualização.', false);
+    return;
+  }
+
+  const pedidoId = getForm(nomeForm)?.campos?.id;
+  if (!pedidoId) {
+    definirMensagem('erro', 'Salve o pedido antes de adicionar incidências.', false);
+    return;
+  }
+
+  const payload = {
+    id:           document.getElementById('inc_id').value || null,
+    pedido_id:    pedidoId,
+    data:         document.getElementById('inc_data').value,
+    origem:       document.getElementById('inc_origem').value,
+    tipo:         document.getElementById('inc_tipo').value,
+    artigo:       document.getElementById('inc_artigo').value,
+    valor:        document.getElementById('inc_valor').value,
+    motorista_id: document.getElementById('inc_motorista').value || null,
+    obs:          document.getElementById('inc_obs').value,
+  };
+
+  const resp = await fazerRequisicao('/app/logistica/pedidos/inc/save', payload);
+  if (!resp.success) {
+    if (resp.data) updateState(resp.data);
+    return;
+  }
+
+  if (resp.data) updateState(resp.data);
+  modalInc.hide();
+  await carregarIncidencias();
+}
+
+async function excluirIncidencia(id) {
+  const resp = await fazerRequisicao('/app/logistica/pedidos/inc/del', { id });
+  if (!resp.success) {
+    if (resp.data) updateState(resp.data);
+    return;
+  }
+  if (resp.data) updateState(resp.data);
+  await carregarIncidencias();
+}
+
 function preencherMotoristasFilial(filialId) {
   const selectPedido = document.getElementById('motorista_id');
   const selectMov = document.getElementById('mov_motorista');
+  const selectInc = document.getElementById('inc_motorista');
   const atualPedido = getForm(nomeForm)?.campos?.motorista_id;
   const atualMov = document.getElementById('mov_motorista')?.value || '';
 
-  [selectPedido, selectMov].forEach(select => {
+  [selectPedido, selectMov, selectInc].forEach(select => {
     if (select) {
       select.innerHTML = '';
       const opt = document.createElement('option');
@@ -508,7 +698,7 @@ function preencherMotoristasFilial(filialId) {
 
       const registros = resultado?.data?.registros || [];
       registros.forEach(m => {
-        [selectPedido, selectMov].forEach(select => {
+        [selectPedido, selectMov, selectInc].forEach(select => {
           if (!select) return;
           const opt = document.createElement('option');
           opt.value = m.id;
@@ -712,6 +902,7 @@ async function resetarFormularioAposCancelamento() {
   preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
   await carregarMovimentacoes();
   await carregarDevolucoes();
+  await carregarIncidencias();
   aplicarPermissoesNaInterface();
 }
 
@@ -784,6 +975,7 @@ function aplicarPermissoesNaInterface() {
   aplicarTravasImportados();
   aplicarTravasMovimentacoes();
   aplicarTravasDevolucoes();
+  aplicarTravasIncidencias();
 }
 
 const updater = criarAtualizadorForm({ formId: nomeForm, setter: updateFormField, form });
@@ -813,6 +1005,7 @@ document.addEventListener('DOMContentLoaded', () => {
   preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
   carregarMovimentacoes();
   carregarDevolucoes();
+  carregarIncidencias();
 
   const areaCadastro = document.getElementById('area-cadastro');
   const divPesquisa = document.getElementById('div-pesquisa');
@@ -836,6 +1029,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateState({ form: { [nomeForm]: { estado: 'novo', campos: { ...getForm(nomeForm).campos, id: null, origem: 'MANUAL' } } } });
     carregarMovimentacoes();
     carregarDevolucoes();
+    carregarIncidencias();
     aplicarPermissoesNaInterface();
   });
 
@@ -865,6 +1059,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hidratarFormulario(nomeForm);
     await carregarMovimentacoes();
     await carregarDevolucoes();
+    await carregarIncidencias();
     aplicarPermissoesNaInterface();
   });
 
@@ -913,6 +1108,7 @@ document.addEventListener('DOMContentLoaded', () => {
       preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
       await carregarMovimentacoes();
       await carregarDevolucoes();
+      await carregarIncidencias();
       alternar();
       aplicarPermissoesNaInterface();
     } finally {
@@ -943,6 +1139,7 @@ document.addEventListener('DOMContentLoaded', () => {
       preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
       await carregarMovimentacoes();
       await carregarDevolucoes();
+      await carregarIncidencias();
       updateFormField(nomeCons, 'id_selecionado', null);
       alternar();
       aplicarPermissoesNaInterface();
@@ -1075,5 +1272,55 @@ document.addEventListener('DOMContentLoaded', () => {
       mensagem: 'Deseja remover esta foto?',
       onConfirmar: async () => removerFoto(btn.dataset.imgbbId),
     });
+  });
+
+  // ── Incidências ────────────────────────────────────────────────────────────
+  document.getElementById('btn-inc-novo').addEventListener('click', () => {
+    if (formEmVisualizacao()) return;
+    if (!pedidoEstaSalvo()) {
+      definirMensagem('aviso', 'Salve o pedido antes de adicionar incidências.');
+      return;
+    }
+    abrirModalInc(null);
+  });
+
+  document.getElementById('btn-inc-salvar').addEventListener('click', salvarIncidencia);
+
+  document.getElementById('inc_origem').addEventListener('change', (e) => {
+    const origem = e.target.value;
+    preencherTiposIncidencia(origem);
+    const selMotorista = document.getElementById('inc_motorista');
+    selMotorista.disabled = origem.toLowerCase() !== 'filial';
+    if (selMotorista.disabled) selMotorista.value = '';
+  });
+
+  tabelaIncCorpo.addEventListener('click', (e) => {
+    if (e.target.closest('.btn-inc-editar, .btn-inc-excluir')) e.preventDefault();
+    if (formEmVisualizacao()) return;
+
+    const btnEditar = e.target.closest('.btn-inc-editar');
+    if (btnEditar) {
+      abrirModalInc({
+        id:           Number(btnEditar.dataset.id),
+        data:         btnEditar.dataset.data,
+        origem:       btnEditar.dataset.origem,
+        tipo:         btnEditar.dataset.tipo,
+        artigo:       btnEditar.dataset.artigo,
+        valor:        btnEditar.dataset.valor,
+        motorista_id: btnEditar.dataset.motoristaId,
+        obs:          btnEditar.dataset.obs,
+      });
+      return;
+    }
+
+    const btnExcluir = e.target.closest('.btn-inc-excluir');
+    if (btnExcluir) {
+      const id = Number(btnExcluir.dataset.id);
+      confirmar({
+        titulo: 'Excluir incidência',
+        mensagem: 'Deseja excluir esta incidência?',
+        onConfirmar: async () => excluirIncidencia(id),
+      });
+    }
   });
 });
