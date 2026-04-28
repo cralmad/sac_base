@@ -175,6 +175,21 @@
               </label>
               <textarea id="sms_padrao_2" name="sms_padrao_2" class="form-control" rows="4"></textarea>
             </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="sms_auto">
+                <span>Horário Envio SMS Automático</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="Horário de Lisboa (24h) para disparo automático diário de SMS. Ex.: 08:00. Deixe em branco para desativar.">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <input type="time" id="sms_auto" name="sms_auto" class="form-control">
+            </div>
 
             <div class="col-12 col-md-8">
               <label class="form-label mb-0 d-flex align-items-center gap-1" for="gsheets_spreadsheet_id">

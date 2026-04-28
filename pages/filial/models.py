@@ -104,6 +104,11 @@ class FilialConfig(models.Model):
     )
     sms_padrao_1 = models.TextField(null=True, blank=True)
     sms_padrao_2 = models.TextField(null=True, blank=True)
+    sms_auto = models.TimeField(
+        null=True,
+        blank=True,
+        help_text="Horário (Lisboa) para envio automático de SMS. Formato 24h — ex.: 08:00. Deixe em branco para desativar.",
+    )
     gsheets_spreadsheet_id = models.CharField(max_length=200, null=True, blank=True)
     gsheets_sheet_name = models.CharField(max_length=100, null=True, blank=True)
 
