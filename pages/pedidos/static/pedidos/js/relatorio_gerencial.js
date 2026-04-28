@@ -25,7 +25,9 @@ const totalBar    = document.getElementById('rg-total-bar');
 const btnImprimir      = document.getElementById('rg-btn-imprimir');
 const btnSelTodos      = document.getElementById('rg-btn-sel-todos');
 const btnDesTodos      = document.getElementById('rg-btn-des-todos');
+const selTipo          = document.getElementById('rg-tipo');
 const selArmazem       = document.getElementById('rg-armazem');
+const selConferencia   = document.getElementById('rg-conferencia');
 const colBtnDev        = document.getElementById('rg-col-btn-dev');
 const btnRegistrarDev  = document.getElementById('rg-btn-registrar-dev');
 const erroVonzu        = document.getElementById('rg-id-vonzu-erro');
@@ -366,8 +368,10 @@ async function buscar() {
         data_final:   dataFim,
         id_vonzu:     inpIdVonzu.value.trim(),
         referencia:   inpRef.value.trim(),
+        tipo:         selTipo.value,
         estados:      getMultiSelectValues(selEstados),
         armazem:      selArmazem.value,
+        conferencia:  selConferencia.value,
       },
     };
 

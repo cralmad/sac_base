@@ -196,6 +196,27 @@ table.rg-tabela tr.rg-nao-segue td { background: #e0e0e0 !important; }
         </div>
       </div>
 
+      <!-- Tipo de pedido -->
+      <div class="col-6 col-sm-4 col-md-2">
+        <label class="form-label mb-0 d-flex align-items-center gap-1" for="rg-tipo">
+          <span>Tipo</span>
+          <span
+            class="text-primary"
+            role="button"
+            tabindex="0"
+            data-bs-toggle="tooltip"
+            data-bs-placement="top"
+            data-bs-title="Filtra por tipo de pedido: Entrega ou Recolha.">
+            <i class="bi bi-question-circle"></i>
+          </span>
+        </label>
+        <select id="rg-tipo" class="form-select">
+          <option value="">Todos</option>
+          <option value="ENTREGA">Entrega</option>
+          <option value="RECOLHA">Recolha</option>
+        </select>
+      </div>
+
       <!-- Armazém -->
       <div class="col-6 col-sm-4 col-md-2">
         <label class="form-label mb-0 d-flex align-items-center gap-1" for="rg-armazem">
@@ -214,6 +235,27 @@ table.rg-tabela tr.rg-nao-segue td { background: #e0e0e0 !important; }
           <option value="">Todos</option>
           <option value="sim">Sim</option>
           <option value="nao">Não</option>
+        </select>
+      </div>
+
+      <!-- Conferência de volumes -->
+      <div class="col-6 col-sm-4 col-md-2">
+        <label class="form-label mb-0 d-flex align-items-center gap-1" for="rg-conferencia">
+          <span>Conferência</span>
+          <span
+            class="text-primary"
+            role="button"
+            tabindex="0"
+            data-bs-toggle="tooltip"
+            data-bs-placement="top"
+            data-bs-title="Filtra pedidos pelo resultado da conferência de volumes (volume confirmado vs. volume previsto).">
+            <i class="bi bi-question-circle"></i>
+          </span>
+        </label>
+        <select id="rg-conferencia" class="form-select">
+          <option value="">Todos</option>
+          <option value="conferido">Conferido (vol. conf. = vol. previsto)</option>
+          <option value="divergente">Divergente (vol. conf. ≠ vol. previsto)</option>
         </select>
       </div>
 

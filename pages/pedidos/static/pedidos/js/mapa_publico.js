@@ -58,15 +58,19 @@
         }).addTo(mapaLeaflet);
     }
 
-    function criarIcone(cor, carro) {
+    function criarIcone(cor, carro, segueParaEntrega = true) {
         const corEsc = String(cor).replace(/[^#a-zA-Z0-9]/g, '');
         const carroN = carro != null ? Number(carro) : '?';
+        const badge = segueParaEntrega ? '' : `
+          <circle cx="22" cy="6" r="6" fill="#dc3545" stroke="#fff" stroke-width="1.5"/>
+          <text x="22" y="10" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" font-weight="bold" fill="#fff">!</text>`;
         const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="38" viewBox="0 0 28 38">
           <path d="M14 0C6.3 0 0 6.3 0 14c0 9.6 14 24 14 24s14-14.4 14-24C28 6.3 21.7 0 14 0z"
                 fill="${corEsc}" stroke="#fff" stroke-width="2"/>
           <text x="14" y="18" text-anchor="middle" dominant-baseline="middle"
                 font-family="Arial,sans-serif" font-size="10" font-weight="bold"
                 fill="#fff">${carroN}</text>
+          ${badge}
         </svg>`;
         return L.divIcon({ html: svg, iconSize: [28, 38], iconAnchor: [14, 38], popupAnchor: [0, -40], className: '' });
     }
@@ -119,7 +123,7 @@
             const [lng, lat] = feat.geometry.coordinates;
 
             const marker = L.marker([lat, lng], {
-                icon: criarIcone(p.cor, root.dataset.carro),
+                icon: criarIcone(p.cor, root.dataset.carro, p.segue_para_entrega !== false),
                 draggable: false,
                 title: p.referencia,
             });

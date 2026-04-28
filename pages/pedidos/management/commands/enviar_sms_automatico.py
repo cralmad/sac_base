@@ -1,20 +1,22 @@
 """
 Management command: enviar_sms_automatico
 
-Verifica se existe alguma FilialConfig com sms_auto configurado cujo horário
-(no fuso de Lisboa) caia dentro da janela de execução atual (±5 min) e, se
-houver, envia os SMS do dia para as TentativaEntrega elegíveis dessa filial.
+Para cada FilialConfig com sms_auto configurado, verifica se a hora actual
+de Lisboa já ultrapassou o horário configurado e, se ainda houver
+TentativaEntrega elegíveis com sms_enviado=False, envia os SMS.
+
+A guarda contra duplo envio é natural: após o envio os registos ficam com
+sms_enviado=True e o command seguinte não encontra mais nada para enviar.
 
 Uso:
     python manage.py enviar_sms_automatico
 
-Heroku Scheduler:
-    Configurar para executar a cada 10 minutos:
+Heroku Scheduler — recomendado: a cada 10 minutos
     python manage.py enviar_sms_automatico
 
-    O comando só age quando o horário atual de Lisboa está dentro da janela
-    de ±5 minutos do horário configurado em FilialConfig.sms_auto, garantindo
-    que o envio ocorre uma única vez por dia no horário pretendido.
+Flags de teste:
+    --force    Ignora a verificação de horário (envia independente da hora).
+    --dry-run  Simula sem chamar a API BulkGate nem gravar sms_enviado=True.
 """
 
 import logging
@@ -35,9 +37,6 @@ logger = logging.getLogger(__name__)
 
 LISBON_TZ = ZoneInfo("Europe/Lisbon")
 
-# Janela de tolerância em minutos (metade do intervalo do Scheduler = 10/2)
-JANELA_MINUTOS = 5
-
 
 class Command(BaseCommand):
     help = "Envia SMS automáticos para as filiais com sms_auto configurado."
@@ -47,8 +46,8 @@ class Command(BaseCommand):
             "--force",
             action="store_true",
             help=(
-                "Ignora a janela de horário e envia imediatamente para todas as filiais "
-                "com sms_auto configurado. Útil para testes."
+                "Ignora a verificação de horário e envia imediatamente para todas as filiais "
+                "com sms_auto configurado. ATENÇÃO: envia SMS reais — use --dry-run para testar."
             ),
         )
         parser.add_argument(
@@ -93,18 +92,14 @@ class Command(BaseCommand):
 
         for cfg in configs:
             filial = cfg.filial
-            sms_time = cfg.sms_auto  # já é datetime.time (TimeField)
+            sms_time = cfg.sms_auto  # datetime.time (TimeField)
 
             if not force:
-                # Verifica se o horário configurado está dentro da janela atual
-                now_dt = datetime.combine(today, now_time)
-                sms_dt = datetime.combine(today, sms_time)
-                diff_segundos = abs((sms_dt - now_dt).total_seconds())
-
-                if diff_segundos > JANELA_MINUTOS * 60:
+                # Só envia se a hora actual de Lisboa já ultrapassou sms_auto
+                if now_time < sms_time:
                     self.stdout.write(
-                        f"  ↷ Filial '{filial}': horário {sms_time.strftime('%H:%M')} "
-                        f"fora da janela ({diff_segundos/60:.1f} min de diferença). Ignorando."
+                        f"  ↷ Filial '{filial}': horário configurado {sms_time.strftime('%H:%M')} "
+                        f"ainda não chegou (agora {now_time.strftime('%H:%M')}). Ignorando."
                     )
                     continue
 

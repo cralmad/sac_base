@@ -554,7 +554,9 @@ def relatorio_gerencial_view(request):
     id_vonzu_str   = filtros.get("id_vonzu", "").strip()
     referencia_str = filtros.get("referencia", "").strip()
     estados_lista  = filtros.get("estados", [])
+    tipo_filtro    = filtros.get("tipo", "").strip().upper()
     armazem_filtro = filtros.get("armazem", "").strip().lower()
+    conferencia_filtro = filtros.get("conferencia", "").strip().lower()
     if not isinstance(estados_lista, list):
         estados_lista = []
 
@@ -586,6 +588,14 @@ def relatorio_gerencial_view(request):
 
     if estados_lista:
         qs = qs.filter(pedido__estado__in=estados_lista)
+
+    if tipo_filtro in ("ENTREGA", "RECOLHA"):
+        qs = qs.filter(pedido__tipo=tipo_filtro)
+
+    if conferencia_filtro == "conferido":
+        qs = qs.filter(pedido__volume_conf=F("pedido__volume"))
+    elif conferencia_filtro == "divergente":
+        qs = qs.exclude(pedido__volume_conf=F("pedido__volume"))
 
     qs = qs.order_by("carro", "data_tentativa", "pedido__codpost_dest", "pedido__pedido")
 

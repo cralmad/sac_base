@@ -57,7 +57,10 @@ function inicializarMapa() {
 
 // ─── Ícone de pin colorido ────────────────────────────────────────────────────
 
-function criarIcone(cor, carro) {
+function criarIcone(cor, carro, segueParaEntrega = true) {
+  const badge = segueParaEntrega ? '' : `
+      <circle cx="22" cy="6" r="6" fill="#dc3545" stroke="#fff" stroke-width="1.5"/>
+      <text x="22" y="10" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" font-weight="bold" fill="#fff">!</text>`;
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="28" height="38" viewBox="0 0 28 38">
       <path d="M14 0C6.3 0 0 6.3 0 14c0 9.6 14 24 14 24s14-14.4 14-24C28 6.3 21.7 0 14 0z"
@@ -65,6 +68,7 @@ function criarIcone(cor, carro) {
       <text x="14" y="18" text-anchor="middle" dominant-baseline="middle"
             font-family="Arial,sans-serif" font-size="10" font-weight="bold"
             fill="#fff">${carro != null ? carro : '?'}</text>
+      ${badge}
     </svg>`;
   return L.divIcon({
     html: svg,
@@ -82,6 +86,12 @@ function _esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function _fmtPeso(valor) {
+  const n = parseFloat(valor);
+  if (isNaN(n)) return valor ?? '—';
+  return n.toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function _precisaoCor(precision) {
   if (precision === 'muito_impreciso') return '#dc3545';
   if (precision === 'impreciso') return '#ffc107';
@@ -95,36 +105,37 @@ function conteudoPopup(p) {
     ? `<span class="mapa-prec-dot" style="background:${corPrec}" title="${p.geocoding_precision === 'muito_impreciso' ? 'Localiza\u00e7\u00e3o muito imprecisa' : 'Localiza\u00e7\u00e3o imprecisa'}"></span>`
     : '';
   const displayLine = p.geocoding_display
-    ? `<span class="mapa-geocoding-display">${_esc(p.geocoding_display)}</span><br>`
+    ? `<span class="mapa-geocoding-display">${_esc(p.geocoding_display)}</span><hr style="width:80%;margin:2px auto">`
     : '';
+  const carroLabel = p.carro != null ? `Carro ${p.carro}` : 'Sem carro';
+  const botoesAcao = (podeEditarCarro || podeMoverMarcador) ? `
+      <hr class="my-1">
+      <div class="d-flex gap-1">
+        ${podeEditarCarro ? `<button class="btn btn-sm btn-outline-primary w-50 btn-popup-editar-carro"
+                              data-mov-id="${p.mov_id}" data-carro="${p.carro ?? ''}"
+                              title="Alterar carro"><i class="bi bi-pencil"></i> ${_esc(carroLabel)}</button>` : ''}
+        ${podeMoverMarcador ? `<button class="btn btn-sm btn-outline-warning ${podeEditarCarro ? 'w-50' : 'w-100'} btn-popup-regeocodificar"
+                              data-pedido-id="${p.pedido_id}" data-mov-id="${p.mov_id}"
+                              title="Re-geocodificar"><i class="bi bi-arrow-repeat"></i></button>` : ''}
+      </div>` : '';
   return `
     <div class="mapa-popup">
-      <div class="d-flex align-items-center gap-1"><strong>${_esc(p.referencia)}</strong>${dotHtml}</div>
-      ${displayLine}<span class="text-muted small">${_esc(p.tipo)}</span><br>
-      ${_esc(p.endereco)}<br>
-      <em>${_esc(p.codpost)} ${_esc(p.cidade)}</em><br>
-      Vol: <b>${p.volume ?? '—'}</b> | VolConf: <b>${p.volume_conf ?? '—'}</b> ${conf}<br>
-      Peso: ${_esc(p.peso)}<br>
+      <div class="d-flex align-items-center gap-1"><strong>${_esc(p.referencia)}</strong> <span class="text-muted small">(${_esc(p.tipo)})</span>${dotHtml}</div>
+      ${displayLine}<span class="small">${_esc(p.endereco)}, <em>${_esc(p.codpost)} ${_esc(p.cidade)}</em></span><br>
+      <div class="d-flex justify-content-between gap-2">
+        <span>Vol: <b>${p.volume_conf ?? '—'}</b>/<b>${p.volume ?? '—'}</b> ${conf}</span>
+        <span>Peso: ${_esc(_fmtPeso(p.peso))}</span>
+        ${p.periodo ? `<span class="text-muted small">${_esc(p.periodo)}</span>` : ''}
+      </div>
       ${p.obs_rota ? `<span class="text-primary small">Obs Rota: ${_esc(p.obs_rota)}</span><br>` : ''}
       ${p.obs ? `<span class="text-secondary small">Obs: ${_esc(p.obs)}</span><br>` : ''}
-      ${p.periodo ? `Período: ${_esc(p.periodo)}<br>` : ''}
-      <hr class="my-1">
-      Carro: <b>${p.carro != null ? p.carro : '—'}</b>
-      ${podeEditarCarro ? `<br><button class="btn btn-sm btn-outline-primary mt-1 w-100 btn-popup-editar-carro"
-                              data-mov-id="${p.mov_id}" data-carro="${p.carro ?? ''}">
-                              ✏️ Alterar carro
-                           </button>` : ''}
+      ${botoesAcao}
       ${podeMoverMarcador ? `
-      <hr class="my-1">
-      <button class="btn btn-sm btn-outline-warning w-100 mb-1 btn-popup-regeocodificar"
-              data-pedido-id="${p.pedido_id}" data-mov-id="${p.mov_id}">
-        🔄 Re-geocodificar
-      </button>
       <div class="input-group input-group-sm mt-1">
         <input type="text" class="form-control inp-popup-busca-local"
-               placeholder="Buscar endereço para reposicionar…"
+               placeholder="Buscar endereço…"
                data-pedido-id="${p.pedido_id}" data-mov-id="${p.mov_id}">
-        <button class="btn btn-outline-secondary btn-popup-buscar-local" type="button" title="Buscar">🔍</button>
+        <button class="btn btn-outline-secondary btn-popup-buscar-local" type="button" title="Buscar"><i class="bi bi-search"></i></button>
       </div>
       <div class="mapa-popup-busca-status small text-muted mt-1"></div>` : ''}
     </div>`;
@@ -142,7 +153,7 @@ function renderizarMarcadores(geojson) {
     const [lng, lat] = feat.geometry.coordinates;
 
     const marker = L.marker([lat, lng], {
-      icon: criarIcone(p.cor, p.carro),
+      icon: criarIcone(p.cor, p.carro, p.segue_para_entrega !== false),
       draggable: podeMoverMarcador,
       title: p.referencia,
     });
