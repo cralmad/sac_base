@@ -667,5 +667,11 @@ def mapa_publico_periodo_view(request, token):
             return JsonResponse({"success": False, "mensagem": "mov_ids inválido."}, status=400)
         qs = qs.filter(id__in=mov_ids)
 
+    if qs.filter(sms_enviado=True).exists():
+        return JsonResponse(
+            {"success": False, "mensagem": "Não é possível alterar o período: SMS já enviado para um ou mais pedidos desta rota."},
+            status=409,
+        )
+
     atualizados = qs.update(periodo=periodo or None)
     return JsonResponse({"success": True, "atualizados": atualizados, "periodo": periodo})

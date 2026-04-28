@@ -154,7 +154,12 @@ def enviar_sms_bulkgate(numero: str, mensagem: str, ddi_padrao: str = _DDI_FALLB
     }
     try:
         resp = requests.post(BULKGATE_URL, json=payload, timeout=15)
-        data = resp.json()
+        try:
+            data = resp.json()
+        except ValueError as json_exc:
+            # resp.json() pode lançar ValueError/JSONDecodeError (não é RequestException)
+            logger.error("BulkGate: resposta não-JSON para %s (status %s)", numero_norm, resp.status_code)
+            return {"sucesso": False, "erro": f"Resposta inválida da BulkGate (não-JSON): {json_exc}"}
         if resp.status_code == 200 and "data" in data:
             return {"sucesso": True, "sms_id": data["data"].get("sms_id")}
         erro = data.get("error", "Erro desconhecido.")

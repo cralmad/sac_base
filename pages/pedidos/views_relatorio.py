@@ -328,15 +328,16 @@ def relatorio_sms_view(request):
     except ValueError:
         return JsonResponse({"success": False, "mensagem": "Data inválida."}, status=400)
 
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse({"success": False, "mensagem": "Filial ativa não encontrada na sessão."}, status=403)
+
     qs = (
         TentativaEntrega.objects
         .select_related("pedido")
-        .filter(data_tentativa=dt)
+        .filter(data_tentativa=dt, pedido__filial=filial_ativa)
         .order_by("pedido__codpost_dest", "pedido__pedido")
     )
-    filial_ativa = getattr(request, "filial_ativa", None)
-    if filial_ativa:
-        qs = qs.filter(pedido__filial=filial_ativa)
 
     registros = []
     for mov in qs:
@@ -352,6 +353,7 @@ def relatorio_sms_view(request):
             "volume": pedido.volume,
             "peso": str(pedido.peso) if pedido.peso is not None else "",
             "periodo": mov.periodo or "",
+            "segue_para_entrega": pedido.estado in ESTADOS_SEGUE_PARA_ENTREGA,
         })
 
     return JsonResponse({"success": True, "registros": registros, "data_fmt": dt.strftime("%d/%m/%Y")})
@@ -377,6 +379,10 @@ def relatorio_sms_enviar_view(request):
     except ValueError:
         return JsonResponse({"success": False, "mensagem": "Data inválida."}, status=400)
 
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse({"success": False, "mensagem": "Filial ativa não encontrada na sessão."}, status=403)
+
     qs = (
         TentativaEntrega.objects
         .select_related(
@@ -385,13 +391,11 @@ def relatorio_sms_enviar_view(request):
             "pedido__filial__config",
             "pedido__filial__pais_atuacao",
         )
-        .filter(id__in=ids, sms_enviado=False)
+        .filter(id__in=ids, sms_enviado=False, pedido__filial=filial_ativa)
+        .filter(pedido__estado__in=ESTADOS_SEGUE_PARA_ENTREGA)
         .exclude(periodo__isnull=True)
         .exclude(periodo="")
     )
-    filial_ativa = getattr(request, "filial_ativa", None)
-    if filial_ativa:
-        qs = qs.filter(pedido__filial=filial_ativa)
 
     # Carrega configuração da filial a partir do primeiro registro
     tentativas = list(qs)
@@ -400,13 +404,17 @@ def relatorio_sms_enviar_view(request):
 
     filial = tentativas[0].pedido.filial
     try:
-        template_msg = filial.config.sms_padrao_1 or ""
+        # Templates por período: sms_padrao_1 → MANHÃ, sms_padrao_2 → TARDE.
+        # Se sms_padrao_2 não estiver configurado, usa sms_padrao_1 como fallback.
+        template_manha = filial.config.sms_padrao_1 or ""
+        template_tarde = filial.config.sms_padrao_2 or template_manha
     except Exception:
-        template_msg = ""
+        template_manha = ""
+        template_tarde = ""
 
-    if not template_msg:
+    if not template_manha and not template_tarde:
         return JsonResponse(
-            {"success": False, "mensagem": "Mensagem padrão (sms_padrao_1) não configurada para esta filial."},
+            {"success": False, "mensagem": "Nenhum template SMS configurado (sms_padrao_1/2) para esta filial."},
             status=400,
         )
 
@@ -432,6 +440,17 @@ def relatorio_sms_enviar_view(request):
         if not fones:
             erros += 1
             erros_detalhe.append(f"{referencia}: sem número de telefone.")
+            continue
+
+        # Seleciona template pelo período
+        if mov.periodo == "TARDE":
+            template_msg = template_tarde
+        else:
+            template_msg = template_manha
+
+        if not template_msg:
+            erros += 1
+            erros_detalhe.append(f"{referencia}: template para período '{mov.periodo}' não configurado.")
             continue
 
         try:
@@ -499,20 +518,28 @@ def relatorio_sms_preview_view(request):
     if not filial:
         return JsonResponse({"success": False, "mensagem": "Nenhuma filial ativa na sessão."}, status=400)
 
-    template_msg = ""
+    template_manha = ""
+    template_tarde = ""
     sigla_pais = ""
     try:
-        template_msg = filial.config.sms_padrao_1 or ""
+        # Templates por período: sms_padrao_1 → MANHÃ, sms_padrao_2 → TARDE.
+        # Se sms_padrao_2 não estiver configurado, usa sms_padrao_1 como fallback.
+        template_manha = filial.config.sms_padrao_1 or ""
+        template_tarde = filial.config.sms_padrao_2 or template_manha
         if filial.pais_atuacao:
             sigla_pais = filial.pais_atuacao.sigla or ""
     except Exception:
         pass
 
-    if not template_msg:
-        return JsonResponse({"success": False, "mensagem": "Mensagem padrão (sms_padrao_1) não configurada para a filial ativa."}, status=400)
+    if not template_manha and not template_tarde:
+        return JsonResponse({"success": False, "mensagem": "Nenhum template SMS configurado (sms_padrao_1/2) para a filial ativa."}, status=400)
 
     previews = {}
-    for periodo in ("MANHA", "TARDE"):
+    templates_por_periodo = {"MANHA": template_manha, "TARDE": template_tarde}
+    for periodo, template_msg in templates_por_periodo.items():
+        if not template_msg:
+            previews[periodo] = "[Template não configurado para este período.]"
+            continue
         try:
             previews[periodo] = montar_mensagem(template_msg, dt, periodo, sigla_pais)
         except Exception as exc:

@@ -57,12 +57,14 @@ function renderizarTabela(registros, dataFmt) {
   chkTodos.disabled = false;
 
   registros.forEach(reg => {
-    const smsEnviado  = !!reg.sms_enviado;
-    const temPeriodo  = !!(reg.periodo && reg.periodo !== '');
-    const desabilitado = smsEnviado || !temPeriodo;
+    const smsEnviado     = !!reg.sms_enviado;
+    const temPeriodo     = !!(reg.periodo && reg.periodo !== '');
+    const segueEntrega   = reg.segue_para_entrega !== false;
+    const desabilitado   = smsEnviado || !temPeriodo || !segueEntrega;
 
     const tr = document.createElement('tr');
     if (smsEnviado) tr.classList.add('rs-enviado');
+    if (!segueEntrega) tr.classList.add('rs-nao-segue');
     tr.dataset.id = String(reg.id);
 
     // Checkbox

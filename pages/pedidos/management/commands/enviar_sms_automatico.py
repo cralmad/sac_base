@@ -20,13 +20,13 @@ Flags de teste:
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from django.core.management.base import BaseCommand
 
 from pages.filial.models import FilialConfig
-from pages.pedidos.models import TentativaEntrega
+from pages.pedidos.models import TentativaEntrega, ESTADOS_SEGUE_PARA_ENTREGA
 from sac_base.sms_service import (
     HORARIO_PERIODO,
     enviar_sms_bulkgate,
@@ -114,10 +114,14 @@ class Command(BaseCommand):
             self.stdout.write("Nenhuma filial no horário de envio agora.")
 
     def _enviar_para_filial(self, cfg, filial, today, dry_run=False):
-        template_msg = cfg.sms_padrao_1 or ""
-        if not template_msg:
+        # Templates por período: sms_padrao_1 → MANHÃ, sms_padrao_2 → TARDE.
+        # Se sms_padrao_2 não estiver configurado, usa sms_padrao_1 como fallback.
+        template_manha = cfg.sms_padrao_1 or ""
+        template_tarde = cfg.sms_padrao_2 or template_manha
+
+        if not template_manha and not template_tarde:
             self.stderr.write(
-                f"  [ERRO] Filial '{filial}': sms_padrao_1 não configurado. Ignorando."
+                f"  [ERRO] Filial '{filial}': nenhum template SMS configurado (sms_padrao_1/2). Ignorando."
             )
             return
 
@@ -136,6 +140,7 @@ class Command(BaseCommand):
                 pedido__filial=filial,
                 data_tentativa=today,
                 sms_enviado=False,
+                pedido__estado__in=ESTADOS_SEGUE_PARA_ENTREGA,
             )
             .exclude(periodo__isnull=True)
             .exclude(periodo="")
@@ -159,6 +164,17 @@ class Command(BaseCommand):
 
             if not fones:
                 self.stderr.write(f"    [{referencia}] Sem telefone. Ignorado.")
+                erros += 1
+                continue
+
+            # Seleciona template pelo período
+            if mov.periodo == "TARDE":
+                template_msg = template_tarde
+            else:
+                template_msg = template_manha
+
+            if not template_msg:
+                self.stderr.write(f"    [{referencia}] Template para período '{mov.periodo}' não configurado. Ignorado.")
                 erros += 1
                 continue
 
