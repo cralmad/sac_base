@@ -79,5 +79,31 @@ def append_devolucao_rows(
         return 0
     client = _build_client()
     sheet = client.open_by_key(spreadsheet_id).worksheet(sheet_name)
-    sheet.append_rows(rows, value_input_option="USER_ENTERED")
+
+    # Busca todas as linhas existentes
+    all_values = sheet.get_all_values()
+
+    def is_row_filled_ah(row):
+        # Considera preenchida se pelo menos uma das colunas A-H tem valor não vazio
+        return any((str(row[i]).strip() != "" if i < len(row) else False) for i in range(8))
+
+    # Procura de baixo para cima a última linha preenchida (A-H)
+    last_filled_idx = None
+    for idx in range(len(all_values) - 1, -1, -1):
+        if is_row_filled_ah(all_values[idx]):
+            last_filled_idx = idx
+            break
+
+    # Se não encontrou nenhuma linha preenchida, começa na primeira linha
+    if last_filled_idx is None:
+        last_filled_idx = -1
+
+    # Calcula o range para update
+    start_row = last_filled_idx + 2  # 1-based, linha após a última preenchida
+    end_row = start_row + len(rows) - 1
+    cell_range = f"A{start_row}:H{end_row}"
+
+    # Prepara os dados para 8 colunas
+    values_to_write = [r[:8] + [""] * (8 - len(r)) if len(r) < 8 else r[:8] for r in rows]
+    sheet.update(cell_range, values_to_write, value_input_option="USER_ENTERED")
     return len(rows)
