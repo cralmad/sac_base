@@ -1,4 +1,36 @@
 # 📘 Guia de Padrões de Desenvolvimento — SAC Base (Instruções para Copilot)
+---
+
+## Configuração do Heroku Scheduler para envio automático de SMS
+
+O envio automático de SMS é realizado pelo comando de management `enviar_sms_automatico.py`, localizado em `pages/pedidos/management/commands/enviar_sms_automatico.py`. Para garantir o funcionamento desta rotina em produção, é OBRIGATÓRIO configurar o Heroku Scheduler para executar este comando periodicamente.
+
+### Como configurar o Heroku Scheduler
+
+1. No painel do Heroku, acesse o app desejado.
+2. Instale o add-on **Heroku Scheduler** (caso ainda não esteja instalado).
+3. Abra o Heroku Scheduler e adicione uma nova tarefa (Job) com a seguinte configuração:
+     - **Task:**
+         ```
+         python manage.py enviar_sms_automatico
+         ```
+     - **Frequency:** Every 10 minutes (ou conforme necessidade do negócio)
+     - **Next Due:** Escolha o horário de início desejado
+4. Salve a tarefa.
+
+> O comando é idempotente: só envia SMS para registros ainda não notificados, evitando duplicidade.
+
+#### Flags de teste
+Para simular o envio sem disparar SMS reais, utilize a flag `--dry-run`:
+```
+python manage.py enviar_sms_automatico --dry-run
+```
+Para forçar o envio ignorando o horário configurado nas filiais, utilize a flag `--force`:
+```
+python manage.py enviar_sms_automatico --force
+```
+
+---
 
 Este guia define a arquitetura, o fluxo de dados e os padrões de interface do projeto. Use-o como fonte de verdade absoluta.
 
@@ -156,6 +188,8 @@ O layout deve seguir rigorosamente a abordagem Mobile-First:
 | `IMGBB_API_KEY` | API Key gerada em [api.imgbb.com](https://api.imgbb.com/). Obrigatória para upload de fotos em devoluções de pedidos. Lida em `pages/pedidos/views.py` via `os.environ.get("IMGBB_API_KEY")`. |
 
 > **SMS — padrão de números:** A função `sac_base/sms_service.py::normalizar_numero()` aceita qualquer formato (`+351...`, `00351...`, `912...`). Números sem DDI são tratados como pertencentes ao país de atuação da Filial (`Filial.pais_atuacao.codigo_tel`). O fallback hardcoded é `351` (Portugal).
+
+> **SMS — envio automático:** O envio automático depende do agendamento do comando `enviar_sms_automatico` via Heroku Scheduler. Sem o agendamento, os SMS automáticos não serão enviados.
 
 ### Exemplo mínimo para o Heroku
 ```bash
