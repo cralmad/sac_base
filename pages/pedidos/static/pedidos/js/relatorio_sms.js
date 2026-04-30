@@ -206,6 +206,10 @@ async function enviarSms() {
     return;
   }
 
+  // #region agent log
+  fetch('http://127.0.0.1:7802/ingest/f2f9b235-15de-4af1-bf02-3609801d8f94',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5874e6'},body:JSON.stringify({sessionId:'5874e6',runId:'manual-sms-ui',hypothesisId:'H1',location:'relatorio_sms.js:enviarSms:start',message:'manual_sms_ui_request_start',data:{idsCount:ids.length,dataTentativa:_dataAtual},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+
   btnEnviar.disabled = true;
   AppLoader.show();
 
@@ -215,6 +219,9 @@ async function enviarSms() {
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ ids, data_tentativa: _dataAtual }),
     });
+    // #region agent log
+    fetch('http://127.0.0.1:7802/ingest/f2f9b235-15de-4af1-bf02-3609801d8f94',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5874e6'},body:JSON.stringify({sessionId:'5874e6',runId:'manual-sms-ui',hypothesisId:'H5',location:'relatorio_sms.js:enviarSms:response',message:'manual_sms_ui_http_response',data:{ok:resp.ok,status:resp.status},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     const json = await resp.json();
 
     if (!json.success) {
@@ -252,6 +259,9 @@ async function enviarSms() {
     atualizarBtnEnviar();
     sincronizarChkTodos();
   } catch {
+    // #region agent log
+    fetch('http://127.0.0.1:7802/ingest/f2f9b235-15de-4af1-bf02-3609801d8f94',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5874e6'},body:JSON.stringify({sessionId:'5874e6',runId:'manual-sms-ui',hypothesisId:'H5',location:'relatorio_sms.js:enviarSms:catch',message:'manual_sms_ui_exception',data:{error:'fetch_or_json_failed'},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     definirMensagem('erro', 'Falha na comunicação com o servidor.', false);
     btnEnviar.disabled = false;
   } finally {

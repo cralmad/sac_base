@@ -1,247 +1,119 @@
-# 📘 Guia de Padrões de Desenvolvimento — SAC Base (Instruções para Copilot)
----
+# Guia de desenvolvimento SAC Base (instrucoes para Copilot)
 
-## Configuração do Heroku Scheduler para envio automático de SMS
+Este documento define padroes de implementacao para o projeto. Em caso de conflito, use esta prioridade: **Seguranca > Arquitetura > UI**.
 
-O envio automático de SMS é realizado pelo comando de management `enviar_sms_automatico.py`, localizado em `pages/pedidos/management/commands/enviar_sms_automatico.py`. Para garantir o funcionamento desta rotina em produção, é OBRIGATÓRIO configurar o Heroku Scheduler para executar este comando periodicamente.
-
-### Como configurar o Heroku Scheduler
-
-1. No painel do Heroku, acesse o app desejado.
-2. Instale o add-on **Heroku Scheduler** (caso ainda não esteja instalado).
-3. Abra o Heroku Scheduler e adicione uma nova tarefa (Job) com a seguinte configuração:
-     - **Task:**
-         ```
-         python manage.py enviar_sms_automatico
-         ```
-     - **Frequency:** Every 10 minutes (ou conforme necessidade do negócio)
-     - **Next Due:** Escolha o horário de início desejado
-4. Salve a tarefa.
-
-> O comando é idempotente: só envia SMS para registros ainda não notificados, evitando duplicidade.
-
-#### Flags de teste
-Para simular o envio sem disparar SMS reais, utilize a flag `--dry-run`:
-```
-python manage.py enviar_sms_automatico --dry-run
-```
-Para forçar o envio ignorando o horário configurado nas filiais, utilize a flag `--force`:
-```
-python manage.py enviar_sms_automatico --force
-```
+Referencia de padrao: `cadastro_view` (`pages/usuario/views.py`) e dependencias (`usuario.html`, `scriptsuser.js`).
 
 ---
 
-Este guia define a arquitetura, o fluxo de dados e os padrões de interface do projeto. Use-o como fonte de verdade absoluta.
+## 1) Escopo e prioridade
 
-> Referência de padrão baseada em `cadastro_view` (`pages/usuario/views.py`) e suas dependências (`usuario.html`, `scriptsuser.js`). Use este guia como fonte de verdade ao desenvolver qualquer nova funcionalidade.
+Este guia tem tres objetivos:
+- alinhar arquitetura e fluxo de dados;
+- evitar duplicacao de logica entre apps;
+- garantir seguranca e consistencia de interface.
 
----
-
-## 1. VISÃO GERAL DA ARQUITETURA
-O projeto segue o padrão Django MTV com comportamento de SPA via Vanilla JS:
-* **Servidor (GET):** Entrega a página inicial e o estado inicial via `render()`.
-* **Servidor (POST):** Processa operações e retorna dados ou mensagens via `JsonResponse()`.
-* **Frontend:** Controlado pela variável de estado global `sisVar`, que é a única fonte de verdade dos dados.
-* **Segurança:** Autenticação via JWT (cookies HttpOnly) e CSRF Token injetado automaticamente em todas as respostas JSON.
-* **Backend DRY:** Helpers compartilhados de autorização e mensagens devem ficar em `sac_base/permissions_utils.py`.
+Classificacao das regras:
+- **MUST:** obrigatorio.
+- **SHOULD:** recomendado.
+- **AVOID:** evitar; use so com justificativa no codigo.
 
 ---
 
-## 2. O FLUXO DE DADOS PELA `sisVar`
-A `sisVar` é um objeto reativo (Proxy) que sincroniza o back-end e o front-end:
-1. **Origem:** Na View, o desenvolvedor popula `request.sisvar_extra`.
-2. **Hidratação:** O `context_processors.py` mescla esses dados e o `base.html` os serializa no script `#sisDados`.
-3. **Reatividade:** A `sisVar.js` transforma o objeto em Proxy. Mudanças no estado disparam automaticamente:
-    * `applyFormState()`: Controla visibilidade de botões e bloqueio de inputs.
-    * `renderMensagens()`: Exibe alertas no `#container-mensagens`.
-4. **Regra de Chaves:** Qualquer dado novo sem uma chave principal (como 'usuario' ou 'form') deve ser adicionado obrigatoriamente em `others`.
+## 2) Arquitetura e fluxo `sisVar`
+
+O projeto segue Django MTV com comportamento SPA em Vanilla JS:
+- **GET (servidor):** renderiza pagina e estado inicial.
+- **POST (servidor):** retorna dados/mensagens via `JsonResponse()`.
+- **Frontend:** `sisVar` e a fonte de verdade de estado.
+- **Seguranca:** JWT em cookie HttpOnly + CSRF token em respostas JSON.
+
+Fluxo da `sisVar`:
+1. View popula `request.sisvar_extra`.
+2. `context_processors.py` mescla dados e `base.html` serializa em `#sisDados`.
+3. `sisVar.js` cria Proxy reativo e dispara `applyFormState()` e `renderMensagens()`.
+4. Dados sem chave principal devem ir em `others`.
 
 ---
 
-## 3. RELAÇÃO DE ARQUIVOS GLOBAIS E DEPENDÊNCIAS
-Comportamentos globais devem ser implementados uma única vez nestes arquivos:
-* **`base.html`:** Estrutura base, carrega Bootstrap 5.3.3 e scripts globais.
-    * O `base.html` deve expor obrigatoriamente um bloco `{% block estilo %}` dentro de `<head>` para CSS específico de página.
-    * CSS específico de página só pode ser incluído nesse bloco e deve sempre apontar para um arquivo que exista no app.
-* **`base.js`:** Comportamentos globais de interface (Navbar, inicialização).
-* **`screen_permissions.js`:** Regras globais de visibilidade de botões por estado/permissão. Evitar duplicar `botaoDeveFicarVisivel` e `podeExibirBotaoPorPermissao` em scripts de página.
-    * Para leitura de permissões por ação, preferir `createActionChecker(...)` no script da página em vez de recriar helpers de `getScreenPermissions`.
-* **`permissions_utils.py`:** Regras globais de autorização e resposta de permissão no backend.
-    * Em views, preferir `build_action_permissions(...)` e `permission_denied_response(...)` em vez de recriar helpers locais.
-    * Para normalização de `ValidationError`, preferir `extract_validation_messages(...)`.
-    * Evitar criar wrappers locais como `obter_acoes_permitidas_*` e `resposta_sem_permissao` quando apenas delegarem para utilitários globais.
-* **`sisVar.js`:** Gerenciamento do estado global, Proxy, mensagens e modais de confirmação.
-* **`input_rules.js`:** Máscaras e regras de inputs (ativado pela classe `.smart-input`). Uso obrigatório em formulários.
-* **`conditional_select.js`:** Lógica para selects dependentes. Uso obrigatório sempre que houver campos condicionais.
-    * Em cascatas como país → região → cidade, usar `data-hierarchy*` no template e `initHierarchicalSelects(...)` no script da página; não duplicar lógica manual de dependência.
-* **`loader.js` (AppLoader):** Deve ser ativado obrigatoriamente no carregamento da página (evitando cliques precoces) e em todas as requisições assíncronas.
-* **`smart_filter.js`** (`static/js/smart_filter.js`) **+ `smart_filter.py`** (`sac_base/smart_filter.py`): Utilitário padrão para filtros avançados em campos de texto e número em relatórios e consultas. **Uso obrigatório** sempre que houver filtros do tipo "número(s)", "faixa numérica" ou "texto(s) com curinga" em formulários de pesquisa/relatório. Nunca recriar lógica equivalente no script da página ou na view.
-    * **Frontend (JS):** importar `parseSmartNumber`, `parseSmartText`, `validateSmartNumber`, `validateSmartText`, `getMultiSelectValues` de `static/js/smart_filter.js`.
-    * **Backend (Python):** usar `apply_smart_number_filter(qs, field, value)` e `apply_smart_text_filter(qs, field, value)` de `sac_base/smart_filter.py`.
-    * **Sintaxe de número:** `1,3,5-10,11` → lista/faixa de inteiros. Exemplo de campo: `<input class="form-control font-monospace" placeholder="ex: 1,3,5-10,11">`.
-    * **Sintaxe de texto:** termos separados por vírgula, `*` como curinga no início/fim. Exemplo: `REF001,*LEROY*,COMEÇA*`. Aspas ao redor de cada termo são suportadas mas opcionais (legado).
-    * **Select múltiplo:** usar `getMultiSelectValues(selectEl)` para obter os valores selecionados e enviá-los ao backend como array (via JSON body).
-* **`styles.css`:** Estilos globais e utilitários de layout.
+## 3) Reutilizacao obrigatoria (DRY)
+
+Se uma logica pode ser usada por mais de uma tela/app, ela deve ficar em utilitario global.
+
+### Frontend
+- `base.js`: comportamentos globais da interface.
+- `screen_permissions.js`: visibilidade de botoes por estado/permissao.
+- `sisVar.js`: estado global, mensagens e confirmacoes.
+- `input_rules.js`: mascaras e regras de input (`.smart-input`).
+- `conditional_select.js`: selects dependentes (`initHierarchicalSelects(...)`).
+- `loader.js`: bloquear interacoes no load e em requests assincronos.
+- `static/js/smart_filter.js`: parsing/validacao de filtros numericos/textuais.
+
+### Backend
+- `sac_base/permissions_utils.py`: permissoes e payloads de erro (`build_action_permissions(...)`, `permission_denied_response(...)`, `extract_validation_messages(...)`).
+- `sac_base/smart_filter.py`: `apply_smart_number_filter(...)` e `apply_smart_text_filter(...)`.
+- `pages/filial/services.py`: `get_filiais_escrita_queryset(...)` e `obter_filial_escrita(...)`.
+
+### Regra pratica
+- **MUST:** reutilizar helpers globais existentes.
+- **AVOID:** criar wrappers locais que apenas delegam para utilitarios globais.
 
 ---
 
-## 4. DESIGN MOBILE-FIRST (BREAKPOINTS)
-O layout deve seguir rigorosamente a abordagem Mobile-First:
-* **Mobile (Base):** 320px a 375px. Todo conteúdo deve caber sem rolagem horizontal.
-* **Tablet / Mobile Landscape:** 481px a 768px. Introdução de colunas duplas ou aumento de margens.
-* **Desktop Padrão:** 1025px a 1280px. Layout multi-coluna completo.
-* **Limite Máximo (Container):** max-width de 1140px a 1200px para o conteúdo principal, mantendo-o centralizado.
-* **Classes Bootstrap:** Nunca inventar classes utilitárias ou de container (ex.: `container-md-3`). Use apenas classes válidas do Bootstrap ou classes próprias declaradas em CSS global.
-* **Estilo Inline:** Evitar `style="max-width:..."`, `style="width:..."` e similares em templates. Se a regra se repetir ou fizer parte do layout, mover para CSS global ou CSS do app.
+## 4) UI e formularios
+
+### Layout e responsividade
+- **MUST:** mobile-first (320-375 base, 481-768 intermediario, 1025-1280 desktop).
+- **MUST:** usar classes validas do Bootstrap; evitar classes ad hoc de container.
+- **SHOULD:** usar max-width de 1140-1200 para conteudo principal.
+- **AVOID:** `style` inline repetitivo de layout (`width`, `max-width` etc.).
+
+### Formularios
+- **MUST:** validacao em 3 camadas: HTML nativo -> JS -> backend.
+- **MUST:** manter schema consistente entre View, HTML e JS.
+- **MUST:** limpar mensagens antes de novo POST.
+
+### Renderizacao segura no JS
+- **MUST:** tratar dados do backend como nao confiaveis.
+- **MUST:** preferir `createElement` + `textContent`.
+- **SHOULD:** quando precisar HTML dinamico, escapar com helper global (`_esc()`).
+- **AVOID:** interpolar dados brutos em `innerHTML`, `outerHTML`, `insertAdjacentHTML`.
+- **AVOID:** montar listas/tabelas com `array.map(...).join('')` para dados externos.
+
+### Padrao de ajuda em campos
+- **MUST:** usar tooltip Bootstrap no label (`data-bs-toggle="tooltip"`, `data-bs-placement="top"`, `data-bs-title="..."`).
+- **MUST:** padrao visual `d-flex align-items-center gap-1` + `bi bi-question-circle`.
+- **SHOULD:** preferir tooltip a `small/form-text` quando a ajuda for contextual.
+
+### Botoes e acoes
+- **MUST:** visibilidade por `data-show-on` com regra global de permissao.
+- **MUST:** usar wrapper semantico `<div class="btn-actions">` para barra responsiva.
+- Acoes padrao: `NOVO`, `SALVAR`, `EDITAR`, `EXCLUIR`, `PESQUISAR`, `FILTRAR`, `GERAR`, `VOLTAR`, `CANCELAR`.
+
+### Container de pesquisa
+- **MUST:** `#div-pesquisa` com `class="container-xl d-none mt-3"`.
 
 ---
 
-## 5. PADRÕES DE FORMULÁRIO E UI
-* **Estilização:** A estilização deve ser realizada, sempre que possível, pelo Bootstrap.
-* **Hierarquia de Validação:**
-    1. Regras nativas do HTML (required, maxlength, etc.).
-    2. Validação JavaScript (via scripts de página).
-    3. Validação de Back-end (SchemaValidator e regras de negócio).
-* **Diversos:**
-    1. Schemas: O mesmo schema de campos definido na View deve ser refletido no HTML e no JS.
-    2. Mensagens: Sempre chamar a limpeza de mensagens antes de iniciar uma nova requisição POST.
-    3. Segurança de renderização: Nunca interpolar dados dinâmicos em `innerHTML`, `outerHTML` ou `insertAdjacentHTML` sem sanitização. Preferir `textContent`, `createElement` ou helper global de escape HTML.
-    4. Renderização de listas/tabelas: Não usar `array.map(...).join('')` para montar HTML com dados vindos do backend. Construir linhas/células com `document.createElement` e atribuir conteúdo com `textContent`.
-    5. Tabelas e listas renderizadas via JS devem tratar todo valor vindo do backend como não confiável.
-        6. **Texto de ajuda em campos (padrão obrigatório):**
-                * Sempre usar no `<label>` o mesmo padrão visual do app motorista (campo `codigo`): `d-flex align-items-center gap-1` + ícone `bi bi-question-circle`.
-                * O texto de ajuda deve ficar em tooltip Bootstrap via `data-bs-toggle="tooltip"`, `data-bs-placement="top"` e `data-bs-title="..."`.
-                * Evitar `small/form-text` abaixo do input quando a ajuda for apenas contextual; nesses casos, preferir tooltip para manter o layout consistente.
-                * Modelo padrão (copiar e adaptar apenas o texto e o `for/id`):
-                    ```html
-                    <label class="form-label mb-0 d-flex align-items-center gap-1" for="campo_exemplo">
-                        <span>Rótulo do Campo</span>
-                        <span
-                            class="text-primary"
-                            role="button"
-                            tabindex="0"
-                            data-bs-toggle="tooltip"
-                            data-bs-placement="top"
-                            data-bs-title="Texto de ajuda objetivo e curto.">
-                            <i class="bi bi-question-circle"></i>
-                        </span>
-                    </label>
-                    ```
-* **Botões Padronizados (visibilidade via `data-show-on`) (devem ser estilizados via CSS global):**
-    * `NOVO`: Inicia novo registro.
-    * `SALVAR`: Submete o formulário.
-    * `EDITAR`: Habilita edição em modo visualização.
-    * `EXCLUIR`: Remove o registro.
-    * `PESQUISAR`: Direciona para o formulário de consulta/pesquisa.
-    * `FILTRAR`: Executa busca com base nos filtros.
-    * `GERAR`: Exclusivo para processamento de relatórios.
-    * `VOLTAR`: Retorna à tela anterior.
-    * `CANCELAR`: Limpa o formulário e/ou cancela a ação em andamento.
-* **Barra de Ações Responsiva:** Envolver botões principais em `<div class="btn-actions">` para empilhamento no mobile e linha no desktop. Evitar botões soltos fora de wrapper semântico.
+## 5) Seguranca obrigatoria
 
----
-
-## 6. PREFERÊNCIAS DO COPILOT (Código no chat)
-* **Ação Preferida:** Sempre utilize a ferramenta **Código no chat** para comitar alterações diretamente no repositório.
-* **Transparência:** Apresente sempre as opções (githubwrite, Código no chat, Copilot Agent) e seus custos antes de agir.
-* **DRY Global:** Se o comportamento for necessário em múltiplas páginas, implemente em um arquivo global, nunca no script específico da página.
-* **DRY Backend:** Em views Django, evitar duplicar helpers de permissões por app; reutilizar utilitários de `sac_base/permissions_utils.py`.
-* **Permissões de Botões:** Em telas de cadastro, reutilizar o helper global `screen_permissions.js` para visibilidade por `data-show-on` e por ação (`incluir/editar/excluir`).
-* **Renderização Segura:** Ao precisar gerar HTML dinamicamente em JS, usar helper global compartilhado para escape ou construir o DOM com `document.createElement`.
-* **Layout Consistente:** Para páginas de cadastro/consulta, preferir containers Bootstrap válidos e consistentes entre apps, evitando classes ad hoc no template.
-* **Container de Pesquisa:** O bloco `#div-pesquisa` deve usar `class="container-xl d-none mt-3"` para manter alinhamento e respiro visual consistentes entre apps.
-
----
-
-## 7. VARIÁVEIS DE AMBIENTE (PRODUÇÃO — HEROKU)
-
-### Obrigatórias
-| Variável | Descrição |
-|---|---|
-| `BANCO_DE_DADOS` | URL de conexão com o banco (ex.: `postgres://user:pass@host:5432/db`). O settings também aceita `DATABASE_URL` como fallback (padrão do addon Heroku Postgres). |
-| `DJANGO_SECRET_KEY` | Chave secreta do Django. Gerar com `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"`. **Nunca reutilizar a chave de desenvolvimento.** |
-| `DJANGO_ALLOWED_HOSTS` | Domínios aceitos, separados por vírgula. Ex.: `meuapp.herokuapp.com,meudominio.com`. |
-| `DJANGO_CSRF_TRUSTED_ORIGINS` | Origens confiáveis para CSRF, separadas por vírgula. Ex.: `https://meuapp.herokuapp.com,https://meudominio.com`. |
-
-### Segurança (assumem valor seguro automaticamente quando `DJANGO_DEBUG` está ausente/false)
-| Variável | Padrão em produção | Descrição |
-|---|---|---|
-| `DJANGO_DEBUG` | `false` (não definir em prod) | Nunca definir como `true` em produção. |
-| `DJANGO_SESSION_COOKIE_SECURE` | `true` | Cookies de sessão somente via HTTPS. |
-| `DJANGO_CSRF_COOKIE_SECURE` | `true` | Cookie CSRF somente via HTTPS. |
-| `DJANGO_AUTH_COOKIE_SECURE` | `true` | Cookie JWT somente via HTTPS. |
-| `DJANGO_USE_X_FORWARDED_PROTO` | `false` | Definir como `true` no Heroku para reconhecer HTTPS via proxy. |
-| `DJANGO_SECURE_SSL_REDIRECT` | `false` | Definir como `true` para redirecionar HTTP → HTTPS. |
-
-### Opcionais / Infraestrutura
-| Variável | Descrição |
-|---|---|
-| `REDIS_URL` | URL do Redis. Necessário para WebSockets em ambientes multi-dyno (addon Heroku Redis). Sem ela, usa `InMemoryChannelLayer` (não funciona com mais de um dyno). |
-| `DJANGO_DB_SSL_REQUIRE` | `true` por padrão em produção. Forçar SSL na conexão com o banco. |
-
-### Integrações externas
-| Variável | Descrição |
-|---|---|
-| `BULKGATE_APP_ID` | Application ID gerado no portal BulkGate (`portal.bulkgate.com` → Modules & APIs → Create API). Obrigatório para envio de SMS. |
-| `BULKGATE_APP_TOKEN` | Application Token gerado no portal BulkGate. Nunca versionar. Obrigatório para envio de SMS. |
-| `IMGBB_API_KEY` | API Key gerada em [api.imgbb.com](https://api.imgbb.com/). Obrigatória para upload de fotos em devoluções de pedidos. Lida em `pages/pedidos/views.py` via `os.environ.get("IMGBB_API_KEY")`. |
-
-> **SMS — padrão de números:** A função `sac_base/sms_service.py::normalizar_numero()` aceita qualquer formato (`+351...`, `00351...`, `912...`). Números sem DDI são tratados como pertencentes ao país de atuação da Filial (`Filial.pais_atuacao.codigo_tel`). O fallback hardcoded é `351` (Portugal).
-
-> **SMS — envio automático:** O envio automático depende do agendamento do comando `enviar_sms_automatico` via Heroku Scheduler. Sem o agendamento, os SMS automáticos não serão enviados.
-
-### Exemplo mínimo para o Heroku
-```bash
-heroku config:set BANCO_DE_DADOS="postgres://..." \
-  DJANGO_SECRET_KEY="..." \
-  DJANGO_ALLOWED_HOSTS="meuapp.herokuapp.com" \
-  DJANGO_CSRF_TRUSTED_ORIGINS="https://meuapp.herokuapp.com" \
-  DJANGO_USE_X_FORWARDED_PROTO=true \
-  DJANGO_SECURE_SSL_REDIRECT=true \
-  BULKGATE_APP_ID="12345" \
-  BULKGATE_APP_TOKEN="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
-  IMGBB_API_KEY="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-```
-
-### Após o deploy
-```bash
-heroku run python manage.py migrate
-heroku run python manage.py collectstatic --noinput  # executado automaticamente no build
-```
-
----
-
-## 8. PADRÕES DE SEGURANÇA (OBRIGATÓRIOS)
-
-### 8.1 IDOR — Filtro por Filial Ativa
-**Toda view que acessa Pedido, TentativaEntrega, Devolucao ou qualquer dado multi-tenant DEVE filtrar por `request.filial_ativa`.**
+### 5.1 IDOR multi-tenant por filial ativa
+Toda view multi-tenant deve validar e filtrar por `request.filial_ativa`.
 
 ```python
-# Padrão obrigatório no início de cada view de POST multi-tenant:
-filial_ativa = getattr(request, 'filial_ativa', None)
+filial_ativa = getattr(request, "filial_ativa", None)
 if not filial_ativa:
-    return JsonResponse(build_error_payload("Filial ativa não encontrada."), status=403)
+    return JsonResponse(build_error_payload("Filial ativa nao encontrada."), status=403)
 
-# Filtrar queryset sempre com filial_ativa:
 Pedido.objects.filter(filial=filial_ativa, ...)
 TentativaEntrega.objects.filter(pedido__filial=filial_ativa, ...)
 Devolucao.objects.filter(pedido__filial=filial_ativa, ...)
 ```
 
-* `request.filial_ativa` é injetado pelo `JWTAuthMiddleware._resolve_filial_context()` (`pages/usuario/middleware.py`).
-* Nunca confiar em IDs vindos do cliente sem verificar contra a filial ativa.
-* Endpoints públicos (ex.: mapa público com token de URL) são a única exceção autorizada — devem estar documentados no código.
+- `request.filial_ativa` vem de `JWTAuthMiddleware._resolve_filial_context()` (`pages/usuario/middleware.py`).
+- Excecoes (endpoint publico com token) devem ser documentadas no codigo.
 
-### 8.2 DRY — Helpers de Filial
-As funções `get_filiais_escrita_queryset(usuario)` e `obter_filial_escrita(filial_id, usuario)` vivem **exclusivamente** em `pages/filial/services.py`. Nunca duplicar em outros apps.
-
-```python
-from pages.filial.services import get_filiais_escrita_queryset, obter_filial_escrita
-```
-
-### 8.3 JWT Blacklist — Logout e Troca de Senha
-Ao fazer logout ou alterar senha, invalidar o refresh token antes de apagar o cookie:
+### 5.2 JWT blacklist em logout/troca de senha
 
 ```python
 refresh_token_str = request.COOKIES.get("refresh_token")
@@ -253,60 +125,142 @@ if refresh_token_str:
         pass
 ```
 
-Requer `rest_framework_simplejwt.token_blacklist` em `INSTALLED_APPS` e migrações aplicadas.
+Requer `rest_framework_simplejwt.token_blacklist` no `INSTALLED_APPS` e migracoes aplicadas.
 
-### 8.4 Rate Limiting — Login
-O endpoint de login limita a **5 tentativas por IP em janela de 5 minutos** usando Django cache:
+### 5.3 Rate limit no login
+- **MUST:** limitar a 5 tentativas por IP em 5 minutos (cache).
 
-```python
-ip = request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "")).split(",")[0].strip()
-cache_key = f"login_attempts_{ip}"
-tentativas = cache.get(cache_key, 0)
-if tentativas >= 5:
-    return JsonResponse(build_error_payload("Muitas tentativas de login. Aguarde alguns minutos."), status=429)
-# Em caso de falha: cache.set(cache_key, tentativas + 1, 5 * 60)
-# Em caso de sucesso: cache.delete(cache_key)
-```
-
-### 8.5 Paginação — Sanitizar Parâmetros
-Sempre sanitizar `pagina` e `page_size` vindos do cliente:
+### 5.4 Paginacao segura
 
 ```python
 pagina = max(1, int(data.get("pagina", 1)))
 page_size = max(1, min(int(data.get("page_size", 30)), 200))
 ```
 
-O cap em 200 evita DoS; o `max(1, ...)` evita offsets negativos. Não altera a lógica de scroll infinito (o JS continua incrementando `pagina`).
+- Cap de 200 reduz risco de DoS.
 
-### 8.6 XSS — Escape em Template Literals JS
-Ao interpolar dados do backend em HTML via JS, **sempre usar `_esc()`** (helper global em `static/js/html.js`):
+### 5.5 CSP
+- `sac_base.csp_middleware.CSPMiddleware` injeta `Content-Security-Policy`.
+- **AVOID:** `unsafe-inline` e `unsafe-eval` sem justificativa formal.
 
-```js
-// ❌ Proibido:
-el.innerHTML = `<td>${dado.valor}</td>`;
+### 5.6 Regras complementares
+- `SchemaValidator` (`sac_base/form_validador.py`) aceita: `string`, `password`, `email`, `integer`, `boolean`.
+- `SoftDeleteMixin`: `objects` retorna ativos; para deletados usar `all_objects`.
+- Em `pages/pedidos/views_relatorio.py`, sempre passar filial em `_build_qs_relatorio(filtros, filial=...)`.
 
-// ✅ Correto:
-el.innerHTML = `<td>${_esc(dado.valor)}</td>`;
+---
 
-// ✅ Melhor ainda (sem innerHTML):
-const td = document.createElement('td');
-td.textContent = dado.valor;
+## 6) Producao no Heroku
+
+### Variaveis obrigatorias
+- `BANCO_DE_DADOS` (ou fallback `DATABASE_URL`).
+- `DJANGO_SECRET_KEY`.
+- `DJANGO_ALLOWED_HOSTS`.
+- `DJANGO_CSRF_TRUSTED_ORIGINS`.
+
+### Variaveis de seguranca
+- `DJANGO_DEBUG=false` em producao.
+- `DJANGO_SESSION_COOKIE_SECURE=true`.
+- `DJANGO_CSRF_COOKIE_SECURE=true`.
+- `DJANGO_AUTH_COOKIE_SECURE=true`.
+- Em Heroku, configurar:
+  - `DJANGO_USE_X_FORWARDED_PROTO=true`
+  - `DJANGO_SECURE_SSL_REDIRECT=true`
+
+### Variaveis opcionais/infra
+- `REDIS_URL` para WebSockets em multi-dyno.
+- `DJANGO_DB_SSL_REQUIRE=true` (padrao seguro em prod).
+
+### Integracoes externas
+- `BULKGATE_APP_ID` e `BULKGATE_APP_TOKEN` para SMS.
+- `IMGBB_API_KEY` para upload de fotos em devolucoes.
+- `EMAIL_HOST_USER` e `EMAIL_HOST_PASSWORD` para autenticacao SMTP (Gmail).
+
+### Avaliacoes e e-mails automaticos
+Fluxo funcional da pesquisa de satisfacao:
+- cada `Pedido` concluido pode gerar 1 `AvaliacaoPedido`;
+- o envio do e-mail cria/usa token publico unico por pedido;
+- o cliente responde via link publico (`/app/logistica/avaliacao/<token>/`);
+- apos resposta, o link e inativado (`link_ativo=False`) e nao permite novo envio.
+
+Comando automatico:
+- `pages/pedidos/management/commands/enviar_email_avaliacao_automatico.py`;
+- processa por filial conforme `FilialConfig.email_auto`;
+- respeita fila (pendentes sem `email_enviado`) e evita duplicidade;
+- flags de apoio: `--dry-run` (simula) e `--force` (ignora horario).
+
+### Variaveis essenciais de e-mail (Gmail SMTP)
+Usar um unico payload no padrao dicionario:
+
+```bash
+EMAIL_AUTO='{"EMAIL_HOST":"smtp.gmail.com","EMAIL_PORT":"587","EMAIL_USE_TLS":"true","EMAIL_HOST_USER":"conta@gmail.com","EMAIL_HOST_PASSWORD":"app_password","DEFAULT_FROM_EMAIL":"conta@gmail.com","APP_BASE_URL":"https://meuapp.herokuapp.com"}'
 ```
 
-Aplicar a todos os valores dinâmicos em `insertAdjacentHTML`, `innerHTML`, `outerHTML`.
+### Scheduler de SMS automatico
+O comando `pages/pedidos/management/commands/enviar_sms_automatico.py` deve ser agendado no Heroku Scheduler.
 
-### 8.7 Content-Security-Policy
-O middleware `sac_base.csp_middleware.CSPMiddleware` injeta o header `Content-Security-Policy` em todas as respostas. Está posicionado após `WhiteNoiseMiddleware` no `MIDDLEWARE`. Para adicionar novas origens (CDN, API externa), editar `sac_base/csp_middleware.py` — nunca usar `unsafe-inline` ou `unsafe-eval` sem justificativa documentada.
+Configurar job:
+- **Task:** `python manage.py enviar_sms_automatico`
+- **Frequency:** a cada 10 minutos (ou conforme negocio)
+- **Next due:** horario de inicio desejado
 
-### 8.8 SchemaValidator — Tipos Suportados
-`sac_base/form_validador.py::SchemaValidator` valida os tipos: `string`, `password`, `email`, `integer`, `boolean`. Para campos numéricos do formulário, declarar `'type': 'integer'` no schema.
+Observacoes:
+- o comando e idempotente (nao duplica notificacoes ja enviadas);
+- teste sem envio real: `python manage.py enviar_sms_automatico --dry-run`;
+- forcar envio ignorando horario: `python manage.py enviar_sms_automatico --force`.
 
-### 8.9 SoftDeleteMixin — Manager Padrão
-Models com `SoftDeleteMixin` têm `objects` como `ActiveManager` (filtra `is_deleted=False` automaticamente). Para acessar registros deletados, usar `Model.all_objects`. Nunca presumir que `objects.all()` retorna deletados.
+### Scheduler de e-mail automatico (avaliacao)
+O comando `pages/pedidos/management/commands/enviar_email_avaliacao_automatico.py` deve ser agendado no Heroku Scheduler.
 
-### 8.10 `_build_qs_relatorio` — Sempre Passar Filial
-A função `_build_qs_relatorio(filtros, filial=None)` em `pages/pedidos/views_relatorio.py` aceita `filial` como segundo argumento. Sempre passar:
+Configurar job:
+- **Task:** `python manage.py enviar_email_avaliacao_automatico`
+- **Frequency:** a cada 10 minutos (ou conforme negocio)
+- **Next due:** horario de inicio desejado
 
-```python
-qs = _build_qs_relatorio(filtros, filial=getattr(request, 'filial_ativa', None))
+Observacoes:
+- o comando e idempotente para pedidos ja enviados/respondidos;
+- teste sem envio real: `python manage.py enviar_email_avaliacao_automatico --dry-run`;
+- forcar envio ignorando horario: `python manage.py enviar_email_avaliacao_automatico --force`.
+
+### Exemplo minimo de setup
+```bash
+heroku config:set BANCO_DE_DADOS="postgres://..." \
+  DJANGO_SECRET_KEY="..." \
+  DJANGO_ALLOWED_HOSTS="meuapp.herokuapp.com" \
+  DJANGO_CSRF_TRUSTED_ORIGINS="https://meuapp.herokuapp.com" \
+  DJANGO_USE_X_FORWARDED_PROTO=true \
+  DJANGO_SECURE_SSL_REDIRECT=true \
+  EMAIL_AUTO='{"EMAIL_HOST":"smtp.gmail.com","EMAIL_PORT":"587","EMAIL_USE_TLS":"true","EMAIL_HOST_USER":"conta@gmail.com","EMAIL_HOST_PASSWORD":"app_password","DEFAULT_FROM_EMAIL":"conta@gmail.com","APP_BASE_URL":"https://meuapp.herokuapp.com"}' \
+  BULKGATE_APP_ID="12345" \
+  BULKGATE_APP_TOKEN="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  IMGBB_API_KEY="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
+
+### Pos-deploy
+```bash
+heroku run python manage.py migrate
+heroku run python manage.py collectstatic --noinput
+```
+
+---
+
+## 7) Modo de atuacao do agente (Copilot)
+
+- **MUST:** quando houver opcao, priorizar "Codigo no chat" para alteracoes no repositorio.
+- **MUST:** explicitar opcoes de execucao (githubwrite, Codigo no chat, Copilot Agent) e custo antes de agir.
+- **MUST:** respeitar padroes globais deste documento antes de criar implementacao local.
+- **SHOULD:** manter respostas objetivas, com foco em reuso, seguranca e consistencia visual.
+
+---
+
+## 8) Checklist por feature (entrega)
+
+Antes de finalizar uma funcionalidade, validar:
+- [ ] View aplica regras de permissao e filial ativa (se multi-tenant).
+- [ ] `request.sisvar_extra` e payload de resposta estao consistentes com a UI.
+- [ ] Template usa estrutura Bootstrap valida e sem regras de layout duplicadas.
+- [ ] Script da pagina reutiliza helpers globais (`screen_permissions`, `smart_filter`, etc.).
+- [ ] Renderizacao JS nao injeta dados nao confiaveis sem escape/sanitizacao.
+- [ ] Botoes padrao e `btn-actions` aplicados corretamente.
+- [ ] Validacao HTML + JS + backend alinhada ao schema.
+- [ ] Variaveis de ambiente/deploy (quando aplicavel) documentadas e conferidas.

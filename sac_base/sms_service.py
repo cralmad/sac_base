@@ -9,6 +9,9 @@ Credenciais obrigatórias (variáveis de ambiente):
 import logging
 import os
 import re
+import json
+import time
+import uuid
 from datetime import date
 
 import requests
@@ -49,6 +52,23 @@ HORARIO_PERIODO = {
 
 # DDI padrão caso o pais_atuacao não esteja configurado
 _DDI_FALLBACK = "351"
+DEBUG_LOG_PATH = "debug-5874e6.log"
+DEBUG_SESSION_ID = "5874e6"
+
+
+def _debug_log(hypothesis_id: str, location: str, message: str, data: dict):
+    payload = {
+        "sessionId": DEBUG_SESSION_ID,
+        "runId": "sms-service",
+        "hypothesisId": hypothesis_id,
+        "id": f"log_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}",
+        "timestamp": int(time.time() * 1000),
+        "location": location,
+        "message": message,
+        "data": data,
+    }
+    with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(payload, ensure_ascii=True) + "\n")
 
 
 def normalizar_numero(numero: str, ddi_padrao: str = _DDI_FALLBACK) -> str | None:
@@ -152,6 +172,14 @@ def enviar_sms_bulkgate(numero: str, mensagem: str, ddi_padrao: str = _DDI_FALLB
         "number": numero_norm,
         "text": mensagem,
     }
+    # #region agent log
+    _debug_log(
+        "H3",
+        "sms_service.py:enviar_sms_bulkgate",
+        "bulkgate_request_start",
+        {"numero_original": (numero or "")[-4:], "mensagem_len": len(mensagem or ""), "ddi_padrao": ddi_padrao},
+    )
+    # #endregion
     try:
         resp = requests.post(BULKGATE_URL, json=payload, timeout=15)
         try:
@@ -163,9 +191,25 @@ def enviar_sms_bulkgate(numero: str, mensagem: str, ddi_padrao: str = _DDI_FALLB
         if resp.status_code == 200 and "data" in data:
             return {"sucesso": True, "sms_id": data["data"].get("sms_id")}
         erro = data.get("error", "Erro desconhecido.")
+        # #region agent log
+        _debug_log(
+            "H3",
+            "sms_service.py:enviar_sms_bulkgate",
+            "bulkgate_request_failed",
+            {"status_code": resp.status_code, "error": erro},
+        )
+        # #endregion
         logger.error("BulkGate erro para %s: %s", numero_norm, data)
         return {"sucesso": False, "erro": erro}
     except requests.RequestException as exc:
+        # #region agent log
+        _debug_log(
+            "H1",
+            "sms_service.py:enviar_sms_bulkgate",
+            "bulkgate_request_exception",
+            {"error_type": type(exc).__name__, "error": str(exc)},
+        )
+        # #endregion
         logger.exception("BulkGate: falha na requisição para %s", numero_norm)
         return {"sucesso": False, "erro": str(exc)}
 

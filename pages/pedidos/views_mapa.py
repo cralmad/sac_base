@@ -299,12 +299,21 @@ def mapa_pontos_view(request):
             geocoding_falhou += 1
 
     # Re-carrega com coordenadas atualizadas
-    movs = (
+    movs = list(
         TentativaEntrega.objects
         .filter(data_tentativa=dt, pedido__filial=filial_ativa)
         .select_related("pedido")
         .order_by("carro", "pedido__codpost_dest")
     )
+    pedido_ids = {m.pedido_id for m in movs}
+    pedidos_com_tentativa_posterior = set()
+    if pedido_ids:
+        pedidos_com_tentativa_posterior = set(
+            TentativaEntrega.objects
+            .filter(pedido_id__in=pedido_ids, data_tentativa__gt=dt)
+            .values_list("pedido_id", flat=True)
+            .distinct()
+        )
 
     for mov in movs:
         pedido = mov.pedido
@@ -338,7 +347,10 @@ def mapa_pontos_view(request):
                 "cor": _cor_carro(mov.carro),
                 "geocoding_display": pedido.geocoding_display or "",
                 "geocoding_precision": pedido.geocoding_precision or "",
-                "segue_para_entrega": pedido.estado in ESTADOS_SEGUE_PARA_ENTREGA,
+                "segue_para_entrega": (
+                    (pedido.estado in ESTADOS_SEGUE_PARA_ENTREGA)
+                    and (pedido.id not in pedidos_com_tentativa_posterior)
+                ),
                 "updated_at": mov.updated_at.isoformat(),
             },
         })
@@ -564,12 +576,21 @@ def mapa_publico_pontos_view(request, token):
         carro, data = _validar_token_carro(token)
     except Exception:
         return JsonResponse({"success": False, "mensagem": "Link inválido ou expirado."}, status=403)
-    movs = (
+    movs = list(
         TentativaEntrega.objects
         .filter(data_tentativa=data, carro=carro)
         .select_related("pedido")
         .order_by("pedido__codpost_dest")
     )
+    pedido_ids = {m.pedido_id for m in movs}
+    pedidos_com_tentativa_posterior = set()
+    if pedido_ids:
+        pedidos_com_tentativa_posterior = set(
+            TentativaEntrega.objects
+            .filter(pedido_id__in=pedido_ids, data_tentativa__gt=data)
+            .values_list("pedido_id", flat=True)
+            .distinct()
+        )
 
     features = []
     linhas = []
@@ -625,7 +646,10 @@ def mapa_publico_pontos_view(request, token):
                 "obs_rota": pedido.obs_rota or "",
                 "periodo": mov.periodo or "",
                 "cor": cor,
-                "segue_para_entrega": pedido.estado in ESTADOS_SEGUE_PARA_ENTREGA,
+                "segue_para_entrega": (
+                    (pedido.estado in ESTADOS_SEGUE_PARA_ENTREGA)
+                    and (pedido.id not in pedidos_com_tentativa_posterior)
+                ),
             },
         })
 

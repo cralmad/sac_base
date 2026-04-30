@@ -50,6 +50,10 @@ def build_filial_campos_iniciais():
         "sms_padrao_1": "",
         "sms_padrao_2": "",
         "sms_auto": "",
+        "email_template_assunto": "",
+        "email_template_corpo": "",
+        "email_auto": "",
+        "email_nome_remetente": "",
         "gsheets_spreadsheet_id": "",
         "gsheets_sheet_name": "",
     }
@@ -72,12 +76,20 @@ def serializar_form_filial(filial):
         sms_padrao_1 = config.sms_padrao_1 or ""
         sms_padrao_2 = config.sms_padrao_2 or ""
         sms_auto = config.sms_auto.strftime("%H:%M") if config.sms_auto else ""
+        email_template_assunto = config.email_template_assunto or ""
+        email_template_corpo = config.email_template_corpo or ""
+        email_auto = config.email_auto.strftime("%H:%M") if config.email_auto else ""
+        email_nome_remetente = config.email_nome_remetente or ""
         gsheets_spreadsheet_id = config.gsheets_spreadsheet_id or ""
         gsheets_sheet_name = config.gsheets_sheet_name or ""
     except FilialConfig.DoesNotExist:
         sms_padrao_1 = ""
         sms_padrao_2 = ""
         sms_auto = ""
+        email_template_assunto = ""
+        email_template_corpo = ""
+        email_auto = ""
+        email_nome_remetente = ""
         gsheets_spreadsheet_id = ""
         gsheets_sheet_name = ""
     return {
@@ -95,6 +107,10 @@ def serializar_form_filial(filial):
         "sms_padrao_1": sms_padrao_1,
         "sms_padrao_2": sms_padrao_2,
         "sms_auto": sms_auto,
+        "email_template_assunto": email_template_assunto,
+        "email_template_corpo": email_template_corpo,
+        "email_auto": email_auto,
+        "email_nome_remetente": email_nome_remetente,
         "gsheets_spreadsheet_id": gsheets_spreadsheet_id,
         "gsheets_sheet_name": gsheets_sheet_name,
     }
@@ -123,6 +139,10 @@ def cadastro_filial_view(request):
             "sms_padrao_1": {"type": "string", "required": False, "value": ""},
             "sms_padrao_2": {"type": "string", "required": False, "value": ""},
             "sms_auto": {"type": "string", "required": False, "value": ""},
+            "email_template_assunto": {"type": "string", "maxlength": 200, "required": False, "value": ""},
+            "email_template_corpo": {"type": "string", "required": False, "value": ""},
+            "email_auto": {"type": "string", "required": False, "value": ""},
+            "email_nome_remetente": {"type": "string", "maxlength": 120, "required": False, "value": ""},
             "gsheets_spreadsheet_id": {"type": "string", "maxlength": 200, "required": False, "value": ""},
             "gsheets_sheet_name": {"type": "string", "maxlength": 100, "required": False, "value": ""},
         },
@@ -294,6 +314,19 @@ def cadastro_filial_view(request):
             return JsonResponse(build_error_payload("Horário SMS automático inválido. Use o formato HH:MM."), status=400)
     else:
         sms_auto = None
+    email_template_assunto = (campos.get("email_template_assunto") or "").strip() or None
+    email_template_corpo = (campos.get("email_template_corpo") or "").strip() or None
+    _email_auto_raw = (campos.get("email_auto") or "").strip()
+    if _email_auto_raw:
+        try:
+            from datetime import time as _time
+            _h, _m = _email_auto_raw.split(":")
+            email_auto = _time(int(_h), int(_m))
+        except (ValueError, AttributeError):
+            return JsonResponse(build_error_payload("Horário de e-mail automático inválido. Use o formato HH:MM."), status=400)
+    else:
+        email_auto = None
+    email_nome_remetente = (campos.get("email_nome_remetente") or "").strip() or None
     gsheets_spreadsheet_id = (campos.get("gsheets_spreadsheet_id") or "").strip() or None
     gsheets_sheet_name = (campos.get("gsheets_sheet_name") or "").strip() or None
     FilialConfig.objects.update_or_create(
@@ -302,6 +335,10 @@ def cadastro_filial_view(request):
             "sms_padrao_1": sms_padrao_1,
             "sms_padrao_2": sms_padrao_2,
             "sms_auto": sms_auto,
+            "email_template_assunto": email_template_assunto,
+            "email_template_corpo": email_template_corpo,
+            "email_auto": email_auto,
+            "email_nome_remetente": email_nome_remetente,
             "gsheets_spreadsheet_id": gsheets_spreadsheet_id,
             "gsheets_sheet_name": gsheets_sheet_name,
         },

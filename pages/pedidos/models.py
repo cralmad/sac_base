@@ -171,6 +171,46 @@ class Pedido(AuditFieldsMixin, models.Model):
         return str(self.pedido or self.id_vonzu)
 
 
+class AvaliacaoPedido(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    pedido = models.OneToOneField(
+        Pedido,
+        on_delete=models.CASCADE,
+        db_column="pedido_id",
+        related_name="avaliacao",
+    )
+    token_publico = models.CharField(max_length=512, unique=True, null=True, blank=True)
+    link_ativo = models.BooleanField(default=True)
+    email_enviado = models.BooleanField(default=False)
+    email_enviado_em = models.DateTimeField(null=True, blank=True)
+    email_tentativas = models.PositiveSmallIntegerField(default=0)
+    respondido_em = models.DateTimeField(null=True, blank=True)
+    p1_entrega_no_prazo = models.CharField(max_length=3, null=True, blank=True)
+    p2_aviso_antes_chegada = models.CharField(max_length=3, null=True, blank=True)
+    p3_educacao_simpatia = models.PositiveSmallIntegerField(null=True, blank=True)
+    p4_cuidado_encomenda = models.PositiveSmallIntegerField(null=True, blank=True)
+    p5_equipa_identificada = models.CharField(max_length=3, null=True, blank=True)
+    p6_facilidade_processo = models.PositiveSmallIntegerField(null=True, blank=True)
+    p7_veiculo_limpo = models.CharField(max_length=3, null=True, blank=True)
+    p8_esclareceu_duvidas = models.CharField(max_length=3, null=True, blank=True)
+    p9_satisfacao_geral = models.PositiveSmallIntegerField(null=True, blank=True)
+    p10_recomendaria = models.CharField(max_length=3, null=True, blank=True)
+    comentario = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "avaliacao_pedido"
+        indexes = [
+            models.Index(fields=["email_enviado"]),
+            models.Index(fields=["link_ativo"]),
+            models.Index(fields=["respondido_em"]),
+        ]
+
+    def __str__(self):
+        return f"Avaliação Pedido {self.pedido_id}"
+
+
 class TentativaEntrega(models.Model):
     id = models.BigAutoField(primary_key=True)
     pedido = models.ForeignKey(
@@ -203,6 +243,8 @@ class TentativaEntrega(models.Model):
             ("change_carro_tentativaentrega", "Pode alterar o campo Carro na conferência de volumes"),
             ("send_sms_tentativaentrega", "Pode enviar SMS de notificação de entrega"),
             ("view_relatorio_gerencial", "Pode acessar o Relatório Gerencial de Pedidos"),
+            ("view_relatorio_avaliacao", "Pode acessar o Relatório de Avaliações"),
+            ("send_email_avaliacao", "Pode enviar e-mails de avaliação"),
         ]
         indexes = [
             models.Index(fields=["pedido", "data_tentativa"]),

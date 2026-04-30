@@ -47,4 +47,5 @@ urlpatterns = [
 
     # Mapa de conferência / rotas
     path("logistica/", include("pages.pedidos.urls_mapa")),
+    path("logistica/", include("pages.pedidos.urls_avaliacao")),
 ]

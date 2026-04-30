@@ -1,0 +1,10 @@
+body {
+  background: #f4f7f6;
+  color: #333;
+}
+
+.avaliacao-card {
+  max-width: 760px;
+  margin: 0 auto;
+  border-radius: 12px;
+}

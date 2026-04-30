@@ -109,6 +109,14 @@ class FilialConfig(models.Model):
         blank=True,
         help_text="Horário (Lisboa) para envio automático de SMS. Formato 24h — ex.: 08:00. Deixe em branco para desativar.",
     )
+    email_template_assunto = models.CharField(max_length=200, null=True, blank=True)
+    email_template_corpo = models.TextField(null=True, blank=True)
+    email_auto = models.TimeField(
+        null=True,
+        blank=True,
+        help_text="Horário (Lisboa) para envio automático diário de e-mails de avaliação.",
+    )
+    email_nome_remetente = models.CharField(max_length=120, null=True, blank=True)
     gsheets_spreadsheet_id = models.CharField(max_length=200, null=True, blank=True)
     gsheets_sheet_name = models.CharField(max_length=100, null=True, blank=True)
 

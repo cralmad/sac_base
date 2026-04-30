@@ -119,7 +119,7 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
     const tbody = document.createElement('tbody');
     grupo.linhas.forEach(linha => {
       const tr = document.createElement('tr');
-      if (!linha.segue_para_entrega) tr.classList.add('rr-nao-segue');
+      if (linha.nao_segue_para_entrega ?? !linha.segue_para_entrega) tr.classList.add('rr-nao-segue');
 
       const campos = [
         { val: linha.pedido },

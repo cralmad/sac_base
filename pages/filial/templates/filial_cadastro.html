@@ -190,6 +190,66 @@
               </label>
               <input type="time" id="sms_auto" name="sms_auto" class="form-control">
             </div>
+            <div class="col-12 col-md-8">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="email_template_assunto">
+                <span>Assunto E-mail Avaliação</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="Assunto padrão do e-mail de pesquisa. Pode usar {pedido}, {cliente} e {filial}.">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <input type="text" id="email_template_assunto" name="email_template_assunto" class="form-control" maxlength="200">
+            </div>
+            <div class="col-12">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="email_template_corpo">
+                <span>Corpo E-mail Avaliação</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="Texto do e-mail de pesquisa. Use {nome}, {pedido}, {filial} e {link_avaliacao}.">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <textarea id="email_template_corpo" name="email_template_corpo" class="form-control" rows="4"></textarea>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="email_auto">
+                <span>Horário E-mail Automático</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="Horário de Lisboa (24h) para envio automático diário de e-mails de avaliação.">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <input type="time" id="email_auto" name="email_auto" class="form-control">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="email_nome_remetente">
+                <span>Nome Remetente E-mail</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="Nome exibido para o destinatário. Em branco usa configuração global.">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <input type="text" id="email_nome_remetente" name="email_nome_remetente" class="form-control" maxlength="120">
+            </div>
 
             <div class="col-12 col-md-8">
               <label class="form-label mb-0 d-flex align-items-center gap-1" for="gsheets_spreadsheet_id">

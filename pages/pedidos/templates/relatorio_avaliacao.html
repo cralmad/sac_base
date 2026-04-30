@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Relatório de Avaliações{% endblock %}
+{% block page_title %}Relatório de Avaliações{% endblock %}
+
+{% block content %}
+<div class="container-xl my-3" id="rel-av-root" data-url-lote="{% url 'relatorio_avaliacao_enviar_lote' %}">
+  <form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-12 col-md-4">
+      <label class="form-label mb-0">Pedido</label>
+      <input type="text" name="pedido" value="{{ filtros.pedido }}" class="form-control">
+    </div>
+    <div class="col-12 col-md-3">
+      <label class="form-label mb-0">Status</label>
+      <select name="status" class="form-select">
+        <option value="" {% if not filtros.status %}selected{% endif %}>Todos</option>
+        <option value="respondido" {% if filtros.status == "respondido" %}selected{% endif %}>Respondido</option>
+        <option value="pendente" {% if filtros.status == "pendente" %}selected{% endif %}>Pendente resposta</option>
+        <option value="enviado" {% if filtros.status == "enviado" %}selected{% endif %}>E-mail enviado</option>
+        <option value="nao_enviado" {% if filtros.status == "nao_enviado" %}selected{% endif %}>E-mail não enviado</option>
+      </select>
+    </div>
+    <div class="col-12 col-md-2">
+      <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+    </div>
+    {% if pode_enviar %}
+    <div class="col-12 col-md-3">
+      <button type="button" id="btn-enviar-selecionados" class="btn btn-success w-100" disabled>
+        Enviar selecionados
+      </button>
+    </div>
+    {% endif %}
+  </form>
+
+  <div class="table-responsive">
+    <table class="table table-sm table-bordered align-middle">
+      <thead class="table-dark">
+        <tr>
+          {% if pode_enviar %}
+          <th class="text-center" style="width:40px;">
+            <input type="checkbox" id="chk-todos-avaliacao" class="form-check-input" title="Selecionar todos">
+          </th>
+          {% endif %}
+          <th>Pedido</th>
+          <th>Cliente</th>
+          <th>E-mail</th>
+          <th>Enviado em</th>
+          <th>Respondido em</th>
+          <th>Status Link</th>
+          <th class="text-center">Ação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in registros %}
+        <tr>
+          {% if pode_enviar %}
+          <td class="text-center">
+            {% if not item.respondido_em and item.pedido.email_dest %}
+            <input type="checkbox" class="form-check-input chk-avaliacao" value="{{ item.id }}">
+            {% endif %}
+          </td>
+          {% endif %}
+          <td>{{ item.pedido.pedido|default:item.pedido.id_vonzu }}</td>
+          <td>{{ item.pedido.nome_dest }}</td>
+          <td>{{ item.pedido.email_dest }}</td>
+          <td>{% if item.email_enviado_em %}{{ item.email_enviado_em|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
+          <td>{% if item.respondido_em %}{{ item.respondido_em|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
+          <td>{% if item.link_ativo %}<span class="badge bg-success">Ativo</span>{% else %}<span class="badge bg-secondary">Inativo</span>{% endif %}</td>
+          <td class="text-center">
+            {% if not item.respondido_em %}
+            <form method="post" action="/app/logistica/relatorio_avaliacao/{{ item.id }}/enviar">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-outline-primary" type="submit">Reenviar</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="{% if pode_enviar %}8{% else %}7{% endif %}" class="text-center text-muted">Nenhuma avaliação encontrada.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div id="rel-av-msg" class="mt-3"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="/static/pedidos/js/relatorio_avaliacao.js"></script>
+{% endblock %}

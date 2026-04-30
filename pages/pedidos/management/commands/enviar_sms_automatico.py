@@ -20,6 +20,9 @@ Flags de teste:
 """
 
 import logging
+import json
+import time
+import uuid
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -36,6 +39,23 @@ from sac_base.sms_service import (
 logger = logging.getLogger(__name__)
 
 LISBON_TZ = ZoneInfo("Europe/Lisbon")
+DEBUG_LOG_PATH = "debug-5874e6.log"
+DEBUG_SESSION_ID = "5874e6"
+
+
+def _debug_log(hypothesis_id: str, location: str, message: str, data: dict):
+    payload = {
+        "sessionId": DEBUG_SESSION_ID,
+        "runId": "auto-sms",
+        "hypothesisId": hypothesis_id,
+        "id": f"log_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}",
+        "timestamp": int(time.time() * 1000),
+        "location": location,
+        "message": message,
+        "data": data,
+    }
+    with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(payload, ensure_ascii=True) + "\n")
 
 
 class Command(BaseCommand):
@@ -89,6 +109,20 @@ class Command(BaseCommand):
             return
 
         total_filiais_enviadas = 0
+        # #region agent log
+        _debug_log(
+            "H4",
+            "enviar_sms_automatico.py:handle",
+            "auto_sms_command_started",
+            {
+                "force": force,
+                "dry_run": dry_run,
+                "now_lisbon": now_lisbon.isoformat(),
+                "now_time": now_time.strftime("%H:%M"),
+                "configs_count": configs.count(),
+            },
+        )
+        # #endregion
 
         for cfg in configs:
             filial = cfg.filial
@@ -97,6 +131,18 @@ class Command(BaseCommand):
             if not force:
                 # Só envia se a hora actual de Lisboa já ultrapassou sms_auto
                 if now_time < sms_time:
+                    # #region agent log
+                    _debug_log(
+                        "H4",
+                        "enviar_sms_automatico.py:handle",
+                        "auto_sms_skipped_by_schedule",
+                        {
+                            "filial_id": getattr(filial, "id", None),
+                            "sms_time": sms_time.strftime("%H:%M"),
+                            "now_time": now_time.strftime("%H:%M"),
+                        },
+                    )
+                    # #endregion
                     self.stdout.write(
                         f"  ↷ Filial '{filial}': horário configurado {sms_time.strftime('%H:%M')} "
                         f"ainda não chegou (agora {now_time.strftime('%H:%M')}). Ignorando."

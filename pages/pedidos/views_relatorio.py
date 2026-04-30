@@ -7,6 +7,9 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods, require_POST
 from datetime import datetime
 from itertools import groupby
+import json
+import time
+import uuid
 
 from pages.pedidos.models import TentativaEntrega, Pedido, Devolucao, ESTADOS_SEGUE_PARA_ENTREGA, ESTADO_DEFINITIONS, ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA, MOTIVO_CHOICES
 from pages.motorista.models import Motorista
@@ -14,6 +17,24 @@ from sac_base.permissions_utils import build_action_permissions
 from sac_base.sisvar_builders import build_sisvar_payload
 from sac_base.sms_service import montar_mensagem, enviar_sms_bulkgate, HORARIO_PERIODO as _SMS_HORARIO_PERIODO
 from sac_base.smart_filter import apply_smart_number_filter, apply_smart_text_filter
+
+DEBUG_LOG_PATH = "debug-5874e6.log"
+DEBUG_SESSION_ID = "5874e6"
+
+
+def _debug_log(hypothesis_id: str, location: str, message: str, data: dict):
+    payload = {
+        "sessionId": DEBUG_SESSION_ID,
+        "runId": "manual-sms",
+        "hypothesisId": hypothesis_id,
+        "id": f"log_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}",
+        "timestamp": int(time.time() * 1000),
+        "location": location,
+        "message": message,
+        "data": data,
+    }
+    with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(payload, ensure_ascii=True) + "\n")
 
 PERMISSOES_RELATORIO = {
     "acessar": "pedidos.view_tentativaentrega",
@@ -243,8 +264,19 @@ def relatorio_rotas_view(request):
         qs = qs.order_by("carro", "pedido__codpost_dest", "pedido__pedido")
         key_fn = lambda m: m.carro
 
+    movs = list(qs)
+    pedido_ids = {m.pedido_id for m in movs}
+    pedidos_com_tentativa_posterior = set()
+    if pedido_ids:
+        pedidos_com_tentativa_posterior = set(
+            TentativaEntrega.objects
+            .filter(pedido_id__in=pedido_ids, data_tentativa__gt=dt)
+            .values_list("pedido_id", flat=True)
+            .distinct()
+        )
+
     grupos = []
-    for grupo_key, items in groupby(qs, key=key_fn):
+    for grupo_key, items in groupby(movs, key=key_fn):
         linhas = []
         data_str = None
         motorista_nome = ""
@@ -266,6 +298,8 @@ def relatorio_rotas_view(request):
                     peso_str = str(int(p.peso))
                 except Exception:
                     peso_str = str(p.peso)
+            segue_para_entrega = p.estado in ESTADOS_SEGUE_PARA_ENTREGA
+            tem_tentativa_posterior = p.id in pedidos_com_tentativa_posterior
             linhas.append({
                 "pedido": p.pedido or str(p.id_vonzu),
                 "tipo": tipo_abrev,
@@ -278,7 +312,8 @@ def relatorio_rotas_view(request):
                 "peso": peso_str,
                 "periodo": mov.periodo or "",
                 "obs_rota": p.obs_rota or "",
-                "segue_para_entrega": p.estado in ESTADOS_SEGUE_PARA_ENTREGA,
+                "segue_para_entrega": segue_para_entrega,
+                "nao_segue_para_entrega": (not segue_para_entrega) or tem_tentativa_posterior,
             })
         grupos.append({
             "carro": str(carro_val) if carro_val is not None else "—",
@@ -367,6 +402,7 @@ def relatorio_sms_enviar_view(request):
     data = request.sisvar_front or {}
     ids = data.get("ids", [])
     data_tentativa = data.get("data_tentativa", "").strip()
+    started_at = time.perf_counter()
 
     if not ids:
         return JsonResponse({"success": False, "mensagem": "Nenhum registro selecionado."}, status=400)
@@ -382,6 +418,15 @@ def relatorio_sms_enviar_view(request):
     filial_ativa = getattr(request, "filial_ativa", None)
     if not filial_ativa:
         return JsonResponse({"success": False, "mensagem": "Filial ativa não encontrada na sessão."}, status=403)
+
+    # #region agent log
+    _debug_log(
+        "H1",
+        "views_relatorio.py:relatorio_sms_enviar_view",
+        "manual_sms_request_received",
+        {"ids_count": len(ids), "data_tentativa": data_tentativa, "filial_id": getattr(filial_ativa, "id", None)},
+    )
+    # #endregion
 
     qs = (
         TentativaEntrega.objects
@@ -399,6 +444,14 @@ def relatorio_sms_enviar_view(request):
 
     # Carrega configuração da filial a partir do primeiro registro
     tentativas = list(qs)
+    # #region agent log
+    _debug_log(
+        "H2",
+        "views_relatorio.py:relatorio_sms_enviar_view",
+        "manual_sms_query_loaded",
+        {"tentativas_elegiveis": len(tentativas), "ids_recebidos": len(ids)},
+    )
+    # #endregion
     if not tentativas:
         return JsonResponse({"success": False, "mensagem": "Nenhum registro elegível encontrado."}, status=400)
 
@@ -485,6 +538,21 @@ def relatorio_sms_enviar_view(request):
         partes_resumo.append(f"Total: {enviados}")
         resumo = "\n".join(partes_resumo)
         enviar_sms_bulkgate(filial.numero, resumo, ddi_padrao)
+
+    # #region agent log
+    _debug_log(
+        "H1",
+        "views_relatorio.py:relatorio_sms_enviar_view",
+        "manual_sms_request_finished",
+        {
+            "duracao_ms": int((time.perf_counter() - started_at) * 1000),
+            "enviados": enviados,
+            "erros": erros,
+            "ids_enviados_count": len(ids_enviados),
+            "erros_detalhe_count": len(erros_detalhe),
+        },
+    )
+    # #endregion
 
     return JsonResponse({
         "success": True,
