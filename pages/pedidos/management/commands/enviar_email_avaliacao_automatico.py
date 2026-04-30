@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 from django.core.management.base import BaseCommand
 
 from pages.filial.models import FilialConfig
-from pages.pedidos.models import Pedido, ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA
+from pages.pedidos.models import AvaliacaoPedido, ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA
 from pages.pedidos.views_avaliacao import enviar_email_pedido_avaliacao
 
 LISBON_TZ = ZoneInfo("Europe/Lisbon")
@@ -38,27 +38,30 @@ class Command(BaseCommand):
                 )
                 continue
 
-            self.stdout.write(f"  → Filial '{filial}': processando pedidos concluídos.")
-            pedidos = (
-                Pedido.objects.select_related("filial")
-                .filter(filial=filial, estado__in=ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA)
-                .exclude(email_dest__isnull=True)
-                .exclude(email_dest="")
+            self.stdout.write(f"  → Filial '{filial}': processando fila de avaliações.")
+            avaliacoes = (
+                AvaliacaoPedido.objects.select_related("pedido", "pedido__filial")
+                .filter(
+                    pedido__filial=filial,
+                    selecionado_para_envio=True,
+                    respondido_em__isnull=True,
+                    email_enviado=False,
+                    pedido__estado__in=ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA,
+                )
+                .exclude(pedido__email_dest__isnull=True)
+                .exclude(pedido__email_dest="")
             )
 
             enviados = 0
             erros = 0
-            for pedido in pedidos:
-                avaliacao = getattr(pedido, "avaliacao", None)
-                if avaliacao and (avaliacao.email_enviado or avaliacao.respondido_em):
-                    continue
-
+            for avaliacao in avaliacoes:
+                pedido = avaliacao.pedido
                 if dry_run:
                     self.stdout.write(f"    [DRY-RUN] Pedido {pedido.pedido or pedido.id_vonzu}: elegível para envio.")
                     enviados += 1
                     continue
 
-                retorno = enviar_email_pedido_avaliacao(pedido=pedido)
+                retorno = enviar_email_pedido_avaliacao(avaliacao=avaliacao)
                 if retorno.get("sucesso"):
                     enviados += 1
                     self.stdout.write(f"    Pedido {pedido.pedido or pedido.id_vonzu}: e-mail enviado.")

@@ -24,6 +24,9 @@
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="tab-inc" data-bs-toggle="tab" data-bs-target="#inc" type="button" role="tab">INCIDÊNCIAS</button>
     </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-avaliacao" data-bs-toggle="tab" data-bs-target="#avaliacao" type="button" role="tab">AVALIAÇÃO</button>
+    </li>
   </ul>
 
   <form id="cadPedido" data-form-lock="cadPedido" method="POST">
@@ -238,6 +241,82 @@
               </thead>
               <tbody id="tabela-inc-corpo"></tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-pane fade" id="avaliacao" role="tabpanel">
+        <div class="container-xl my-3 mx-auto">
+          <div class="row g-3">
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0">ID Avaliação</label>
+              <input id="av-id" class="form-control" disabled>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0">E-mail Enviado</label>
+              <input id="av-email-enviado" class="form-control" disabled>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0">Data Envio</label>
+              <input id="av-email-enviado-em" class="form-control" disabled>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0">Tentativas</label>
+              <input id="av-email-tentativas" class="form-control" disabled>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0">Link Ativo</label>
+              <input id="av-link-ativo" class="form-control" disabled>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0">Respondido em</label>
+              <input id="av-respondido-em" class="form-control" disabled>
+            </div>
+            <div class="col-12"><hr class="my-1"></div>
+            <div class="col-12 col-md-6">
+              <label class="form-label mb-0">1. Entrega no prazo</label>
+              <input id="av-p1" class="form-control" disabled>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label mb-0">2. Aviso antes da chegada</label>
+              <input id="av-p2" class="form-control" disabled>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0">3. Educação/simpatia</label>
+              <input id="av-p3" class="form-control" disabled>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0">4. Cuidado encomenda</label>
+              <input id="av-p4" class="form-control" disabled>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0">5. Equipa identificada</label>
+              <input id="av-p5" class="form-control" disabled>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0">6. Facilidade do processo</label>
+              <input id="av-p6" class="form-control" disabled>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0">7. Veículo limpo</label>
+              <input id="av-p7" class="form-control" disabled>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0">8. Esclareceu dúvidas</label>
+              <input id="av-p8" class="form-control" disabled>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label mb-0">9. Satisfação geral</label>
+              <input id="av-p9" class="form-control" disabled>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label mb-0">10. Recomendaria</label>
+              <input id="av-p10" class="form-control" disabled>
+            </div>
+            <div class="col-12">
+              <label class="form-label mb-0">Comentário</label>
+              <textarea id="av-comentario" class="form-control" rows="4" disabled></textarea>
+            </div>
           </div>
         </div>
       </div>

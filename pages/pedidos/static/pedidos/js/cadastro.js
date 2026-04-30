@@ -755,6 +755,12 @@ function aplicarTravasImportados() {
       }
     }
   });
+
+  // Campos de avaliação são sempre somente leitura visual (disabled),
+  // independentemente do estado do formulário (novo/editar/visualizar).
+  form.querySelectorAll('#avaliacao input, #avaliacao textarea, #avaliacao select').forEach(el => {
+    el.disabled = true;
+  });
 }
 
 function renderMovimentacoes(registros = []) {
@@ -978,6 +984,63 @@ function aplicarPermissoesNaInterface() {
   aplicarTravasIncidencias();
 }
 
+function formatarDataHoraIso(valor) {
+  if (!valor) return '';
+  const dt = new Date(valor);
+  if (Number.isNaN(dt.getTime())) return valor;
+  const dd = String(dt.getDate()).padStart(2, '0');
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const yyyy = dt.getFullYear();
+  const hh = String(dt.getHours()).padStart(2, '0');
+  const mi = String(dt.getMinutes()).padStart(2, '0');
+  return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+}
+
+function renderAvaliacao(av = null) {
+  const setVal = (id, v) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = v ?? '';
+  };
+  if (!av) {
+    setVal('av-id', '');
+    setVal('av-email-enviado', '');
+    setVal('av-email-enviado-em', '');
+    setVal('av-email-tentativas', '');
+    setVal('av-link-ativo', '');
+    setVal('av-respondido-em', '');
+    setVal('av-p1', '');
+    setVal('av-p2', '');
+    setVal('av-p3', '');
+    setVal('av-p4', '');
+    setVal('av-p5', '');
+    setVal('av-p6', '');
+    setVal('av-p7', '');
+    setVal('av-p8', '');
+    setVal('av-p9', '');
+    setVal('av-p10', '');
+    setVal('av-comentario', '');
+    return;
+  }
+  setVal('av-id', av.id || '');
+  setVal('av-email-enviado', av.email_enviado ? 'Sim' : 'Não');
+  setVal('av-email-enviado-em', formatarDataHoraIso(av.email_enviado_em));
+  setVal('av-email-tentativas', av.email_tentativas ?? 0);
+  setVal('av-link-ativo', av.link_ativo ? 'Sim' : 'Não');
+  setVal('av-respondido-em', formatarDataHoraIso(av.respondido_em));
+  setVal('av-p1', av.p1_entrega_no_prazo || '');
+  setVal('av-p2', av.p2_aviso_antes_chegada || '');
+  setVal('av-p3', av.p3_educacao_simpatia ?? '');
+  setVal('av-p4', av.p4_cuidado_encomenda ?? '');
+  setVal('av-p5', av.p5_equipa_identificada || '');
+  setVal('av-p6', av.p6_facilidade_processo ?? '');
+  setVal('av-p7', av.p7_veiculo_limpo || '');
+  setVal('av-p8', av.p8_esclareceu_duvidas || '');
+  setVal('av-p9', av.p9_satisfacao_geral ?? '');
+  setVal('av-p10', av.p10_recomendaria || '');
+  setVal('av-comentario', av.comentario || '');
+}
+
 const updater = criarAtualizadorForm({ formId: nomeForm, setter: updateFormField, form });
 form.addEventListener('input', updater);
 form.addEventListener('change', updater);
@@ -1006,6 +1069,7 @@ document.addEventListener('DOMContentLoaded', () => {
   carregarMovimentacoes();
   carregarDevolucoes();
   carregarIncidencias();
+  renderAvaliacao(getDataBackEnd()?.avaliacao || null);
 
   const areaCadastro = document.getElementById('area-cadastro');
   const divPesquisa = document.getElementById('div-pesquisa');
@@ -1030,6 +1094,7 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarMovimentacoes();
     carregarDevolucoes();
     carregarIncidencias();
+    renderAvaliacao(null);
     aplicarPermissoesNaInterface();
   });
 
@@ -1060,6 +1125,7 @@ document.addEventListener('DOMContentLoaded', () => {
     await carregarMovimentacoes();
     await carregarDevolucoes();
     await carregarIncidencias();
+    renderAvaliacao(resultado.data?.avaliacao || null);
     aplicarPermissoesNaInterface();
   });
 
@@ -1109,6 +1175,7 @@ document.addEventListener('DOMContentLoaded', () => {
       await carregarMovimentacoes();
       await carregarDevolucoes();
       await carregarIncidencias();
+      renderAvaliacao(resultado.data?.avaliacao || null);
       alternar();
       aplicarPermissoesNaInterface();
     } finally {
@@ -1140,6 +1207,7 @@ document.addEventListener('DOMContentLoaded', () => {
       await carregarMovimentacoes();
       await carregarDevolucoes();
       await carregarIncidencias();
+      renderAvaliacao(resultado.data?.avaliacao || null);
       updateFormField(nomeCons, 'id_selecionado', null);
       alternar();
       aplicarPermissoesNaInterface();

@@ -1,0 +1,89 @@
+# IMPORTANT: You are an agent specialized in the SisVar Django Logistics Ecosystem.
+# SAC Base — Cursor agent rules
+
+When writing or editing code in this repository, follow these rules. If anything conflicts, priority is: **Security > Architecture > UI**.
+
+Reference implementations: `pages/usuario/views.py` (`cadastro_view`), `pages/pedidos/views.py` (after refactor), matching templates and page JS.
+
+For full Heroku env lists, scheduler jobs, and long checklists, see `.github/copilot-instructions.md`.
+
+---
+
+## Architecture and flow (SisVar)
+
+- Stack: **Django MTV** + **vanilla JS SPA** behaviour: GET renders HTML + initial state; POST returns **`JsonResponse`** payloads.
+- **SisVar** owns client-side state: views set `request.sisvar_extra`; `context_processors` merges; `base.html` exposes `#sisDados`; `sisVar.js` drives forms and messages.
+- Keep **views thin**: permission checks, parse request, call **services** for transactions and domain rules, return builders (`build_form_response`, `build_error_payload`, `build_records_response`, `build_sisvar_payload`).
+- **Early returns**: validate method, auth, filial, payload shape first; return 4xx immediately; avoid deep nesting.
+- **No DRY violations**: if logic is shared across apps or HTTP + CSV, put it in a global helper (see “Reuse map” below). Do not add thin wrappers that only forward to those helpers.
+
+### View layer boundary (MUST)
+
+- **Views** must only: parse the request (method, body, query), enforce auth/permission hooks, delegate to a **Service** or **Builder**, and format the HTTP/JSON response.
+- **All business logic, ORM queries, and non-trivial validation** MUST live in **Service** or **Builder** classes/modules — not in the view function body.
+- **Hard limit**: if a view function contains **more than 15 lines of logic** (anything beyond trivial guards, a single service call, and `return JsonResponse(...)` / `render(...)`), that is a **violation** — extract to a service/builder until the view is a thin orchestration layer. (Decorator lines and blank lines do not count toward “logic”.)
+
+### Tenant isolation on database access (MUST — critical)
+
+- Every **ORM query** that reads or writes **tenant-scoped** data MUST apply **branch isolation**: filter by `filial_id`, `filial`, `pedido__filial`, `filial_id__in` from the user’s allowed set, and/or **`request.filial_ativa`** (or equivalent write-scope helper such as `get_filiais_escrita_queryset` / `obter_filial_escrita`) as the domain requires.
+- Issuing a tenant-scoped query **without** an explicit filial / filial_id constraint is a **critical security failure**. Exceptions are rare (e.g. global auth tables, superuser-only admin); they must be **documented in code** next to the query.
+
+### Backend reuse map (MUST use when applicable)
+
+| Concern | Module / symbol |
+|--------|------------------|
+| Parse ints, dates, decimals, datetimes (form vs CSV) | `sac_base.coercion` — `parse_int(..., context="form"\|"csv")`, `parse_date`, `parse_decimal`, `parse_datetime` |
+| JSON 405 wrong method | `sac_base.http_json.json_method_not_allowed` |
+| Permissions on actions | `sac_base.permissions_utils` — `build_action_permissions`, `permission_denied_response`, `extract_validation_messages` |
+| Smart grid filters | `sac_base.smart_filter` |
+| Filial write scope | `pages.filial.services` — `get_filiais_escrita_queryset`, `obter_filial_escrita` |
+| Form field schema validation | `sac_base.form_validador.SchemaValidator` (supports string types incl. boolean; string booleans like `"true"`/`"false"` are accepted where configured) |
+| SisVar JSON builders | `sac_base.sisvar_builders` |
+| Pedido form persistence + extra payload | `pages.pedidos.services.pedido_form`, `pages.pedidos.serializers` — do not duplicate `TRAVAS_IMPORTADOS` or serialize blocks in views |
+
+### Python style (MUST)
+
+- **PEP 8**: `snake_case` for functions, variables, modules; `PascalCase` for classes; `UPPER_SNAKE` for module-level constants.
+- **Naming**: Portuguese for domain nouns (`pedido`, `filial`); short English for cross-cutting utils (`parse_int`, `build_error_payload`).
+- **Public vs private**: reusable symbols in `sac_base` without a leading underscore; package-private helpers may use one leading `_`.
+
+### Exceptions and external I/O (MUST)
+
+- Do not use bare `except Exception:` for control flow except where documented (e.g. optional JWT blacklist on logout).
+- **HTTP clients (`requests`)**: catch `requests.RequestException`; for `.json()`, catch `ValueError` separately when you need a clear message.
+- **DB saves**: catch `ValidationError`, `IntegrityError`, `DatabaseError`; log DB failures with **`logging.error(e, exc_info=True)`** (or `logger.error(..., exc_info=True)` on a module logger) — **never** `print(e)`. Then return a **generic** user message — never leak raw DB or internal exception strings to the client.
+- **Invalid query params** (dates, ids): validate with `coercion` helpers; return **400** with a clear message instead of silently ignoring bad input.
+
+### Multi-tenant / IDOR (MUST)
+
+- Aligns with **Tenant isolation on database access** above: resolve **`request.filial_ativa`** where applicable (set in `JWTAuthMiddleware`); if the endpoint requires an active branch and it is missing, return **403** JSON with `build_error_payload`.
+
+### Frontend (SHOULD / MUST where noted)
+
+- **MUST**: validate in layers — HTML → JS → backend; schema aligned across view, template, and page script.
+- **MUST**: treat server data as untrusted in JS — prefer `createElement` + `textContent`; escape if HTML is needed; avoid `innerHTML` with raw user/server strings.
+- **MUST**: reuse global scripts (`base.js`, `sisVar.js`, `screen_permissions.js`, `input_rules.js`, `conditional_select.js`, `loader.js`, `smart_filter.js`) instead of copying patterns.
+- **MUST**: mobile-first Bootstrap; `data-show-on` for button visibility; `#div-pesquisa` pattern for search container where applicable.
+
+### Security reminders (MUST)
+
+- Login: rate limit (e.g. 5 attempts / IP / 5 minutes via cache) — already implemented; preserve when touching auth.
+- JWT refresh blacklist on password change / logout where applicable.
+- Safe pagination caps (e.g. `page_size` max 200).
+- Respect CSP middleware; avoid widening CSP without justification.
+
+---
+
+## Change discipline
+
+- Touch only files and lines needed for the task; no drive-by refactors or unrelated formatting.
+- Do not add markdown docs unless the user asks.
+- After substantive Python changes, run `python manage.py check` and relevant tests when possible.
+
+---
+
+## Agent behaviour in Cursor
+
+- Prefer implementing changes in the repo over only describing steps.
+- **Before creating any utility** for HTTP, JSON, or permissions, the agent **MUST** search existing code — at minimum: **`sac_base/`** (shared utilities), **`sac_base/sisvar_builders.py`**, any app-level **`utils/`** packages (e.g. `pages/*/utils/` if present), and **`pages/*/services/`**. Do **not** reinvent helpers that already exist under other names.
+- Keep answers concise; cite existing code with proper code references when explaining behaviour. If unsure where a utility belongs, ask the user for the location of existing helpers before generating new ones

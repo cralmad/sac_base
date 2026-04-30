@@ -1,8 +1,6 @@
 import csv
 import io
 import re
-from datetime import datetime
-from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
 from django.utils import timezone
@@ -10,6 +8,7 @@ from django.utils import timezone
 from pages.cad_cliente.models import Cliente
 from pages.motorista.models import Motorista
 from pages.pedidos.models import Pedido, TentativaEntrega
+from sac_base.coercion import parse_date, parse_datetime, parse_decimal, parse_int
 
 from .normalizacao import normalizar_estado
 
@@ -73,45 +72,6 @@ def _parse_csv_bytes(conteudo_bytes):
     return [(i + 2, dict(row)) for i, row in enumerate(reader)]
 
 
-def _parse_datetime(valor):
-    if not valor or not valor.strip():
-        return None
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
-        try:
-            naive = datetime.strptime(valor.strip(), fmt)
-            return timezone.make_aware(naive)
-        except ValueError:
-            continue
-    return None
-
-
-def _parse_date(valor):
-    if not valor or not valor.strip():
-        return None
-    try:
-        return datetime.strptime(valor.strip(), "%Y-%m-%d").date()
-    except ValueError:
-        return None
-
-
-def _parse_decimal(valor):
-    if not valor or not valor.strip():
-        return None
-    try:
-        return Decimal(valor.strip().replace(",", "."))
-    except InvalidOperation:
-        return None
-
-
-def _parse_int(valor):
-    if not valor or not valor.strip():
-        return None
-    try:
-        return int(float(valor.strip().replace(",", ".")))
-    except (ValueError, TypeError):
-        return None
-
-
 def _normalizar_linha(num_linha, row):
     """Normaliza e valida uma linha do CSV.
 
@@ -132,12 +92,12 @@ def _normalizar_linha(num_linha, row):
         erros.append(f"Linha {num_linha}: tipo inválido — '{tipo_raw}' (esperado: delivery ou pickup)")
         return None, erros
 
-    criado = _parse_datetime(row.get("Data criação"))
+    criado = parse_datetime(row.get("Data criação"), context="csv")
     if criado is None:
         erros.append(f"Linha {num_linha}: 'Data criação' inválida — '{row.get('Data criação')}'")
         return None, erros
 
-    atualizacao = _parse_datetime(row.get("Data actualização"))
+    atualizacao = parse_datetime(row.get("Data actualização"), context="csv")
     if atualizacao is None:
         erros.append(f"Linha {num_linha}: 'Data actualização' inválida — '{row.get('Data actualização')}'")
         return None, erros
@@ -148,10 +108,10 @@ def _normalizar_linha(num_linha, row):
         "tipo": tipo,
         "criado": criado,
         "atualizacao": atualizacao,
-        "prev_entrega": _parse_date(row.get("*Data")),
-        "dt_entrega": _parse_date(row.get("Data entrega")),
+        "prev_entrega": parse_date(row.get("*Data")),
+        "dt_entrega": parse_date(row.get("Data entrega")),
         "estado": normalizar_estado(row.get("Estado")),
-        "volume": _parse_int(row.get("Embalagens")),
+        "volume": parse_int(row.get("Embalagens"), context="csv"),
         "nome_dest": (row.get("*Nome destinatário") or "").strip() or None,
         "email_dest": (row.get("Email destinatário") or "").strip() or None,
         "fone_dest": (row.get("Telefone destinatário") or "").strip() or None,
@@ -162,7 +122,7 @@ def _normalizar_linha(num_linha, row):
         "obs": (row.get("Comentários") or "").strip() or None,
         "nome_cliente_csv": (row.get("Nome cliente") or "").strip() or None,
         "nome_motorista_csv": (row.get("Nome utilizador condutor") or "").strip() or None,
-        "peso": _parse_decimal(row.get("Peso")),
+        "peso": parse_decimal(row.get("Peso"), context="csv"),
         "expresso": str(row.get("Expresso") or "").strip().lower() in {"1", "true", "sim", "s", "yes", "y"},
         "description_raw": (row.get("Description") or "").strip(),
     }, []
@@ -452,7 +412,7 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
                                 estado=p.estado,
                                 motorista_id=p.motorista_id,
                                 dt_entrega=p.dt_entrega,
-                                periodo="MANHA",
+                                periodo="TARDE",
                             )
                         )
                         tentativas += 1

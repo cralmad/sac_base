@@ -40,9 +40,16 @@ class SchemaValidator:
                 except (TypeError, ValueError):
                     self._add_error(field, "Valor inteiro inválido")
 
-            # 6. Booleans (Ex: "ativo")
-            if rules.get('type') == 'boolean' and not isinstance(value, bool):
-                self._add_error(field, "Valor booleano inválido")
+            # 6. Booleans (JSON pode enviar string "true"/"false")
+            if rules.get('type') == 'boolean':
+                if isinstance(value, bool):
+                    pass
+                elif isinstance(value, str) and value.lower() in (
+                    'true', 'false', '1', '0', 'yes', 'no', 'sim', 'não', 'nao',
+                ):
+                    pass
+                else:
+                    self._add_error(field, "Valor booleano inválido")
 
         return len(self.errors) == 0
 

@@ -1,4 +1,5 @@
 import { confirmar, getCsrfToken } from "/static/js/sisVar.js";
+import { AppLoader } from "/static/js/loader.js";
 
 const root = document.getElementById("rel-av-root");
 if (!root) {
@@ -56,6 +57,7 @@ if (!root) {
   async function enviarSelecionados(selecionados) {
     btnEnviar.disabled = true;
     renderMsg("aviso", "Enviando e-mails selecionados...");
+    AppLoader.show();
     try {
       const resp = await fetch(urlLote, {
         method: "POST",
@@ -76,6 +78,8 @@ if (!root) {
     } catch (err) {
       renderMsg("erro", "Erro de comunicação ao disparar envio em lote.");
       btnEnviar.disabled = false;
+    } finally {
+      AppLoader.hide();
     }
   }
 

@@ -178,15 +178,16 @@ page_size = max(1, min(int(data.get("page_size", 30)), 200))
 
 ### Avaliacoes e e-mails automaticos
 Fluxo funcional da pesquisa de satisfacao:
-- cada `Pedido` concluido pode gerar 1 `AvaliacaoPedido`;
-- o envio do e-mail cria/usa token publico unico por pedido;
+- a fila deve ser gerada manualmente no relatorio por data (`prev_entrega`);
+- apenas pedidos selecionados entram em `AvaliacaoPedido` (1 por pedido);
+- o envio do e-mail usa apenas registros pre-gerados na fila;
 - o cliente responde via link publico (`/app/logistica/avaliacao/<token>/`);
 - apos resposta, o link e inativado (`link_ativo=False`) e nao permite novo envio.
 
 Comando automatico:
 - `pages/pedidos/management/commands/enviar_email_avaliacao_automatico.py`;
 - processa por filial conforme `FilialConfig.email_auto`;
-- respeita fila (pendentes sem `email_enviado`) e evita duplicidade;
+- processa somente fila pre-gerada (`selecionado_para_envio=True`, pendentes sem `email_enviado`) e evita duplicidade;
 - flags de apoio: `--dry-run` (simula) e `--force` (ignora horario).
 
 ### Variaveis essenciais de e-mail (Gmail SMTP)

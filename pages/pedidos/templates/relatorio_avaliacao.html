@@ -30,6 +30,13 @@
       </button>
     </div>
     {% endif %}
+    {% if pode_gerar %}
+    <div class="col-12 col-md-3">
+      <a href="{% url 'relatorio_avaliacao_geracao' %}" class="btn btn-outline-primary w-100">
+        Gerar fila por data
+      </a>
+    </div>
+    {% endif %}
   </form>
 
   <div class="table-responsive">

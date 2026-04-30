@@ -149,12 +149,12 @@ def logout_view(request):
 @permission_required(PERMISSOES_USUARIO["acessar"], raise_exception=True)
 def cadastro_view(request):
     template = "usuario.html"
-    nomeForm = "cadUsuario"
-    nomeFormCons = "consUsuario"
+    nome_form = "cadUsuario"
+    nome_form_cons = "consUsuario"
     acoes_permitidas = build_action_permissions(getattr(request, "user", None), PERMISSOES_USUARIO)
 
     schema = {
-        nomeForm: {
+        nome_form: {
             "username":    {'type': 'string',  'maxlength': 20, 'minlength': 3, 'required': True,  'value': ''},
             "first_name":  {'type': 'string',  'maxlength': 30, 'minlength': 3, 'required': True,  'value': ''},
             "email":       {'type': 'string',  'maxlength': 60, 'required': True,  'value': ''},
@@ -162,7 +162,7 @@ def cadastro_view(request):
             "confirmpass": {'type': 'password', 'required': True,  'value': ''},
             "ativo":       {'type': 'boolean', 'required': False, 'value': None}
         },
-        nomeFormCons: {
+        nome_form_cons: {
             "username_cons": {'type': 'string', 'maxlength': 20},
             "first_name_cons":{'type': 'string', 'maxlength': 30},
             "email_cons": {'type': 'string', 'maxlength': 60},
@@ -176,7 +176,7 @@ def cadastro_view(request):
         request.sisvar_extra = build_sisvar_payload(
             schema=schema,
             forms={
-                nomeForm: build_form_state(
+                nome_form: build_form_state(
                     estado="novo" if acoes_permitidas["incluir"] else "visualizar",
                     campos={
                         "id": None,
@@ -188,7 +188,7 @@ def cadastro_view(request):
                         "ativo": None,
                     },
                 ),
-                nomeFormCons: build_form_state(
+                nome_form_cons: build_form_state(
                     campos={
                         "username_cons": "",
                         "first_name_cons": "",
@@ -205,8 +205,8 @@ def cadastro_view(request):
         return render(request, template)
 
     # ---------- POST ----------
-    dataFront = request.sisvar_front
-    form      = dataFront.get("form", {}).get(nomeForm, {})
+    data_front = request.sisvar_front
+    form      = data_front.get("form", {}).get(nome_form, {})
     campos    = form.get("campos", {})
     estado    = form.get("estado", "")
 
@@ -217,7 +217,7 @@ def cadastro_view(request):
         return permission_denied_response("Você não possui permissão para editar usuários.")
 
     # Validação de schema #####################################################
-    validator = SchemaValidator(schema[nomeForm])
+    validator = SchemaValidator(schema[nome_form])
     if not validator.validate(campos):
         errosForm = [
             f"{campo} - {', '.join(erros)}"
@@ -302,7 +302,7 @@ def cadastro_view(request):
 
     # ===== RESPOSTA JSON =====
     return JsonResponse(build_form_response(
-        form_id=nomeForm,
+        form_id=nome_form,
         estado="visualizar",
         update=usuario.date_joined,
         campos={
@@ -319,10 +319,10 @@ def cadastro_view(request):
 
 def alterar_senha_view(request):
     template = "alterarsenha.html"
-    nomeForm = "alterarSenhaForm"
+    nome_form = "alterarSenhaForm"
 
     schema = {
-        nomeForm: {
+        nome_form: {
             'senha_atual':     {'type': 'password', 'required': True},
             'nova_senha':      {'type': 'password', 'required': True},
             'confirmar_senha': {'type': 'password', 'required': True}
@@ -334,7 +334,7 @@ def alterar_senha_view(request):
         request.sisvar_extra = build_sisvar_payload(
             schema=schema,
             forms={
-                nomeForm: build_form_state(
+                nome_form: build_form_state(
                     estado="editar",
                     campos={
                         "senha_atual": "",
@@ -356,7 +356,7 @@ def alterar_senha_view(request):
 
     try:
         payload       = request.sisvar_front
-        form          = payload.get("form", {}).get(nomeForm, {})
+        form          = payload.get("form", {}).get(nome_form, {})
         campos        = form.get("campos", {})
         senha_atual   = campos.get("senha_atual")
         nova_senha    = campos.get("nova_senha")
@@ -365,7 +365,7 @@ def alterar_senha_view(request):
         return JsonResponse(build_error_payload("Payload inválido"), status=400)
 
     # Validação de schema #####################################################
-    validator = SchemaValidator(schema[nomeForm])
+    validator = SchemaValidator(schema[nome_form])
     if not validator.validate(campos):
         errosForm = [
             f"{campo} - {', '.join(erros)}"
@@ -412,7 +412,7 @@ def alterar_senha_view(request):
     )
 
     return JsonResponse(build_form_response(
-        form_id=nomeForm,
+        form_id=nome_form,
         estado="editar",
         update=None,
         campos={
@@ -426,14 +426,14 @@ def alterar_senha_view(request):
 
 @permission_required(PERMISSOES_USUARIO["consultar"], raise_exception=True)
 def cadastro_cons_view(request):
-    nomeForm     = "cadUsuario"
-    nomeFormCons = "consUsuario"
+    nome_form = "cadUsuario"
+    nome_form_cons = "consUsuario"
 
     if request.method != "POST":
         return JsonResponse(build_error_payload("Método não permitido."), status=405)
 
-    dataFront = request.sisvar_front
-    form      = dataFront.get("form", {}).get(nomeFormCons, {})
+    data_front = request.sisvar_front
+    form      = data_front.get("form", {}).get(nome_form_cons, {})
     campos    = form.get("campos", {})
 
     id_selecionado = int(campos.get('id_selecionado') or 0)
@@ -443,7 +443,7 @@ def cadastro_cons_view(request):
             # is_superuser=False garante que superusuários nunca sejam retornados
             usuario = Usuarios.objects.get(id=id_selecionado, is_superuser=False)
             return JsonResponse(build_form_response(
-                form_id=nomeForm,
+                form_id=nome_form,
                 estado="visualizar",
                 update=usuario.date_joined,
                 campos={

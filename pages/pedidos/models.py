@@ -172,6 +172,10 @@ class Pedido(AuditFieldsMixin, models.Model):
 
 
 class AvaliacaoPedido(models.Model):
+    ORIGEM_GERACAO_CHOICES = [
+        ("MANUAL_RELATORIO", "Manual via Relatório"),
+    ]
+
     id = models.BigAutoField(primary_key=True)
     pedido = models.OneToOneField(
         Pedido,
@@ -180,6 +184,8 @@ class AvaliacaoPedido(models.Model):
         related_name="avaliacao",
     )
     token_publico = models.CharField(max_length=512, unique=True, null=True, blank=True)
+    origem_geracao = models.CharField(max_length=30, choices=ORIGEM_GERACAO_CHOICES, default="MANUAL_RELATORIO")
+    selecionado_para_envio = models.BooleanField(default=True)
     link_ativo = models.BooleanField(default=True)
     email_enviado = models.BooleanField(default=False)
     email_enviado_em = models.DateTimeField(null=True, blank=True)
@@ -205,6 +211,7 @@ class AvaliacaoPedido(models.Model):
             models.Index(fields=["email_enviado"]),
             models.Index(fields=["link_ativo"]),
             models.Index(fields=["respondido_em"]),
+            models.Index(fields=["selecionado_para_envio"]),
         ]
 
     def __str__(self):
@@ -245,6 +252,7 @@ class TentativaEntrega(models.Model):
             ("view_relatorio_gerencial", "Pode acessar o Relatório Gerencial de Pedidos"),
             ("view_relatorio_avaliacao", "Pode acessar o Relatório de Avaliações"),
             ("send_email_avaliacao", "Pode enviar e-mails de avaliação"),
+            ("generate_email_queue_avaliacao", "Pode gerar fila de e-mails de avaliação"),
         ]
         indexes = [
             models.Index(fields=["pedido", "data_tentativa"]),
