@@ -1,17 +1,28 @@
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.paginator import Paginator
-from django.db.models import F, Count
+from django.db.models import Count, F
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods, require_POST
 from datetime import datetime
+from collections import defaultdict
 from itertools import groupby
 import json
 import time
 import uuid
 
-from pages.pedidos.models import TentativaEntrega, Pedido, Devolucao, ESTADOS_SEGUE_PARA_ENTREGA, ESTADO_DEFINITIONS, ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA, MOTIVO_CHOICES
+from pages.pedidos.models import (
+    TentativaEntrega,
+    Pedido,
+    Devolucao,
+    ESTADOS_SEGUE_PARA_ENTREGA,
+    ESTADO_DEFINITIONS,
+    ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA,
+    MOTIVO_CHOICES,
+    estado_segue_para_entrega,
+    exclude_tentativas_com_data_posterior,
+)
 from pages.motorista.models import Motorista
 from sac_base.permissions_utils import build_action_permissions
 from sac_base.sisvar_builders import build_sisvar_payload
@@ -298,7 +309,7 @@ def relatorio_rotas_view(request):
                     peso_str = str(int(p.peso))
                 except Exception:
                     peso_str = str(p.peso)
-            segue_para_entrega = p.estado in ESTADOS_SEGUE_PARA_ENTREGA
+            segue_para_entrega = estado_segue_para_entrega(mov.estado)
             tem_tentativa_posterior = p.id in pedidos_com_tentativa_posterior
             linhas.append({
                 "pedido": p.pedido or str(p.id_vonzu),
@@ -374,10 +385,23 @@ def relatorio_sms_view(request):
         .order_by("pedido__codpost_dest", "pedido__pedido")
     )
 
+    movs = list(qs)
+    pedido_ids = {m.pedido_id for m in movs}
+    pedidos_com_tentativa_posterior = set()
+    if pedido_ids:
+        pedidos_com_tentativa_posterior = set(
+            TentativaEntrega.objects
+            .filter(pedido_id__in=pedido_ids, data_tentativa__gt=dt)
+            .values_list("pedido_id", flat=True)
+            .distinct()
+        )
+
     registros = []
-    for mov in qs:
+    for mov in movs:
         pedido = mov.pedido
         fones = [f for f in [pedido.fone_dest or "", pedido.fone_dest2 or ""] if f]
+        segue_tentativa = estado_segue_para_entrega(mov.estado)
+        tem_posterior = pedido.id in pedidos_com_tentativa_posterior
         registros.append({
             "id": mov.id,
             "sms_enviado": mov.sms_enviado,
@@ -388,7 +412,7 @@ def relatorio_sms_view(request):
             "volume": pedido.volume,
             "peso": str(pedido.peso) if pedido.peso is not None else "",
             "periodo": mov.periodo or "",
-            "segue_para_entrega": pedido.estado in ESTADOS_SEGUE_PARA_ENTREGA,
+            "segue_para_entrega": segue_tentativa and not tem_posterior,
         })
 
     return JsonResponse({"success": True, "registros": registros, "data_fmt": dt.strftime("%d/%m/%Y")})
@@ -428,7 +452,7 @@ def relatorio_sms_enviar_view(request):
     )
     # #endregion
 
-    qs = (
+    qs = exclude_tentativas_com_data_posterior(
         TentativaEntrega.objects
         .select_related(
             "pedido",
@@ -437,7 +461,7 @@ def relatorio_sms_enviar_view(request):
             "pedido__filial__pais_atuacao",
         )
         .filter(id__in=ids, sms_enviado=False, pedido__filial=filial_ativa)
-        .filter(pedido__estado__in=ESTADOS_SEGUE_PARA_ENTREGA)
+        .filter(estado__in=ESTADOS_SEGUE_PARA_ENTREGA)
         .exclude(periodo__isnull=True)
         .exclude(periodo="")
     )
@@ -715,6 +739,13 @@ def relatorio_gerencial_view(request):
             .values_list("pedido_id", "cnt")
         )
 
+    datas_por_pedido = defaultdict(set)
+    if pedido_ids:
+        for pid, d in TentativaEntrega.objects.filter(pedido_id__in=pedido_ids).values_list(
+            "pedido_id", "data_tentativa"
+        ):
+            datas_por_pedido[pid].add(d)
+
     grupos = []
     for carro_val, items in groupby(movs, key=lambda m: m.carro):
         linhas = []
@@ -737,6 +768,8 @@ def relatorio_gerencial_view(request):
                 armazem = "SIM" if (estado_concluido and dev_count == 0) else ""
             else:
                 armazem = ""
+            datas_ped = datas_por_pedido.get(p.id, ())
+            tem_tentativa_posterior = any(td > mov.data_tentativa for td in datas_ped)
             linhas.append({
                 "pedido_id":      p.id,
                 "pedido":         p.pedido or str(p.id_vonzu),
@@ -751,7 +784,7 @@ def relatorio_gerencial_view(request):
                 "mov":            mov_count,
                 "dev":            dev_count,
                 "armazem":        armazem,
-                "segue_para_entrega": p.estado in ESTADOS_SEGUE_PARA_ENTREGA,
+                "segue_para_entrega": estado_segue_para_entrega(mov.estado) and not tem_tentativa_posterior,
             })
             if armazem_filtro == "sim" and armazem != "SIM":
                 linhas.pop()

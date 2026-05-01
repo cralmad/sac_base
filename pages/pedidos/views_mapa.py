@@ -15,7 +15,7 @@ from django.views.decorators.csrf import csrf_protect, csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
 from datetime import datetime, time as dt_time
 
-from pages.pedidos.models import Pedido, TentativaEntrega, ESTADOS_SEGUE_PARA_ENTREGA
+from pages.pedidos.models import Pedido, TentativaEntrega, estado_segue_para_entrega
 from sac_base.permissions_utils import build_action_permissions
 from sac_base.sisvar_builders import build_sisvar_payload
 
@@ -348,7 +348,7 @@ def mapa_pontos_view(request):
                 "geocoding_display": pedido.geocoding_display or "",
                 "geocoding_precision": pedido.geocoding_precision or "",
                 "segue_para_entrega": (
-                    (pedido.estado in ESTADOS_SEGUE_PARA_ENTREGA)
+                    estado_segue_para_entrega(mov.estado)
                     and (pedido.id not in pedidos_com_tentativa_posterior)
                 ),
                 "updated_at": mov.updated_at.isoformat(),
@@ -647,7 +647,7 @@ def mapa_publico_pontos_view(request, token):
                 "periodo": mov.periodo or "",
                 "cor": cor,
                 "segue_para_entrega": (
-                    (pedido.estado in ESTADOS_SEGUE_PARA_ENTREGA)
+                    estado_segue_para_entrega(mov.estado)
                     and (pedido.id not in pedidos_com_tentativa_posterior)
                 ),
             },

@@ -29,7 +29,11 @@ from zoneinfo import ZoneInfo
 from django.core.management.base import BaseCommand
 
 from pages.filial.models import FilialConfig
-from pages.pedidos.models import TentativaEntrega, ESTADOS_SEGUE_PARA_ENTREGA
+from pages.pedidos.models import (
+    ESTADOS_SEGUE_PARA_ENTREGA,
+    TentativaEntrega,
+    exclude_tentativas_com_data_posterior,
+)
 from sac_base.sms_service import (
     HORARIO_PERIODO,
     enviar_sms_bulkgate,
@@ -179,14 +183,12 @@ class Command(BaseCommand):
             if codigo_tel:
                 ddi_padrao = codigo_tel
 
-        qs = (
-            TentativaEntrega.objects
-            .select_related("pedido", "pedido__filial")
-            .filter(
+        qs = exclude_tentativas_com_data_posterior(
+            TentativaEntrega.objects.select_related("pedido", "pedido__filial").filter(
                 pedido__filial=filial,
                 data_tentativa=today,
                 sms_enviado=False,
-                pedido__estado__in=ESTADOS_SEGUE_PARA_ENTREGA,
+                estado__in=ESTADOS_SEGUE_PARA_ENTREGA,
             )
             .exclude(periodo__isnull=True)
             .exclude(periodo="")

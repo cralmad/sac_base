@@ -131,6 +131,7 @@ class ImportadorCSVTests(TestCase):
         t = TentativaEntrega.objects.first()
         self.assertEqual(t.data_tentativa, date(2026, 4, 13))
         self.assertEqual(t.estado, "created")
+        self.assertEqual(t.periodo, "TARDE")
 
     def test_deduplicacao_por_id_vonzu(self):
         # Same id_vonzu twice in file — only first is imported
@@ -188,6 +189,8 @@ class ImportadorCSVTests(TestCase):
         self.assertTrue(resultado["sucesso"])
         self.assertEqual(TentativaEntrega.objects.count(), 2)
         self.assertEqual(resultado["stats"]["tentativas"], 1)
+        t_nova = TentativaEntrega.objects.get(data_tentativa=date(2026, 4, 15))
+        self.assertEqual(t_nova.periodo, "TARDE")
 
     def test_atualiza_estado_mov_existente_na_data_prev_entrega(self):
         csv_bytes = _make_csv(_csv_row())

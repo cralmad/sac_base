@@ -397,6 +397,7 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
                                     estado=dados["estado"],
                                     motorista_id=dados["motorista_id"],
                                     dt_entrega=dados["dt_entrega"],
+                                    periodo="TARDE",
                                 )
                             )
                             tentativas += 1

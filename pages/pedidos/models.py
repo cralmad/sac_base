@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Exists, OuterRef
 
 from pages.auditoria.models import AuditFieldsMixin
 from pages.cad_cliente.models import Cliente
@@ -100,6 +101,20 @@ ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA = {
 ESTADOS_SEGUE_PARA_ENTREGA = {
     valor for valor, _label, _concluida, segue in ESTADO_DEFINITIONS if bool(segue)
 }
+
+
+def estado_segue_para_entrega(estado: str | None) -> bool:
+    """True se o estado da tentativa (TentativaEntrega.estado) indica que segue para entrega."""
+    return (estado or "") in ESTADOS_SEGUE_PARA_ENTREGA
+
+
+def exclude_tentativas_com_data_posterior(qs):
+    """Exclui linhas que possuem outra TentativaEntrega do mesmo pedido em data estritamente posterior."""
+    posteriores = TentativaEntrega.objects.filter(
+        pedido_id=OuterRef("pedido_id"),
+        data_tentativa__gt=OuterRef("data_tentativa"),
+    )
+    return qs.exclude(Exists(posteriores))
 
 
 class Pedido(AuditFieldsMixin, models.Model):
