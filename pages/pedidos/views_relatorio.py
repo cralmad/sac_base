@@ -644,6 +644,7 @@ def relatorio_sms_preview_view(request):
 
 PERMISSOES_GERENCIAL = {
     "acessar": "pedidos.view_relatorio_gerencial",
+    "editar": "pedidos.change_pedido",  # registrar devoluções (mesmo critério de pedido_dev_save_view)
 }
 
 
@@ -664,7 +665,7 @@ def relatorio_gerencial_view(request):
         )
         return render(request, "relatorio_gerencial.html")
 
-    # POST: aplica smart filters e agrupa por carro
+    # POST: aplica smart filters e retorna lista plana (sem agrupamento por carro)
     data = request.sisvar_front or {}
     filtros = data.get("filtros", {})
 
@@ -716,7 +717,7 @@ def relatorio_gerencial_view(request):
     elif conferencia_filtro == "divergente":
         qs = qs.exclude(pedido__volume_conf=F("pedido__volume"))
 
-    qs = qs.order_by("carro", "data_tentativa", "pedido__codpost_dest", "pedido__pedido")
+    qs = qs.order_by("data_tentativa", "pedido__codpost_dest", "pedido__pedido")
 
     movs = list(qs)
     pedido_ids = {m.pedido_id for m in movs}
@@ -746,55 +747,48 @@ def relatorio_gerencial_view(request):
         ):
             datas_por_pedido[pid].add(d)
 
-    grupos = []
-    for carro_val, items in groupby(movs, key=lambda m: m.carro):
-        linhas = []
-        for mov in items:
-            p = mov.pedido
-            tipo_abrev = "R" if (p.tipo or "").upper() == "RECOLHA" else "E"
-            peso_str = ""
-            if p.peso is not None:
-                try:
-                    peso_str = str(int(p.peso))
-                except Exception:
-                    peso_str = str(p.peso)
-            dev_count = dev_counts.get(p.id, 0)
-            mov_count = mov_counts.get(p.id, 0)
-            tipo_upper = (p.tipo or "").upper()
-            estado_concluido = p.estado in ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA
-            if tipo_upper == "ENTREGA":
-                armazem = "SIM" if (not estado_concluido and (p.volume_conf or 0) > 0 and dev_count == 0) else ""
-            elif tipo_upper == "RECOLHA":
-                armazem = "SIM" if (estado_concluido and dev_count == 0) else ""
-            else:
-                armazem = ""
-            datas_ped = datas_por_pedido.get(p.id, ())
-            tem_tentativa_posterior = any(td > mov.data_tentativa for td in datas_ped)
-            linhas.append({
-                "pedido_id":      p.id,
-                "pedido":         p.pedido or str(p.id_vonzu),
-                "id_vonzu":       p.id_vonzu,
-                "tipo":           tipo_abrev,
-                "data_tentativa": mov.data_tentativa.strftime("%d/%m/%Y"),
-                "cidade_dest":    p.cidade_dest or "",
-                "codpost_dest":   p.codpost_dest or "",
-                "volumes":        f"{p.volume_conf or 0}/{p.volume or 0}",
-                "peso":           peso_str,
-                "estado":         p.estado or "",
-                "mov":            mov_count,
-                "dev":            dev_count,
-                "armazem":        armazem,
-                "segue_para_entrega": estado_segue_para_entrega(mov.estado) and not tem_tentativa_posterior,
-            })
-            if armazem_filtro == "sim" and armazem != "SIM":
-                linhas.pop()
-            elif armazem_filtro == "nao" and armazem == "SIM":
-                linhas.pop()
-        grupos.append({
-            "carro": str(carro_val) if carro_val is not None else "—",
-            "total": len(linhas),
-            "linhas": linhas,
+    linhas = []
+    for mov in movs:
+        p = mov.pedido
+        tipo_abrev = "R" if (p.tipo or "").upper() == "RECOLHA" else "E"
+        peso_str = ""
+        if p.peso is not None:
+            try:
+                peso_str = str(int(p.peso))
+            except Exception:
+                peso_str = str(p.peso)
+        dev_count = dev_counts.get(p.id, 0)
+        mov_count = mov_counts.get(p.id, 0)
+        tipo_upper = (p.tipo or "").upper()
+        estado_concluido = p.estado in ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA
+        if tipo_upper == "ENTREGA":
+            armazem = "SIM" if (not estado_concluido and (p.volume_conf or 0) > 0 and dev_count == 0) else ""
+        elif tipo_upper == "RECOLHA":
+            armazem = "SIM" if (estado_concluido and dev_count == 0) else ""
+        else:
+            armazem = ""
+        datas_ped = datas_por_pedido.get(p.id, ())
+        tem_tentativa_posterior = any(td > mov.data_tentativa for td in datas_ped)
+        linhas.append({
+            "pedido_id":      p.id,
+            "pedido":         p.pedido or str(p.id_vonzu),
+            "id_vonzu":       p.id_vonzu,
+            "tipo":           tipo_abrev,
+            "data_tentativa": mov.data_tentativa.strftime("%d/%m/%Y"),
+            "cidade_dest":    p.cidade_dest or "",
+            "codpost_dest":   p.codpost_dest or "",
+            "volumes":        f"{p.volume_conf or 0}/{p.volume or 0}",
+            "peso":           peso_str,
+            "estado":         p.estado or "",
+            "mov":            mov_count,
+            "dev":            dev_count,
+            "armazem":        armazem,
+            "segue_para_entrega": estado_segue_para_entrega(mov.estado) and not tem_tentativa_posterior,
         })
+        if armazem_filtro == "sim" and armazem != "SIM":
+            linhas.pop()
+        elif armazem_filtro == "nao" and armazem == "SIM":
+            linhas.pop()
 
     data_fmt = dt_ini.strftime("%d/%m/%Y")
     if dt_ini != dt_fim:
@@ -802,9 +796,9 @@ def relatorio_gerencial_view(request):
 
     return JsonResponse({
         "success": True,
-        "grupos": grupos,
+        "linhas": linhas,
         "data_fmt": data_fmt,
-        "total_pedidos": sum(g["total"] for g in grupos),
+        "total_pedidos": len(linhas),
     })
 
 

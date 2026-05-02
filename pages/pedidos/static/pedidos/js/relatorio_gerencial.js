@@ -1,4 +1,10 @@
-import { getCsrfToken, clearMessages, definirMensagem, getOptions } from '/static/js/sisVar.js';
+import {
+  getCsrfToken,
+  clearMessages,
+  definirMensagem,
+  getOptions,
+  hasScreenPermission,
+} from '/static/js/sisVar.js';
 import { AppLoader } from '/static/js/loader.js';
 import {
   parseSmartNumber,
@@ -104,22 +110,23 @@ function _esc(v) {
 }
 
 // ─── Fila de devoluções pendentes ─────────────────────────────────────────────
-let _devQueue    = [];   // [{pedido_id, pedido, tipo, volumes}, ...]
-let _devIndex    = 0;
-let _bsModal     = null;
+let _devQueue      = [];   // [{pedido_id, pedido, tipo, volumes}, ...]
+let _devIndex      = 0;
+let _bsModal       = null;
+let _ultimasLinhas = [];   // último resultado da busca (lista plana)
 
-function _coletarFilaDev(grupos) {
+function _podeRegistrarDevolucoes() {
+  return hasScreenPermission('gerencial', 'editar');
+}
+
+function _coletarFilaDev(linhas) {
   _devQueue = [];
-  grupos.forEach(g => {
-    g.linhas.forEach(l => {
-      if (l.armazem === 'SIM') {
-        _devQueue.push({
-          pedido_id: l.pedido_id,
-          pedido:    l.pedido,
-          tipo:      l.tipo,
-          volumes:   l.volumes,
-        });
-      }
+  linhas.forEach(l => {
+    _devQueue.push({
+      pedido_id: l.pedido_id,
+      pedido:    l.pedido,
+      tipo:      l.tipo,
+      volumes:   l.volumes,
     });
   });
 }
@@ -234,15 +241,15 @@ async function _salvarDevolucao() {
   }
 }
 
-// ─── Renderizar grupos ────────────────────────────────────────────────────────
-function renderizarGrupos(grupos, dataFmt, totalPedidos) {
+// ─── Renderizar tabela única (sem agrupamento) ────────────────────────────────
+function renderizarRelatorio(linhas, dataFmt, totalPedidos) {
   resultado.replaceChildren();
   vazio.classList.add('d-none');
   totalBar.classList.add('d-none');
-  colBtnDev.classList.add('d-none');
   _devQueue = [];
+  _ultimasLinhas = linhas;
 
-  if (!grupos.length) {
+  if (!linhas.length) {
     vazio.classList.remove('d-none');
     btnImprimir.disabled = true;
     return;
@@ -250,94 +257,68 @@ function renderizarGrupos(grupos, dataFmt, totalPedidos) {
 
   tituloData.textContent = `Período: ${dataFmt}`;
 
-  totalBar.textContent = `Total: ${totalPedidos} pedido(s) em ${grupos.length} carro(s)`;
+  totalBar.textContent = `Total: ${totalPedidos} registro(s)`;
   totalBar.classList.remove('d-none');
 
-  grupos.forEach(grupo => {
-    // Cabeçalho do grupo
-    const header = document.createElement('div');
-    header.className = 'rg-grupo-header';
+  const table = document.createElement('table');
+  table.className = 'rg-tabela';
 
-    const spanCarro = document.createElement('span');
-    spanCarro.textContent = grupo.carro !== '—' ? `Carro ${grupo.carro}` : 'Sem carro';
+  const thead = document.createElement('thead');
+  const trHead = document.createElement('tr');
+  ['Data', 'Referência', 'ID Vonzu', 'T', 'Cidade', 'C. Postal', 'Vol', 'Peso', 'Estado', 'Mov', 'Dev', 'Armazém'].forEach(h => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    trHead.appendChild(th);
+  });
+  thead.appendChild(trHead);
 
-    const spanTotal = document.createElement('span');
-    spanTotal.className = 'rg-badge ms-auto';
-    spanTotal.textContent = `${grupo.total} pedido(s)`;
+  const tbody = document.createElement('tbody');
+  linhas.forEach(linha => {
+    const tr = document.createElement('tr');
+    if (!linha.segue_para_entrega) tr.classList.add('rg-nao-segue');
 
-    header.appendChild(spanCarro);
-    header.appendChild(spanTotal);
+    const volPartes = (linha.volumes || '').split('/');
+    const volNegrito = volPartes.length === 2 && parseInt(volPartes[0], 10) < parseInt(volPartes[1], 10);
 
-    // Tabela
-    const table = document.createElement('table');
-    table.className = 'rg-tabela';
+    const campos = [
+      { val: linha.data_tentativa },
+      { val: linha.pedido },
+      { val: linha.id_vonzu },
+      { val: linha.tipo, cls: linha.tipo === 'R' ? 'rg-tipo-r' : 'rg-tipo-e' },
+      { val: linha.cidade_dest },
+      { val: linha.codpost_dest },
+      { val: linha.volumes, bold: volNegrito },
+      { val: linha.peso },
+      { val: linha.estado },
+      { val: linha.mov },
+      { val: linha.dev },
+      { val: linha.armazem },
+    ];
 
-    const thead = document.createElement('thead');
-    const trHead = document.createElement('tr');
-    ['Data', 'Referência', 'ID Vonzu', 'T', 'Cidade', 'C. Postal', 'Vol', 'Peso', 'Estado', 'Mov', 'Dev', 'Armazém'].forEach(h => {
-      const th = document.createElement('th');
-      th.textContent = h;
-      trHead.appendChild(th);
-    });
-    thead.appendChild(trHead);
-
-    const tbody = document.createElement('tbody');
-    grupo.linhas.forEach(linha => {
-      const tr = document.createElement('tr');
-      if (!linha.segue_para_entrega) tr.classList.add('rg-nao-segue');
-
-      const volPartes = (linha.volumes || '').split('/');
-      const volNegrito = volPartes.length === 2 && parseInt(volPartes[0], 10) < parseInt(volPartes[1], 10);
-
-      const campos = [
-        { val: linha.data_tentativa },
-        { val: linha.pedido },
-        { val: linha.id_vonzu },
-        { val: linha.tipo, cls: linha.tipo === 'R' ? 'rg-tipo-r' : 'rg-tipo-e' },
-        { val: linha.cidade_dest },
-        { val: linha.codpost_dest },
-        { val: linha.volumes, bold: volNegrito },
-        { val: linha.peso },
-        { val: linha.estado },
-        { val: linha.mov },
-        { val: linha.dev },
-        { val: linha.armazem },
-      ];
-
-      campos.forEach(({ val, cls, bold }) => {
-        const td = document.createElement('td');
-        td.textContent = val ?? '';
-        if (cls) td.className = cls;
-        if (bold) td.style.fontWeight = 'bold';
-        tr.appendChild(td);
-      });
-
-      tbody.appendChild(tr);
+    campos.forEach(({ val, cls, bold }) => {
+      const td = document.createElement('td');
+      td.textContent = val ?? '';
+      if (cls) td.className = cls;
+      if (bold) td.style.fontWeight = 'bold';
+      tr.appendChild(td);
     });
 
-    table.appendChild(thead);
-    table.appendChild(tbody);
-
-    const tableScroll = document.createElement('div');
-    tableScroll.className = 'rg-tabela-scroll';
-    tableScroll.appendChild(table);
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'rg-grupo';
-    wrapper.appendChild(header);
-    wrapper.appendChild(tableScroll);
-    resultado.appendChild(wrapper);
+    tbody.appendChild(tr);
   });
 
-  btnImprimir.disabled = false;
+  table.appendChild(thead);
+  table.appendChild(tbody);
 
-  // Mostra botão de devoluções apenas quando filtro Armazém=Sim e há itens
-  if (selArmazem.value === 'sim') {
-    _coletarFilaDev(grupos);
-    if (_devQueue.length > 0) {
-      colBtnDev.classList.remove('d-none');
-    }
-  }
+  const tableScroll = document.createElement('div');
+  tableScroll.className = 'rg-tabela-scroll';
+  tableScroll.appendChild(table);
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'rg-grupo';
+  wrapper.appendChild(tableScroll);
+  resultado.appendChild(wrapper);
+
+  btnImprimir.disabled = false;
 }
 
 // ─── Buscar ───────────────────────────────────────────────────────────────────
@@ -359,6 +340,7 @@ async function buscar() {
   vazio.classList.add('d-none');
   totalBar.classList.add('d-none');
   btnImprimir.disabled = true;
+  _ultimasLinhas = [];
   AppLoader.show();
 
   try {
@@ -387,7 +369,7 @@ async function buscar() {
       return;
     }
 
-    renderizarGrupos(json.grupos || [], json.data_fmt || '', json.total_pedidos || 0);
+    renderizarRelatorio(json.linhas || [], json.data_fmt || '', json.total_pedidos || 0);
   } catch {
     definirMensagem('erro', 'Erro de comunicação com o servidor.', false);
   } finally {
@@ -416,6 +398,10 @@ document.addEventListener('DOMContentLoaded', () => {
   preencherEstados();
   preencherMotivos();
 
+  if (_podeRegistrarDevolucoes()) {
+    colBtnDev.classList.remove('d-none');
+  }
+
   // Inicializar tooltips Bootstrap
   document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
     new bootstrap.Tooltip(el);
@@ -425,6 +411,13 @@ document.addEventListener('DOMContentLoaded', () => {
 // ─── Eventos ─────────────────────────────────────────────────────────────────
 form.addEventListener('submit', e => { e.preventDefault(); buscar(); });
 btnImprimir.addEventListener('click', () => window.print());
-btnRegistrarDev.addEventListener('click', () => _abrirModal(0));
+btnRegistrarDev.addEventListener('click', () => {
+  _coletarFilaDev(_ultimasLinhas);
+  if (!_devQueue.length) {
+    definirMensagem('aviso', 'Não há registros no relatório. Execute uma busca com resultados.', false);
+    return;
+  }
+  _abrirModal(0);
+});
 document.getElementById('rgm-btn-salvar').addEventListener('click', _salvarDevolucao);
 document.getElementById('rgm-btn-pular').addEventListener('click', () => _abrirModal(_devIndex + 1));
