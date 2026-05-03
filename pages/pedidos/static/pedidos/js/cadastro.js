@@ -501,6 +501,7 @@ const _INCIDENCIA_CHOICE = [
   { tipo: 'Acondicionamento/Embalagem', filtro: 'cliente' },
   { tipo: 'Peso/Volume',               filtro: 'cliente' },
   { tipo: 'Data/Horário',              filtro: 'cliente' },
+  { tipo: 'Pedido incompleto',         filtro: 'cliente' },
   { tipo: 'Outros',                    filtro: '' },
   { tipo: 'Artigo Danificado',         filtro: 'filial' },
   { tipo: 'Artigo Extraviado',         filtro: 'filial' },

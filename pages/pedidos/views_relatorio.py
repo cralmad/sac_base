@@ -554,6 +554,19 @@ def relatorio_sms_enviar_view(request):
             contagem_periodo[mov.periodo] = contagem_periodo.get(mov.periodo, 0) + 1
 
     # Resumo para a filial (sms_confirm)
+    # #region agent log
+    _numero_ok = bool((filial.numero or "").strip())
+    _debug_log(
+        "H6",
+        "views_relatorio.py:relatorio_sms_enviar_view",
+        "sms_resumo_gate",
+        {
+            "sms_confirm": bool(filial.sms_confirm),
+            "numero_configurado": _numero_ok,
+            "enviados": enviados,
+        },
+    )
+    # #endregion
     if filial.sms_confirm and filial.numero and enviados > 0:
         partes_resumo = [f"SMS enviados em {dt.strftime('%d/%m/%Y')}:"]
         for periodo, qtd in sorted(contagem_periodo.items()):
@@ -561,7 +574,42 @@ def relatorio_sms_enviar_view(request):
             partes_resumo.append(f"  {periodo} ({horario}): {qtd}")
         partes_resumo.append(f"Total: {enviados}")
         resumo = "\n".join(partes_resumo)
-        enviar_sms_bulkgate(filial.numero, resumo, ddi_padrao)
+        # #region agent log
+        _debug_log(
+            "H7",
+            "views_relatorio.py:relatorio_sms_enviar_view",
+            "sms_resumo_bulkgate_attempt",
+            {"resumo_len": len(resumo), "filial_id": getattr(filial, "id", None)},
+        )
+        # #endregion
+        _resumo_resultado = enviar_sms_bulkgate(filial.numero, resumo, ddi_padrao)
+        # #region agent log
+        _debug_log(
+            "H7",
+            "views_relatorio.py:relatorio_sms_enviar_view",
+            "sms_resumo_bulkgate_result",
+            {
+                "sucesso": bool(_resumo_resultado.get("sucesso")),
+                "erro": (_resumo_resultado.get("erro") or "")[:200],
+            },
+        )
+        # #endregion
+    else:
+        # #region agent log
+        _skip = []
+        if not filial.sms_confirm:
+            _skip.append("sms_confirm_false")
+        if not filial.numero or not (filial.numero or "").strip():
+            _skip.append("numero_vazio")
+        if enviados <= 0:
+            _skip.append("nenhum_enviado")
+        _debug_log(
+            "H6",
+            "views_relatorio.py:relatorio_sms_enviar_view",
+            "sms_resumo_skipped",
+            {"reasons": _skip},
+        )
+        # #endregion
 
     # #region agent log
     _debug_log(

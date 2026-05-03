@@ -273,10 +273,61 @@ class Command(BaseCommand):
         )
 
         # SMS de confirmação para a filial (sms_confirm) — ignorado em dry-run
+        # #region agent log
+        _numero = getattr(filial, "numero", None) or ""
+        _debug_log(
+            "H6",
+            "enviar_sms_automatico.py:_enviar_para_filial",
+            "sms_resumo_auto_gate",
+            {
+                "dry_run": dry_run,
+                "sms_confirm": bool(getattr(filial, "sms_confirm", False)),
+                "numero_configurado": bool(_numero.strip()),
+                "enviados": enviados,
+                "filial_id": getattr(filial, "id", None),
+            },
+        )
+        # #endregion
         if not dry_run and getattr(filial, "sms_confirm", False) and getattr(filial, "numero", None) and enviados > 0:
             partes = [f"SMS automáticos {today.strftime('%d/%m/%Y')}:"]
             for periodo, qtd in sorted(contagem_periodo.items()):
                 horario = HORARIO_PERIODO.get(periodo, periodo)
                 partes.append(f"  {periodo} ({horario}): {qtd}")
             partes.append(f"Total: {enviados}")
-            enviar_sms_bulkgate(filial.numero, "\n".join(partes), ddi_padrao)
+            _texto_resumo = "\n".join(partes)
+            # #region agent log
+            _debug_log(
+                "H7",
+                "enviar_sms_automatico.py:_enviar_para_filial",
+                "sms_resumo_auto_bulkgate_attempt",
+                {"resumo_len": len(_texto_resumo), "filial_id": getattr(filial, "id", None)},
+            )
+            # #endregion
+            _resumo_res = enviar_sms_bulkgate(filial.numero, _texto_resumo, ddi_padrao)
+            # #region agent log
+            _debug_log(
+                "H7",
+                "enviar_sms_automatico.py:_enviar_para_filial",
+                "sms_resumo_auto_bulkgate_result",
+                {
+                    "sucesso": bool(_resumo_res.get("sucesso")),
+                    "erro": (_resumo_res.get("erro") or "")[:200],
+                },
+            )
+            # #endregion
+        elif not dry_run:
+            # #region agent log
+            _skip = []
+            if not getattr(filial, "sms_confirm", False):
+                _skip.append("sms_confirm_false")
+            if not getattr(filial, "numero", None) or not str(filial.numero).strip():
+                _skip.append("numero_vazio")
+            if enviados <= 0:
+                _skip.append("nenhum_enviado")
+            _debug_log(
+                "H6",
+                "enviar_sms_automatico.py:_enviar_para_filial",
+                "sms_resumo_auto_skipped",
+                {"reasons": _skip, "filial_id": getattr(filial, "id", None)},
+            )
+            # #endregion

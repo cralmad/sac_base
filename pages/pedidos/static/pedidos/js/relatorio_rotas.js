@@ -93,6 +93,14 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
     header.appendChild(spanData);
     header.appendChild(spanTotal);
 
+    const btnCopiarRefs = document.createElement('button');
+    btnCopiarRefs.type = 'button';
+    btnCopiarRefs.className = 'btn btn-sm btn-light';
+    btnCopiarRefs.title = 'Copiar todas as referências do grupo (ref1, ref2, …)';
+    btnCopiarRefs.innerHTML = '<i class="bi bi-clipboard"></i>';
+    btnCopiarRefs.addEventListener('click', () => copiarReferenciasGrupo(grupo, btnCopiarRefs));
+    header.appendChild(btnCopiarRefs);
+
     if (agrupamento !== 'motorista' && grupo.carro !== '\u2014') {
       const btnLink = document.createElement('button');
       btnLink.type = 'button';
@@ -161,6 +169,40 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
   });
 
   btnImprimir.disabled = false;
+}
+
+// ─── Copiar referências do grupo (ref1, ref2, …) ────────────────────────────
+async function copiarReferenciasGrupo(grupo, btn) {
+  clearMessages();
+  const refs = (grupo.linhas || [])
+    .map(l => {
+      const p = l.pedido;
+      if (p == null) return '';
+      const s = String(p).trim();
+      return s;
+    })
+    .filter(Boolean);
+  if (!refs.length) {
+    definirMensagem('aviso', 'Nenhuma referência neste grupo.', false);
+    return;
+  }
+  const texto = refs.join(', ');
+  const textoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  try {
+    await navigator.clipboard.writeText(texto);
+    btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+    btn.classList.replace('btn-light', 'btn-success');
+    setTimeout(() => {
+      btn.innerHTML = textoOriginal;
+      btn.classList.replace('btn-success', 'btn-light');
+      btn.disabled = false;
+    }, 2000);
+  } catch {
+    definirMensagem('erro', 'Não foi possível copiar. Verifique as permissões do navegador.', false);
+    btn.innerHTML = textoOriginal;
+    btn.disabled = false;
+  }
 }
 
 // ─── Gerar e copiar link público do carro ───────────────────────────────────

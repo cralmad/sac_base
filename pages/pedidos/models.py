@@ -17,6 +17,7 @@ INCIDENCIA_CHOICE = [
     ("Acondicionamento/Embalagem", "cliente"),
     ("Peso/Volume",               "cliente"),
     ("Data/Horário",              "cliente"),
+    ("Pedido incompleto",         "cliente"),
     ("Outros",                    ""),
     ("Artigo Danificado",         "filial"),
     ("Artigo Extraviado",         "filial"),
