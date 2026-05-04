@@ -136,8 +136,12 @@ function criarMovCard(mov) {
     ['Volume', mov.volume ?? ''],
     ['Peso', mov.peso ?? ''],
   ];
+  if (mov.tem_devolucao) {
+    pares.splice(2, 0, ['Devolução', 'Sim']);
+  }
   for (const [rotulo, valor] of pares) {
     const div = document.createElement('div');
+    if (rotulo === 'Devolução') div.classList.add('mov-field-dev');
     const labelEl = document.createElement('span');
     labelEl.className = 'mov-field-label';
     labelEl.textContent = rotulo;
@@ -609,6 +613,7 @@ function gerarHtmlRelatorio(grupos, filtros) {
         <tr>
           <th>Referência</th>
           <th>Tipo</th>
+          <th>Dev.</th>
           <th>Cód. Postal</th>
           <th>Cidade</th>
           <th>Vol.</th>
@@ -621,10 +626,12 @@ function gerarHtmlRelatorio(grupos, filtros) {
     for (const l of grupo.linhas) {
       const conferidoClass = l.conferido === 'SIM' ? 'conf-sim' : 'conf-nao';
       // Escapa conteúdo usando um trick seguro (sem innerHTML dinâmico)
+      const devTxt = l.tem_devolucao ? 'Sim' : 'Não';
       corpo += `
         <tr>
           <td>${_esc(l.pedido)}</td>
           <td>${_esc(l.tipo)}</td>
+          <td>${_esc(devTxt)}</td>
           <td>${_esc(l.codpost_dest)}</td>
           <td>${_esc(l.cidade_dest)}</td>
           <td>${_esc(l.volume)}</td>
@@ -676,14 +683,15 @@ function gerarHtmlRelatorio(grupos, filtros) {
   }
   th { font-size: 8pt; text-align: left; }
   /* Larguras das colunas */
-  table th:nth-child(1), table td:nth-child(1) { width: 14%; } /* Referência */
-  table th:nth-child(2), table td:nth-child(2) { width: 7%; }  /* Tipo */
-  table th:nth-child(3), table td:nth-child(3) { width: 9%; }  /* Cód. Postal */
-  table th:nth-child(4), table td:nth-child(4) { width: 12%; } /* Cidade */
-  table th:nth-child(5), table td:nth-child(5) { width: 5%; }  /* Vol. */
-  table th:nth-child(6), table td:nth-child(6) { width: 8%; }  /* Peso */
-  table th:nth-child(7), table td:nth-child(7) { width: 33%; } /* Obs. Rota */
-  table th:nth-child(8), table td:nth-child(8) { width: 12%; } /* Conferido */
+  table th:nth-child(1), table td:nth-child(1) { width: 12%; } /* Referência */
+  table th:nth-child(2), table td:nth-child(2) { width: 6%; }  /* Tipo */
+  table th:nth-child(3), table td:nth-child(3) { width: 5%; }  /* Dev. */
+  table th:nth-child(4), table td:nth-child(4) { width: 8%; }  /* Cód. Postal */
+  table th:nth-child(5), table td:nth-child(5) { width: 10%; } /* Cidade */
+  table th:nth-child(6), table td:nth-child(6) { width: 5%; }  /* Vol. */
+  table th:nth-child(7), table td:nth-child(7) { width: 7%; }  /* Peso */
+  table th:nth-child(8), table td:nth-child(8) { width: 30%; } /* Obs. Rota */
+  table th:nth-child(9), table td:nth-child(9) { width: 12%; } /* Conferido */
   .obs-rota { font-size: 8pt; }
   .conf-sim { color: #155724; font-weight: bold; }
   .conf-nao { color: #721c24; font-weight: bold; }

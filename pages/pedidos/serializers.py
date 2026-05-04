@@ -76,6 +76,10 @@ def serialize_devolucao(reg):
 
 
 def serialize_incidencia(reg):
+    fotos_publicas = [
+        {"id": f["id"], "url": f["url"], "thumb_url": f.get("thumb_url", f["url"])}
+        for f in (reg.fotos or [])
+    ]
     return {
         "id": reg.id,
         "pedido_id": reg.pedido_id,
@@ -87,6 +91,8 @@ def serialize_incidencia(reg):
         "motorista_id": reg.motorista_id,
         "motorista_nome": reg.motorista.nome if reg.motorista_id else "",
         "obs": reg.obs or "",
+        "fotos": fotos_publicas,
+        "fotos_count": len(fotos_publicas),
     }
 
 
@@ -123,6 +129,10 @@ def build_pedido_extra_payload(pedido):
         ],
         "registros_dev": [
             serialize_devolucao(d) for d in pedido.devolucoes.order_by("-data", "-id")
+        ],
+        "registros_inc": [
+            serialize_incidencia(i)
+            for i in pedido.incidencias.select_related("motorista").order_by("-data", "-id")
         ],
         "avaliacao": serialize_avaliacao(pedido),
     }

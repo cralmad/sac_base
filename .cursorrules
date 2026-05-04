@@ -7,6 +7,8 @@ Reference implementations: `pages/usuario/views.py` (`cadastro_view`), `pages/pe
 
 For full Heroku env lists, scheduler jobs, and long checklists, see `.github/copilot-instructions.md`.
 
+**Domain architecture in-repo:** keep module-specific architecture here (e.g. **`## Estrutura Financeira do Projeto`** below for `pages.financeiro`). **Do not** duplicate that content in `.github/copilot-instructions.md` — Copilot guide only links back to `.cursorrules`.
+
 ---
 
 ## Architecture and flow (SisVar)
@@ -40,6 +42,7 @@ For full Heroku env lists, scheduler jobs, and long checklists, see `.github/cop
 | Form field schema validation | `sac_base.form_validador.SchemaValidator` (supports string types incl. boolean; string booleans like `"true"`/`"false"` are accepted where configured) |
 | SisVar JSON builders | `sac_base.sisvar_builders` |
 | Pedido form persistence + extra payload | `pages.pedidos.services.pedido_form`, `pages.pedidos.serializers` — do not duplicate `TRAVAS_IMPORTADOS` or serialize blocks in views |
+| SMS (BulkGate, elegibilidade, relatório, automático) | `sac_base.sms_service` (`enviar_sms_bulkgate`, `enviar_sms_bulkgate_resiliente`, `montar_mensagem`); `pages/pedidos/services/sms_relatorio.py`; `pages/pedidos/services/sms_envio_automatico.py`; `pages/pedidos/management/commands/enviar_sms_automatico.py` — **não** duplicar filtros de `TentativaEntrega` fora destes módulos |
 
 ### Python style (MUST)
 
@@ -74,10 +77,74 @@ For full Heroku env lists, scheduler jobs, and long checklists, see `.github/cop
 
 ---
 
+## Estrutura para envio do SMS
+
+Objetivo: notificar o destinatário do pedido sobre a janela de entrega (MANHÃ/TARDE) e, opcionalmente, enviar um **SMS de resumo** ao número da filial (`Filial.sms_confirm` + `Filial.numero`). Provedor: **BulkGate** (HTTP). Estado persistido: `TentativaEntrega.sms_enviado`.
+
+### Dependências externas
+
+| Variável / recurso | Uso |
+|--------------------|-----|
+| `BULKGATE_APP_ID`, `BULKGATE_APP_TOKEN` | Credenciais da API (obrigatórias em produção). |
+| `https://portal.bulkgate.com/...` | URL fixa em `sac_base/sms_service.py`; já referenciada no CSP (`sac_base/csp_middleware.py`). |
+
+### Camada HTTP e mensagens (`sac_base/sms_service.py`)
+
+- **`normalizar_numero`**: E.164 sem `+`, com DDI (`ddi_padrao` vem de `Filial.pais_atuacao.codigo_tel` sem `+`, fallback `351`).
+- **`montar_mensagem(template, dt, periodo, sigla_pais)`**: substitui `#dia_da_semana#`, `#dd/mm/aaaa#`, `#periodo#` (horários em `HORARIO_PERIODO`). Templates vêm de `FilialConfig.sms_padrao_1` (MANHÃ) e `sms_padrao_2` (TARDE; fallback = manhã).
+- **`enviar_sms_bulkgate`**: uma chamada HTTP; retorno `{"sucesso": bool, "erro"|"sms_id": ...}`.
+- **`enviar_sms_bulkgate_resiliente`**: reintentos com backoff para erros considerados **transientes** (quota, rate limit, timeout, 5xx, etc.); usado no **manual**, no **resumo** e no **automático** para alinhar comportamento sob falha da API.
+
+### Elegibilidade (sempre `TentativaEntrega`, não `Pedido.estado` para este fluxo)
+
+Condições comuns a manual + verificação + automático:
+
+1. `data_tentativa` = data alvo (dia do relatório ou “hoje” em Lisboa no comando).
+2. `pedido__filial` = filial (ativa no HTTP; `FilialConfig`/`filial` no comando).
+3. `estado` ∈ `ESTADOS_SEGUE_PARA_ENTREGA` (campo **`TentativaEntrega.estado`**, alinhado a `estado_segue_para_entrega` no UI).
+4. `periodo` preenchido (MANHÃ/TARDE).
+5. **`exclude_tentativas_com_data_posterior`**: não enviar linha se existir outra tentativa do **mesmo pedido** com `data_tentativa` estritamente **posterior** (evita SMS obsoleto).
+
+Envio manual e verificação de “pendentes” exigem ainda `sms_enviado=False`. O automático só lê pendentes.
+
+### Manual (relatório SisVar)
+
+| Peça | Ficheiro |
+|------|----------|
+| Rotas | `pages/pedidos/urls_relatorio.py` — `relatorio_sms`, `relatorio_sms_enviar`, `relatorio_sms_preview`. |
+| View fina | `pages/pedidos/views_relatorio.py` — `relatorio_sms_view` (GET template + POST lista JSON), `relatorio_sms_enviar_view` (delega ao serviço), `relatorio_sms_preview_view`. |
+| Serviço | `pages/pedidos/services/sms_relatorio.py` — `qs_tentativas_sms_pendentes_envio`, `queryset_tentativas_envio_manual_por_ids`, `ler_templates_sms_filial`, `executar_envio_sms_relatorio_manual`, `estado_verificacao_sms_dia`, `complemento_verificacao_solicitacao`. |
+| Front | `pages/pedidos/templates/relatorio_sms.html`, `pages/pedidos/static/pedidos/js/relatorio_sms.js`. |
+
+Permissões: `pedidos.view_tentativaentrega` (listar), `pedidos.send_sms_tentativaentrega` (enviar). **Tenant:** sempre `request.filial_ativa` nos filtros.
+
+Resumo filial: lê `Filial` por `pk=filial_ativa.pk` (número com `.strip()`); JSON inclui `resumo_filial` e `verificacao_envio_sms` para o JS mostrar avisos.
+
+**Armadilhas:** o utilizador pode marcar IDs que o backend exclui (`data_tentativa` diferente da indicada no POST, já enviado, sem período, estado fora do conjunto, outra tentativa posterior) — `ids_solicitados_nao_elegiveis` explica o desvio. Lotes muito grandes podem aproximar-se do **timeout HTTP** do worker (o resiliente aumenta o tempo total).
+
+### Automático (Heroku Scheduler / cron)
+
+| Peça | Ficheiro |
+|------|----------|
+| Comando | `pages/pedidos/management/commands/enviar_sms_automatico.py` — hora de Lisboa vs `FilialConfig.sms_auto`; `--force`, `--dry-run`. |
+| Rondas / pausas | `pages/pedidos/services/sms_envio_automatico.py` — `MAX_RONDAS_FILIAL`, `MAX_PAUSAS_SEM_PROGRESSO`, `listar_pendentes_com_telefone`. Pendentes: `sms_relatorio.qs_tentativas_sms_pendentes_envio` (manual + automático). |
+
+Uma **única execução** do comando: várias **rondas** releem pendentes com telefone; entre rondas sem progresso há **pausa** (quota/rede). Template sem telefone: contados como erro uma vez; falhas permanentes de template/montagem entram em `ids_sem_retry_definitivo` para não loop infinito.
+
+### MUST ao alterar SMS
+
+1. **Não** introduzir um terceiro critério de elegibilidade: pendentes partilham `qs_tentativas_sms_pendentes_envio` em `sms_relatorio`; o automático só acrescenta filtro por telefone em memória (`listar_pendentes_com_telefone`).
+2. **Tenant:** qualquer queryset em `TentativaEntrega`/`Pedido` deve incluir `pedido__filial` / `filial_ativa`.
+3. **Não** ignorar o retorno de `enviar_sms_bulkgate` / resiliente para fluxos que precisam de feedback (resumo já regista sucesso/erro no payload manual).
+4. Não hardcodar URLs de debug nem alargar CSP para domínios aleatórios.
+
+---
+
 ## Change discipline
 
 - Touch only files and lines needed for the task; no drive-by refactors or unrelated formatting.
 - Do not add markdown docs unless the user asks.
+- **Architecture / domain docs** (financeiro, SMS, future modules): extend **`.cursorrules`**; avoid long duplicate sections in `.github/copilot-instructions.md`.
 - After substantive Python changes, run `python manage.py check` and relevant tests when possible.
 
 ---
@@ -87,3 +154,46 @@ For full Heroku env lists, scheduler jobs, and long checklists, see `.github/cop
 - Prefer implementing changes in the repo over only describing steps.
 - **Before creating any utility** for HTTP, JSON, or permissions, the agent **MUST** search existing code — at minimum: **`sac_base/`** (shared utilities), **`sac_base/sisvar_builders.py`**, any app-level **`utils/`** packages (e.g. `pages/*/utils/` if present), and **`pages/*/services/`**. Do **not** reinvent helpers that already exist under other names.
 - Keep answers concise; cite existing code with proper code references when explaining behaviour. If unsure where a utility belongs, ask the user for the location of existing helpers before generating new ones
+
+---
+
+## Estrutura Financeira do Projeto
+
+App Django **`pages.financeiro`**. Objetivo: titulos (`RegistroFinanceiro`), eventos de quitacao (`Faturamento` com M2M via `FaturamentoRegistroFinanceiro`), linhas valor x forma (`FaturamentoFormaPagamento`) e `ParcelaFaturamento`, mais cadastros `PlanoContas`, `ContaFinanceira`, `AdministradoraCartao`, `FormaPagamento`.
+
+### Tres camadas (nao misturar)
+
+| Camada | Modulo | Responsabilidade |
+|--------|--------|------------------|
+| **De-para estatico** | `pages/financeiro/registry.py` | `RegraLancamentoOrigem` + `REGISTRY_POR_CONTENT_TYPE_ID` + `merge_regras()`. Nao acessa DB para decidir *quando* salvar. |
+| **Cerebro** | Services do app de dominio (`pages/pedidos/services/`, etc.) | Decide quando chamar o financeiro, valores, overrides sobre o registry, monta `metadados` e regras. **Nao** persiste `ParcelaFaturamento` diretamente. |
+| **Executor** | `pages/financeiro/services/financeiro_service.py` (`FinanceiroService`) + `services/transferencia.py` | `transaction.atomic()`, **sempre** `filial_id` coerente, hierarquia de gravacao **RF -> Faturamento -> Parcela** quando o fluxo for composto; recalcula **`valor_fat` / `valor_rest`** apos mutacoes no through; validacoes de teto (parcelas vs soma das formas), **multi-contraparte** exige `Faturamento.contraparte_pagamento`. |
+
+### Modelos e regras-chave
+
+- **`RegistroFinanceiro`**: `tipo` ENTRADA | SAIDA | TRANSFERENCIA; GFK `contraparte` e `referencia`; `valor` e input de negocio; **`valor_fat` e `valor_rest` so atualizados pelo executor** (soma `FaturamentoRegistroFinanceiro.valor_abatido` + status derivado).
+- **`Faturamento`**: GFK opcional `contraparte_pagamento` — **obrigatorio** se os RFs vinculados tiverem **mais de uma** contraparte distinta (`FinanceiroService.validar_contraparte_pagamento_obrigatoria`).
+- **Through `FaturamentoRegistroFinanceiro`**: `ordem` (sequencia do usuario), `valor_abatido` > 0 apenas; alocacao **waterfall** (`calcular_waterfall_abatimentos` / `aplicar_waterfall_e_salvar_through`).
+- **`ParcelaFaturamento`**: GFK opcional **`registro_gerado`** = titulo/registro **criado em consequencia** desta parcela (renegociacao/estorno), nao o "pai" da parcela.
+- **Transferencias internas**: `tipo=TRANSFERENCIA` + `PlanoContas` com `tipo_classificacao=neutro` (codigo seed `3.1.1.1`); `registrar_transferencia_interna` em `transferencia.py` (MVP documenta titulo; movimento entre contas pode evoluir).
+
+### Contrato do executor
+
+- Parametro **`metadados: dict`** (opcional): chaves de dominio sao serializadas em `observacao` (prefixo `[metadados]`); chaves reservadas **`fin__*`** para o app financeiro (`pages/financeiro/constants.py`: `FIN_META_PREFIX`).
+- **`FinanceiroService.montar_observacao_com_metadados`**, **`validar_soma_parcelas_vs_formas`**, **`recalcular_agregados_registro`**, **`gerar_parcelas_para_faturamento`** (MVP: 1 parcela por linha de forma), **`merge_regras`** (exposto), **`registrar_transferencia_interna`**.
+
+### Seeds
+
+- Migrations: **`0002_seed_plano_contas_e_formas`** (formas DINHEIRO/PIX + plano minimo legado se necessario); **`0003_plano_contas_arvore_completa`** (RunPython) — arvore completa receita/despesa/neutro (grupos 1 a 4) conforme `pages/financeiro/constants.py`. Titulos que apontavam para o antigo adiantamento `1.2.1.1` da seed sao remapeados para **`4.1.1.1`**.
+
+### MUST ao alterar este modulo
+
+1. **Tenant:** todo queryset em dados da filial deve filtrar por `filial_id` permitido (ver middleware / `pages/filial/services.py`).
+2. **Transacao:** operacoes que alterem RF + FAT + PAR no mesmo fluxo dentro de **`transaction.atomic()`**.
+3. **Nao** gravar `valor_fat`/`valor_rest` a partir de views/forms; apenas o executor apos consolidar through (e futuras parcelas liquidadas, se a regra evoluir).
+
+### Testes
+
+- `pages/financeiro/tests/test_financeiro_service.py` (waterfall, recalculo de agregados, teto parcelas vs formas).
+
+---

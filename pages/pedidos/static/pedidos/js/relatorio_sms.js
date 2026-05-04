@@ -186,6 +186,15 @@ async function buscar() {
     }
 
     renderizarTabela(json.registros, json.data_fmt);
+
+    if (json.verificacao_envio_sms) {
+      const v = json.verificacao_envio_sms;
+      if (!v.dia_completo_todos_com_telefone_enviados && Array.isArray(v.mensagens)) {
+        definirMensagem('aviso', v.mensagens.join(' '), false);
+      } else if (v.sem_telefone > 0 && Array.isArray(v.mensagens) && v.mensagens[0]) {
+        definirMensagem('aviso', v.mensagens[0], false);
+      }
+    }
   } catch {
     definirMensagem('erro', 'Falha na comunicação com o servidor.', false);
   } finally {
@@ -206,10 +215,6 @@ async function enviarSms() {
     return;
   }
 
-  // #region agent log
-  fetch('http://127.0.0.1:7802/ingest/f2f9b235-15de-4af1-bf02-3609801d8f94',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5874e6'},body:JSON.stringify({sessionId:'5874e6',runId:'manual-sms-ui',hypothesisId:'H1',location:'relatorio_sms.js:enviarSms:start',message:'manual_sms_ui_request_start',data:{idsCount:ids.length,dataTentativa:_dataAtual},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-
   btnEnviar.disabled = true;
   AppLoader.show();
 
@@ -219,9 +224,6 @@ async function enviarSms() {
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ ids, data_tentativa: _dataAtual }),
     });
-    // #region agent log
-    fetch('http://127.0.0.1:7802/ingest/f2f9b235-15de-4af1-bf02-3609801d8f94',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5874e6'},body:JSON.stringify({sessionId:'5874e6',runId:'manual-sms-ui',hypothesisId:'H5',location:'relatorio_sms.js:enviarSms:response',message:'manual_sms_ui_http_response',data:{ok:resp.ok,status:resp.status},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     const json = await resp.json();
 
     if (!json.success) {
@@ -256,12 +258,35 @@ async function enviarSms() {
       definirMensagem('erro', `${json.erros} erro(s) ao enviar SMS.`, false);
     }
 
+    if (json.resumo_filial && typeof json.resumo_filial === 'object') {
+      const r = json.resumo_filial;
+      if (r.tentado && r.ok === false && r.detalhe) {
+        definirMensagem('erro', `SMS de resumo para a filial falhou: ${r.detalhe}`, false);
+      } else if (!r.tentado && r.detalhe && json.enviados > 0) {
+        definirMensagem('aviso', `Resumo para a filial não foi enviado (${r.detalhe}).`, false);
+      }
+    }
+
+    if (json.verificacao_envio_sms) {
+      const v = json.verificacao_envio_sms;
+      const partes = [];
+      const ne = v.ids_solicitados_nao_elegiveis || [];
+      if (ne.length) {
+        partes.push(`${ne.length} selecionado(s) não foram processados (não elegíveis ao envio).`);
+      }
+      if (!v.dia_completo_todos_com_telefone_enviados && v.pendentes_com_telefone > 0) {
+        partes.push(`Ainda faltam ${v.pendentes_com_telefone} SMS com telefone nesta data.`);
+      } else if (v.dia_completo_todos_com_telefone_enviados && v.com_telefone > 0) {
+        partes.push('Todos os SMS válidos com telefone para esta data foram enviados.');
+      }
+      if (partes.length) {
+        definirMensagem('aviso', partes.join(' '), false);
+      }
+    }
+
     atualizarBtnEnviar();
     sincronizarChkTodos();
   } catch {
-    // #region agent log
-    fetch('http://127.0.0.1:7802/ingest/f2f9b235-15de-4af1-bf02-3609801d8f94',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5874e6'},body:JSON.stringify({sessionId:'5874e6',runId:'manual-sms-ui',hypothesisId:'H5',location:'relatorio_sms.js:enviarSms:catch',message:'manual_sms_ui_exception',data:{error:'fetch_or_json_failed'},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     definirMensagem('erro', 'Falha na comunicação com o servidor.', false);
     btnEnviar.disabled = false;
   } finally {

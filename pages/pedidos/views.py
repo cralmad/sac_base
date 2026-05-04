@@ -36,7 +36,6 @@ from .serializers import (
 from .services.importador_csv import importar_csv
 from .services.pedido_form import apply_prev_entrega_range_filters, persistir_pedido_cadastro
 
-
 PERMISSOES_PEDIDO = {
     "acessar": "pedidos.view_pedido",
     "consultar": "pedidos.view_pedido",
@@ -552,6 +551,13 @@ def pedido_inc_del_view(request):
     inc = Incidencia.objects.filter(id=inc_id, pedido__filial=filial_ativa).first()
     if not inc:
         return JsonResponse(build_error_payload("Incidência não encontrada."), status=404)
+    for foto in (inc.fotos or []):
+        delete_url = foto.get("delete_url", "")
+        if delete_url:
+            try:
+                requests.get(delete_url, timeout=10)
+            except requests.RequestException:
+                pass
     inc.delete()
     return JsonResponse(build_success_payload("Incidência excluída com sucesso!"))
 
@@ -674,6 +680,123 @@ def pedido_dev_foto_del_view(request):
 
     dev.fotos = [f for f in fotos if f.get("id") != imgbb_id]
     dev.save(update_fields=["fotos"])
+
+    return JsonResponse(build_success_payload("Foto removida."))
+
+
+@permission_required(PERMISSOES_PEDIDO["editar"], raise_exception=True)
+def pedido_inc_foto_add_view(request):
+    """Recebe base64 comprimida do frontend, faz upload no imgbb e persiste metadados."""
+    if request.method != "POST":
+        return json_method_not_allowed()
+
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse(build_error_payload("Filial ativa não encontrada."), status=403)
+
+    data = request.sisvar_front
+    inc_id = parse_int(data.get("inc_id"))
+    imagem_b64 = data.get("imagem_b64", "")
+
+    if not inc_id or not imagem_b64:
+        return JsonResponse(build_error_payload("Dados insuficientes."), status=400)
+
+    inc = Incidencia.objects.filter(id=inc_id, pedido__filial=filial_ativa).first()
+    if not inc:
+        return JsonResponse(build_error_payload("Incidência não encontrada."), status=404)
+
+    try:
+        raw_bytes = base64.b64decode(imagem_b64, validate=True)
+    except (binascii.Error, TypeError):
+        return JsonResponse(build_error_payload("Imagem inválida."), status=400)
+
+    if len(raw_bytes) > _IMGBB_MAX_BYTES:
+        return JsonResponse(
+            build_error_payload("A imagem excede 2 MB mesmo após compressão."), status=400
+        )
+
+    api_key = os.environ.get("IMGBB_API_KEY", "")
+    if not api_key:
+        return JsonResponse(
+            build_error_payload("Serviço de imagens não configurado."), status=500
+        )
+
+    try:
+        resp = requests.post(
+            "https://api.imgbb.com/1/upload",
+            data={"key": api_key, "image": imagem_b64},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        resultado = resp.json()
+    except requests.RequestException:
+        return JsonResponse(
+            build_error_payload("Falha de rede ao enviar imagem para o serviço de hospedagem."), status=502
+        )
+    except ValueError:
+        return JsonResponse(
+            build_error_payload("Resposta inválida do serviço de imagens."), status=502
+        )
+
+    if not resultado.get("success"):
+        return JsonResponse(build_error_payload("O serviço de hospedagem recusou a imagem."), status=502)
+
+    img_data = resultado["data"]
+    nova_foto = {
+        "id": img_data["id"],
+        "url": img_data["url"],
+        "thumb_url": img_data.get("thumb", {}).get("url", img_data["url"]),
+        "delete_url": img_data.get("delete_url", ""),
+    }
+
+    fotos = list(inc.fotos or [])
+    fotos.append(nova_foto)
+    inc.fotos = fotos
+    inc.save(update_fields=["fotos"])
+
+    foto_publica = {
+        "id": nova_foto["id"],
+        "url": nova_foto["url"],
+        "thumb_url": nova_foto["thumb_url"],
+    }
+    return JsonResponse(build_success_payload("Foto adicionada.", extra_payload={"foto": foto_publica}))
+
+
+@permission_required(PERMISSOES_PEDIDO["editar"], raise_exception=True)
+def pedido_inc_foto_del_view(request):
+    """Remove uma foto da incidência e notifica o imgbb via delete_url."""
+    if request.method != "POST":
+        return json_method_not_allowed()
+
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse(build_error_payload("Filial ativa não encontrada."), status=403)
+
+    data = request.sisvar_front
+    inc_id = parse_int(data.get("inc_id"))
+    imgbb_id = (data.get("imgbb_id") or "").strip()
+
+    if not inc_id or not imgbb_id:
+        return JsonResponse(build_error_payload("Dados insuficientes."), status=400)
+
+    inc = Incidencia.objects.filter(id=inc_id, pedido__filial=filial_ativa).first()
+    if not inc:
+        return JsonResponse(build_error_payload("Incidência não encontrada."), status=404)
+
+    fotos = list(inc.fotos or [])
+    alvo = next((f for f in fotos if f.get("id") == imgbb_id), None)
+    if not alvo:
+        return JsonResponse(build_error_payload("Foto não encontrada."), status=404)
+
+    delete_url = alvo.get("delete_url", "")
+    if delete_url:
+        try:
+            requests.get(delete_url, timeout=10)
+        except requests.RequestException:
+            pass
+
+    inc.fotos = [f for f in fotos if f.get("id") != imgbb_id]
+    inc.save(update_fields=["fotos"])
 
     return JsonResponse(build_success_payload("Foto removida."))
 

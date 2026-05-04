@@ -8,15 +8,11 @@ from django.views.decorators.http import require_http_methods, require_POST
 from datetime import datetime
 from collections import defaultdict
 from itertools import groupby
-import json
-import time
-import uuid
 
 from pages.pedidos.models import (
     TentativaEntrega,
     Pedido,
     Devolucao,
-    ESTADOS_SEGUE_PARA_ENTREGA,
     ESTADO_DEFINITIONS,
     ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA,
     MOTIVO_CHOICES,
@@ -24,28 +20,18 @@ from pages.pedidos.models import (
     exclude_tentativas_com_data_posterior,
 )
 from pages.motorista.models import Motorista
+from pages.pedidos.services.sms_relatorio import (
+    complemento_verificacao_solicitacao,
+    estado_verificacao_sms_dia,
+    executar_envio_sms_relatorio_manual,
+    ler_templates_sms_filial,
+    queryset_tentativas_envio_manual_por_ids,
+    sigla_pais_operacao_filial,
+)
 from sac_base.permissions_utils import build_action_permissions
 from sac_base.sisvar_builders import build_sisvar_payload
-from sac_base.sms_service import montar_mensagem, enviar_sms_bulkgate, HORARIO_PERIODO as _SMS_HORARIO_PERIODO
+from sac_base.sms_service import montar_mensagem
 from sac_base.smart_filter import apply_smart_number_filter, apply_smart_text_filter
-
-DEBUG_LOG_PATH = "debug-5874e6.log"
-DEBUG_SESSION_ID = "5874e6"
-
-
-def _debug_log(hypothesis_id: str, location: str, message: str, data: dict):
-    payload = {
-        "sessionId": DEBUG_SESSION_ID,
-        "runId": "manual-sms",
-        "hypothesisId": hypothesis_id,
-        "id": f"log_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}",
-        "timestamp": int(time.time() * 1000),
-        "location": location,
-        "message": message,
-        "data": data,
-    }
-    with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
-        f.write(json.dumps(payload, ensure_ascii=True) + "\n")
 
 PERMISSOES_RELATORIO = {
     "acessar": "pedidos.view_tentativaentrega",
@@ -100,6 +86,14 @@ def relatorio_conferencia_view(request):
 
     paginator = Paginator(qs, page_size)
     page = paginator.get_page(pagina)
+    pedido_ids_pagina = {mov.pedido_id for mov in page.object_list}
+    pedidos_com_devolucao = set()
+    if pedido_ids_pagina:
+        dq = Devolucao.objects.filter(pedido_id__in=pedido_ids_pagina)
+        if filial_ativa:
+            dq = dq.filter(pedido__filial=filial_ativa)
+        pedidos_com_devolucao = set(dq.values_list("pedido_id", flat=True).distinct())
+
     registros = []
     for mov in page.object_list:
         pedido = mov.pedido
@@ -118,6 +112,7 @@ def relatorio_conferencia_view(request):
             "volume_conf": pedido.volume_conf,
             "periodo": mov.periodo or "",
             "updated_at": mov.updated_at.isoformat(),
+            "tem_devolucao": pedido.id in pedidos_com_devolucao,
         })
     return JsonResponse({
         "success": True,
@@ -171,9 +166,18 @@ def relatorio_conferencia_imprimir_view(request):
     data = request.sisvar_front or {}
     filtros = data.get("filtros", {})
 
-    qs, erro = _build_qs_relatorio(filtros, filial=getattr(request, "filial_ativa", None))
+    filial = getattr(request, "filial_ativa", None)
+    qs, erro = _build_qs_relatorio(filtros, filial=filial)
     if erro:
         return JsonResponse({"success": False, "mensagem": erro}, status=400)
+
+    pedido_ids_rel = list(qs.values_list("pedido_id", flat=True).distinct())
+    pedidos_com_devolucao = set()
+    if pedido_ids_rel:
+        dq = Devolucao.objects.filter(pedido_id__in=pedido_ids_rel)
+        if filial:
+            dq = dq.filter(pedido__filial=filial)
+        pedidos_com_devolucao = set(dq.values_list("pedido_id", flat=True).distinct())
 
     # Monta grupos
     grupos = []
@@ -199,6 +203,7 @@ def relatorio_conferencia_imprimir_view(request):
                 "peso": str(pedido.peso) if pedido.peso is not None else "",
                 "obs_rota": pedido.obs_rota or "",
                 "conferido": conferido,
+                "tem_devolucao": pedido.id in pedidos_com_devolucao,
             })
         grupos.append({
             "carro": str(carro_val) if carro_val is not None else "—",
@@ -286,6 +291,13 @@ def relatorio_rotas_view(request):
             .distinct()
         )
 
+    pedidos_com_devolucao = set()
+    if pedido_ids:
+        dq = Devolucao.objects.filter(pedido_id__in=pedido_ids)
+        if filial_ativa:
+            dq = dq.filter(pedido__filial=filial_ativa)
+        pedidos_com_devolucao = set(dq.values_list("pedido_id", flat=True).distinct())
+
     grupos = []
     for grupo_key, items in groupby(movs, key=key_fn):
         linhas = []
@@ -325,6 +337,7 @@ def relatorio_rotas_view(request):
                 "obs_rota": p.obs_rota or "",
                 "segue_para_entrega": segue_para_entrega,
                 "nao_segue_para_entrega": (not segue_para_entrega) or tem_tentativa_posterior,
+                "tem_devolucao": p.id in pedidos_com_devolucao,
             })
         grupos.append({
             "carro": str(carro_val) if carro_val is not None else "—",
@@ -415,7 +428,13 @@ def relatorio_sms_view(request):
             "segue_para_entrega": segue_tentativa and not tem_posterior,
         })
 
-    return JsonResponse({"success": True, "registros": registros, "data_fmt": dt.strftime("%d/%m/%Y")})
+    verificacao_envio_sms = estado_verificacao_sms_dia(filial_ativa, dt)
+    return JsonResponse({
+        "success": True,
+        "registros": registros,
+        "data_fmt": dt.strftime("%d/%m/%Y"),
+        "verificacao_envio_sms": verificacao_envio_sms,
+    })
 
 
 @login_required
@@ -426,7 +445,6 @@ def relatorio_sms_enviar_view(request):
     data = request.sisvar_front or {}
     ids = data.get("ids", [])
     data_tentativa = data.get("data_tentativa", "").strip()
-    started_at = time.perf_counter()
 
     if not ids:
         return JsonResponse({"success": False, "mensagem": "Nenhum registro selecionado."}, status=400)
@@ -443,197 +461,24 @@ def relatorio_sms_enviar_view(request):
     if not filial_ativa:
         return JsonResponse({"success": False, "mensagem": "Filial ativa não encontrada na sessão."}, status=403)
 
-    # #region agent log
-    _debug_log(
-        "H1",
-        "views_relatorio.py:relatorio_sms_enviar_view",
-        "manual_sms_request_received",
-        {"ids_count": len(ids), "data_tentativa": data_tentativa, "filial_id": getattr(filial_ativa, "id", None)},
-    )
-    # #endregion
-
-    qs = exclude_tentativas_com_data_posterior(
-        TentativaEntrega.objects
-        .select_related(
-            "pedido",
-            "pedido__filial",
-            "pedido__filial__config",
-            "pedido__filial__pais_atuacao",
-        )
-        .filter(id__in=ids, sms_enviado=False, pedido__filial=filial_ativa)
-        .filter(estado__in=ESTADOS_SEGUE_PARA_ENTREGA)
-        .exclude(periodo__isnull=True)
-        .exclude(periodo="")
-    )
-
-    # Carrega configuração da filial a partir do primeiro registro
-    tentativas = list(qs)
-    # #region agent log
-    _debug_log(
-        "H2",
-        "views_relatorio.py:relatorio_sms_enviar_view",
-        "manual_sms_query_loaded",
-        {"tentativas_elegiveis": len(tentativas), "ids_recebidos": len(ids)},
-    )
-    # #endregion
+    tentativas = list(queryset_tentativas_envio_manual_por_ids(filial_ativa, dt, ids))
     if not tentativas:
         return JsonResponse({"success": False, "mensagem": "Nenhum registro elegível encontrado."}, status=400)
 
-    filial = tentativas[0].pedido.filial
-    try:
-        # Templates por período: sms_padrao_1 → MANHÃ, sms_padrao_2 → TARDE.
-        # Se sms_padrao_2 não estiver configurado, usa sms_padrao_1 como fallback.
-        template_manha = filial.config.sms_padrao_1 or ""
-        template_tarde = filial.config.sms_padrao_2 or template_manha
-    except Exception:
-        template_manha = ""
-        template_tarde = ""
-
-    if not template_manha and not template_tarde:
+    resultado = executar_envio_sms_relatorio_manual(filial_ativa, dt, tentativas)
+    if not resultado.get("ok"):
         return JsonResponse(
-            {"success": False, "mensagem": "Nenhum template SMS configurado (sms_padrao_1/2) para esta filial."},
+            {"success": False, "mensagem": resultado.get("mensagem", "Erro ao enviar SMS.")},
             status=400,
         )
 
-    sigla_pais = ""
-    ddi_padrao = "351"  # fallback: Portugal
-    if filial.pais_atuacao:
-        sigla_pais = filial.pais_atuacao.sigla or ""
-        # codigo_tel armazenado como "+351", "+55", etc.
-        codigo_tel = (filial.pais_atuacao.codigo_tel or "").strip().lstrip("+")
-        if codigo_tel:
-            ddi_padrao = codigo_tel
+    verificacao_envio_sms = estado_verificacao_sms_dia(filial_ativa, dt)
+    verificacao_envio_sms.update(complemento_verificacao_solicitacao(ids, tentativas))
+    verificacao_envio_sms["enviados_nesta_operacao"] = resultado["enviados"]
+    verificacao_envio_sms["erros_nesta_operacao"] = resultado["erros"]
 
-    enviados = 0
-    erros = 0
-    ids_enviados = []
-    erros_detalhe: list[str] = []
-    contagem_periodo: dict[str, int] = {}
-
-    for mov in tentativas:
-        pedido = mov.pedido
-        referencia = pedido.pedido or str(pedido.id_vonzu)
-        fones = [f.strip() for f in [pedido.fone_dest or "", pedido.fone_dest2 or ""] if f.strip()]
-        if not fones:
-            erros += 1
-            erros_detalhe.append(f"{referencia}: sem número de telefone.")
-            continue
-
-        # Seleciona template pelo período
-        if mov.periodo == "TARDE":
-            template_msg = template_tarde
-        else:
-            template_msg = template_manha
-
-        if not template_msg:
-            erros += 1
-            erros_detalhe.append(f"{referencia}: template para período '{mov.periodo}' não configurado.")
-            continue
-
-        try:
-            mensagem = montar_mensagem(template_msg, dt, mov.periodo, sigla_pais)
-        except Exception as exc:
-            erros += 1
-            erros_detalhe.append(f"{referencia}: erro na montagem da mensagem — {exc}")
-            continue
-
-        sucesso_algum = False
-        for fone in fones:
-            resultado = enviar_sms_bulkgate(fone, mensagem, ddi_padrao)
-            if resultado.get("sucesso"):
-                sucesso_algum = True
-            else:
-                erros += 1
-                erros_detalhe.append(f"{referencia} ({fone}): {resultado.get('erro', 'Erro desconhecido.')}")
-
-        if sucesso_algum:
-            mov.sms_enviado = True
-            mov.save(update_fields=["sms_enviado"])
-            enviados += 1
-            ids_enviados.append(mov.id)
-            contagem_periodo[mov.periodo] = contagem_periodo.get(mov.periodo, 0) + 1
-
-    # Resumo para a filial (sms_confirm)
-    # #region agent log
-    _numero_ok = bool((filial.numero or "").strip())
-    _debug_log(
-        "H6",
-        "views_relatorio.py:relatorio_sms_enviar_view",
-        "sms_resumo_gate",
-        {
-            "sms_confirm": bool(filial.sms_confirm),
-            "numero_configurado": _numero_ok,
-            "enviados": enviados,
-        },
-    )
-    # #endregion
-    if filial.sms_confirm and filial.numero and enviados > 0:
-        partes_resumo = [f"SMS enviados em {dt.strftime('%d/%m/%Y')}:"]
-        for periodo, qtd in sorted(contagem_periodo.items()):
-            horario = _SMS_HORARIO_PERIODO.get(periodo, periodo)
-            partes_resumo.append(f"  {periodo} ({horario}): {qtd}")
-        partes_resumo.append(f"Total: {enviados}")
-        resumo = "\n".join(partes_resumo)
-        # #region agent log
-        _debug_log(
-            "H7",
-            "views_relatorio.py:relatorio_sms_enviar_view",
-            "sms_resumo_bulkgate_attempt",
-            {"resumo_len": len(resumo), "filial_id": getattr(filial, "id", None)},
-        )
-        # #endregion
-        _resumo_resultado = enviar_sms_bulkgate(filial.numero, resumo, ddi_padrao)
-        # #region agent log
-        _debug_log(
-            "H7",
-            "views_relatorio.py:relatorio_sms_enviar_view",
-            "sms_resumo_bulkgate_result",
-            {
-                "sucesso": bool(_resumo_resultado.get("sucesso")),
-                "erro": (_resumo_resultado.get("erro") or "")[:200],
-            },
-        )
-        # #endregion
-    else:
-        # #region agent log
-        _skip = []
-        if not filial.sms_confirm:
-            _skip.append("sms_confirm_false")
-        if not filial.numero or not (filial.numero or "").strip():
-            _skip.append("numero_vazio")
-        if enviados <= 0:
-            _skip.append("nenhum_enviado")
-        _debug_log(
-            "H6",
-            "views_relatorio.py:relatorio_sms_enviar_view",
-            "sms_resumo_skipped",
-            {"reasons": _skip},
-        )
-        # #endregion
-
-    # #region agent log
-    _debug_log(
-        "H1",
-        "views_relatorio.py:relatorio_sms_enviar_view",
-        "manual_sms_request_finished",
-        {
-            "duracao_ms": int((time.perf_counter() - started_at) * 1000),
-            "enviados": enviados,
-            "erros": erros,
-            "ids_enviados_count": len(ids_enviados),
-            "erros_detalhe_count": len(erros_detalhe),
-        },
-    )
-    # #endregion
-
-    return JsonResponse({
-        "success": True,
-        "enviados": enviados,
-        "erros": erros,
-        "erros_detalhe": erros_detalhe,
-        "ids_enviados": ids_enviados,
-        "mensagem": f"{enviados} SMS enviado(s) com sucesso." + (f" {erros} erro(s)." if erros else ""),
-    })
+    corpo = {k: v for k, v in resultado.items() if k != "ok"}
+    return JsonResponse({"success": True, **corpo, "verificacao_envio_sms": verificacao_envio_sms})
 
 
 @login_required
@@ -658,18 +503,8 @@ def relatorio_sms_preview_view(request):
     if not filial:
         return JsonResponse({"success": False, "mensagem": "Nenhuma filial ativa na sessão."}, status=400)
 
-    template_manha = ""
-    template_tarde = ""
-    sigla_pais = ""
-    try:
-        # Templates por período: sms_padrao_1 → MANHÃ, sms_padrao_2 → TARDE.
-        # Se sms_padrao_2 não estiver configurado, usa sms_padrao_1 como fallback.
-        template_manha = filial.config.sms_padrao_1 or ""
-        template_tarde = filial.config.sms_padrao_2 or template_manha
-        if filial.pais_atuacao:
-            sigla_pais = filial.pais_atuacao.sigla or ""
-    except Exception:
-        pass
+    template_manha, template_tarde = ler_templates_sms_filial(filial)
+    sigla_pais = sigla_pais_operacao_filial(filial)
 
     if not template_manha and not template_tarde:
         return JsonResponse({"success": False, "mensagem": "Nenhum template SMS configurado (sms_padrao_1/2) para a filial ativa."}, status=400)
@@ -830,6 +665,7 @@ def relatorio_gerencial_view(request):
             "estado":         p.estado or "",
             "mov":            mov_count,
             "dev":            dev_count,
+            "tem_devolucao":  dev_count > 0,
             "armazem":        armazem,
             "segue_para_entrega": estado_segue_para_entrega(mov.estado) and not tem_tentativa_posterior,
         })

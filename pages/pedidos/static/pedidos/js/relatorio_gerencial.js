@@ -265,7 +265,7 @@ function renderizarRelatorio(linhas, dataFmt, totalPedidos) {
 
   const thead = document.createElement('thead');
   const trHead = document.createElement('tr');
-  ['Data', 'Referência', 'ID Vonzu', 'T', 'Cidade', 'C. Postal', 'Vol', 'Peso', 'Estado', 'Mov', 'Dev', 'Armazém'].forEach(h => {
+  ['Data', 'Referência', 'ID Vonzu', 'T', 'D', 'Cidade', 'C. Postal', 'Vol', 'Peso', 'Estado', 'Mov', 'Dev', 'Armazém'].forEach(h => {
     const th = document.createElement('th');
     th.textContent = h;
     trHead.appendChild(th);
@@ -285,6 +285,7 @@ function renderizarRelatorio(linhas, dataFmt, totalPedidos) {
       { val: linha.pedido },
       { val: linha.id_vonzu },
       { val: linha.tipo, cls: linha.tipo === 'R' ? 'rg-tipo-r' : 'rg-tipo-e' },
+      { val: linha.tem_devolucao ? '\u2022' : '', cls: linha.tem_devolucao ? 'rg-dev-sim' : '' },
       { val: linha.cidade_dest },
       { val: linha.codpost_dest },
       { val: linha.volumes, bold: volNegrito },

@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.contrib.auth.decorators import permission_required
@@ -6,6 +7,8 @@ from django.contrib.auth.models import Group, Permission
 from pages.auditoria.models import AuditEvent
 from pages.auditoria.utils import diff_snapshots, registrar_auditoria
 from pages.filial.models import Filial, UsuarioFilial
+from pages.filial.services import get_filiais_escrita_queryset
+from sac_base.coercion import parse_int
 from sac_base.permissions_utils import build_action_permissions, permission_denied_response
 from sac_base.form_validador import SchemaValidator
 from sac_base.sisvar_builders import build_error_payload, build_form_response, build_form_state, build_forms_response, build_records_response, build_sisvar_payload
@@ -89,8 +92,18 @@ def listar_grupos_cadastrados():
     return [{"id": grupo.id, "nome": grupo.name} for grupo in grupos]
 
 
-def listar_filiais_cadastradas():
-    filiais = Filial.objects.order_by("nome")
+def listar_filiais_cadastradas(usuario=None):
+    # Mesma base que get_filiais_escrita_queryset(superuser): ativas com país de atuação.
+    if usuario is not None and getattr(usuario, "is_superuser", False):
+        filiais = (
+            Filial.objects.filter(ativa=True, pais_atuacao__isnull=False)
+            .select_related("pais_atuacao")
+            .order_by("nome")
+        )
+    elif usuario is not None:
+        filiais = get_filiais_escrita_queryset(usuario).order_by("nome")
+    else:
+        filiais = Filial.objects.none()
     return [
         {
             "id": filial.id,
@@ -213,9 +226,15 @@ def resolver_grupos(grupo_ids):
     return grupos_ordenados, grupos_invalidos
 
 
-def resolver_vinculos_filial(vinculos_payload):
+def resolver_vinculos_filial(vinculos_payload, usuario_operador=None):
     if not isinstance(vinculos_payload, list):
         return None, ["Lista de matriz/filial inválida"]
+
+    permitidas_ids = None
+    if usuario_operador is not None and not getattr(usuario_operador, "is_superuser", False):
+        permitidas_ids = set(
+            get_filiais_escrita_queryset(usuario_operador).values_list("id", flat=True)
+        )
 
     vinculos_normalizados = []
     filiais_invalidas = []
@@ -250,6 +269,8 @@ def resolver_vinculos_filial(vinculos_payload):
     for filial_id in ids_vistos:
         if filial_id not in filiais_por_id:
             filiais_invalidas.append(f"Matriz/filial inválida: {filial_id}")
+        elif permitidas_ids is not None and filial_id not in permitidas_ids:
+            filiais_invalidas.append(f"Matriz/filial fora do seu escopo: {filial_id}")
 
     return vinculos_normalizados, filiais_invalidas
 
@@ -353,6 +374,21 @@ def cadastro_grupo_view(request):
             status=422,
         )
 
+    operador_grupo = getattr(request, "user", None)
+    if estado in ("novo", "editar"):
+        permissoes_gerenciaveis_grupo = obter_permissoes_gerenciaveis(operador_grupo)
+        permissoes_sem_alcada_grupo = sorted(
+            codename for codename in permissoes if codename not in permissoes_gerenciaveis_grupo
+        )
+        if permissoes_sem_alcada_grupo:
+            return JsonResponse(
+                build_error_payload(
+                    "Você só pode atribuir permissões que já possui: "
+                    f"{', '.join(permissoes_sem_alcada_grupo)}"
+                ),
+                status=403,
+            )
+
     match estado:
 
         case 'novo':
@@ -428,7 +464,7 @@ def cadastro_grupo_cons_view(request):
     form = dataFront.get("form", {}).get(nomeFormCons, {})
     campos = form.get("campos", {})
 
-    id_selecionado = int(campos.get("id_selecionado") or 0)
+    id_selecionado = parse_int(campos.get("id_selecionado"), context="form") or 0
 
     if id_selecionado:
         try:
@@ -506,7 +542,7 @@ def permissao_usuario_view(request):
             datasets={
                 "usuarios_ativos": listar_usuarios_ativos(operador),
                 "grupos_cadastrados": listar_grupos_cadastrados(),
-                "filiais_cadastradas": listar_filiais_cadastradas(),
+                "filiais_cadastradas": listar_filiais_cadastradas(operador),
                 "grupos_gerenciaveis_ids": listar_ids_grupos_gerenciaveis(operador),
                 "permissoes_gerenciaveis": sorted(obter_permissoes_gerenciaveis(operador)),
             },
@@ -570,7 +606,7 @@ def permissao_usuario_view(request):
             status=422,
         )
 
-    vinculos_filial, filiais_invalidas = resolver_vinculos_filial(filiais)
+    vinculos_filial, filiais_invalidas = resolver_vinculos_filial(filiais, operador)
     if filiais_invalidas:
         return JsonResponse(
             build_error_payload([f"Matriz e Filiais - {mensagem}" for mensagem in filiais_invalidas]),
@@ -602,37 +638,38 @@ def permissao_usuario_view(request):
 
     match estado:
         case 'novo' | 'editar':
-            grupos_preservados = [
-                grupo
-                for grupo in usuario.groups.prefetch_related("permissions__content_type")
-                if grupo.id not in grupos_gerenciaveis_ids
-            ]
-            permissoes_preservadas = [
-                permissao
-                for permissao in usuario.user_permissions.select_related("content_type")
-                if f"{permissao.content_type.app_label}.{permissao.codename}" not in permissoes_gerenciaveis
-            ]
+            with transaction.atomic():
+                grupos_preservados = [
+                    grupo
+                    for grupo in usuario.groups.prefetch_related("permissions__content_type")
+                    if grupo.id not in grupos_gerenciaveis_ids
+                ]
+                permissoes_preservadas = [
+                    permissao
+                    for permissao in usuario.user_permissions.select_related("content_type")
+                    if f"{permissao.content_type.app_label}.{permissao.codename}" not in permissoes_gerenciaveis
+                ]
 
-            usuario.groups.set([*grupos_preservados, *grupos_obj])
-            usuario.user_permissions.set([*permissoes_preservadas, *permissoes_obj])
-            UsuarioFilial.objects.filter(usuario=usuario).delete()
-            UsuarioFilial.objects.bulk_create([
-                UsuarioFilial(
-                    usuario=usuario,
-                    filial_id=vinculo["filial_id"],
-                    ativo=vinculo["ativo"],
-                    pode_consultar=bool(vinculo["ativo"] and (vinculo["pode_consultar"] or vinculo["pode_escrever"])),
-                    pode_escrever=bool(vinculo["ativo"] and vinculo["pode_escrever"]),
+                usuario.groups.set([*grupos_preservados, *grupos_obj])
+                usuario.user_permissions.set([*permissoes_preservadas, *permissoes_obj])
+                UsuarioFilial.objects.filter(usuario=usuario).delete()
+                UsuarioFilial.objects.bulk_create([
+                    UsuarioFilial(
+                        usuario=usuario,
+                        filial_id=vinculo["filial_id"],
+                        ativo=vinculo["ativo"],
+                        pode_consultar=bool(vinculo["ativo"] and (vinculo["pode_consultar"] or vinculo["pode_escrever"])),
+                        pode_escrever=bool(vinculo["ativo"] and vinculo["pode_escrever"]),
+                    )
+                    for vinculo in vinculos_filial
+                ])
+                after = snapshot_usuario_permissoes(usuario)
+                registrar_auditoria(
+                    actor=request.user,
+                    action=AuditEvent.ACTION_PERMISSION_ASSIGN,
+                    instance=usuario,
+                    changed_fields=diff_snapshots(before, after),
                 )
-                for vinculo in vinculos_filial
-            ])
-            after = snapshot_usuario_permissoes(usuario)
-            registrar_auditoria(
-                actor=request.user,
-                action=AuditEvent.ACTION_PERMISSION_ASSIGN,
-                instance=usuario,
-                changed_fields=diff_snapshots(before, after),
-            )
         case _:
             return JsonResponse(build_error_payload(f"Estado inválido: '{estado}'"), status=400)
 
@@ -657,7 +694,7 @@ def permissao_usuario_cons_view(request):
     campos = form.get("campos", {})
     operador = getattr(request, "user", None)
 
-    id_selecionado = int(campos.get("id_selecionado") or 0)
+    id_selecionado = parse_int(campos.get("id_selecionado"), context="form") or 0
 
     if id_selecionado:
         usuario = buscar_usuario_alvo(id_selecionado, operador)

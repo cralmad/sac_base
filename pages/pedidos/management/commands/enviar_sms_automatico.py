@@ -5,8 +5,11 @@ Para cada FilialConfig com sms_auto configurado, verifica se a hora actual
 de Lisboa já ultrapassou o horário configurado e, se ainda houver
 TentativaEntrega elegíveis com sms_enviado=False, envia os SMS.
 
-A guarda contra duplo envio é natural: após o envio os registos ficam com
-sms_enviado=True e o command seguinte não encontra mais nada para enviar.
+Numa única execução do comando: reintentos com backoff para erros transientes
+(quota/rede) e rondas sobre a base de dados até esgotar pendentes com telefone
+ou até limites de segurança (ver pages.pedidos.services.sms_envio_automatico).
+
+A guarda contra duplo envio: após sucesso os registos ficam com sms_enviado=True.
 
 Uso:
     python manage.py enviar_sms_automatico
@@ -20,46 +23,26 @@ Flags de teste:
 """
 
 import logging
-import json
 import time
-import uuid
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from django.core.management.base import BaseCommand
 
 from pages.filial.models import FilialConfig
-from pages.pedidos.models import (
-    ESTADOS_SEGUE_PARA_ENTREGA,
-    TentativaEntrega,
-    exclude_tentativas_com_data_posterior,
+from pages.pedidos.services.sms_envio_automatico import (
+    MAX_PAUSAS_SEM_PROGRESSO,
+    MAX_RONDAS_FILIAL,
+    PAUSA_SEM_PROGRESSO_SEG,
+    contar_pendentes_sem_telefone,
+    listar_pendentes_com_telefone,
 )
-from sac_base.sms_service import (
-    HORARIO_PERIODO,
-    enviar_sms_bulkgate,
-    montar_mensagem,
-)
+from pages.pedidos.services.sms_relatorio import qs_tentativas_sms_pendentes_envio
+from sac_base.sms_service import HORARIO_PERIODO, montar_mensagem, enviar_sms_bulkgate_resiliente
 
 logger = logging.getLogger(__name__)
 
 LISBON_TZ = ZoneInfo("Europe/Lisbon")
-DEBUG_LOG_PATH = "debug-5874e6.log"
-DEBUG_SESSION_ID = "5874e6"
-
-
-def _debug_log(hypothesis_id: str, location: str, message: str, data: dict):
-    payload = {
-        "sessionId": DEBUG_SESSION_ID,
-        "runId": "auto-sms",
-        "hypothesisId": hypothesis_id,
-        "id": f"log_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}",
-        "timestamp": int(time.time() * 1000),
-        "location": location,
-        "message": message,
-        "data": data,
-    }
-    with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
-        f.write(json.dumps(payload, ensure_ascii=True) + "\n")
 
 
 class Command(BaseCommand):
@@ -113,20 +96,6 @@ class Command(BaseCommand):
             return
 
         total_filiais_enviadas = 0
-        # #region agent log
-        _debug_log(
-            "H4",
-            "enviar_sms_automatico.py:handle",
-            "auto_sms_command_started",
-            {
-                "force": force,
-                "dry_run": dry_run,
-                "now_lisbon": now_lisbon.isoformat(),
-                "now_time": now_time.strftime("%H:%M"),
-                "configs_count": configs.count(),
-            },
-        )
-        # #endregion
 
         for cfg in configs:
             filial = cfg.filial
@@ -135,18 +104,6 @@ class Command(BaseCommand):
             if not force:
                 # Só envia se a hora actual de Lisboa já ultrapassou sms_auto
                 if now_time < sms_time:
-                    # #region agent log
-                    _debug_log(
-                        "H4",
-                        "enviar_sms_automatico.py:handle",
-                        "auto_sms_skipped_by_schedule",
-                        {
-                            "filial_id": getattr(filial, "id", None),
-                            "sms_time": sms_time.strftime("%H:%M"),
-                            "now_time": now_time.strftime("%H:%M"),
-                        },
-                    )
-                    # #endregion
                     self.stdout.write(
                         f"  ↷ Filial '{filial}': horário configurado {sms_time.strftime('%H:%M')} "
                         f"ainda não chegou (agora {now_time.strftime('%H:%M')}). Ignorando."
@@ -183,19 +140,12 @@ class Command(BaseCommand):
             if codigo_tel:
                 ddi_padrao = codigo_tel
 
-        qs = exclude_tentativas_com_data_posterior(
-            TentativaEntrega.objects.select_related("pedido", "pedido__filial").filter(
-                pedido__filial=filial,
-                data_tentativa=today,
-                sms_enviado=False,
-                estado__in=ESTADOS_SEGUE_PARA_ENTREGA,
+        tentativas_snapshot = list(
+            qs_tentativas_sms_pendentes_envio(filial, today).select_related(
+                "pedido", "pedido__filial"
             )
-            .exclude(periodo__isnull=True)
-            .exclude(periodo="")
         )
-
-        tentativas = list(qs)
-        if not tentativas:
+        if not tentativas_snapshot:
             self.stdout.write(
                 f"  Filial '{filial}': sem tentativas elegíveis para {today.strftime('%d/%m/%Y')}."
             )
@@ -205,60 +155,151 @@ class Command(BaseCommand):
         erros = 0
         contagem_periodo: dict[str, int] = {}
 
-        for mov in tentativas:
-            pedido = mov.pedido
-            referencia = pedido.pedido or str(getattr(pedido, "id_vonzu", pedido.pk))
-            fones = [f.strip() for f in [pedido.fone_dest or "", pedido.fone_dest2 or ""] if f.strip()]
+        if dry_run:
+            for mov in tentativas_snapshot:
+                pedido = mov.pedido
+                referencia = pedido.pedido or str(getattr(pedido, "id_vonzu", pedido.pk))
+                fones = [f.strip() for f in [pedido.fone_dest or "", pedido.fone_dest2 or ""] if f.strip()]
 
-            if not fones:
-                self.stderr.write(f"    [{referencia}] Sem telefone. Ignorado.")
-                erros += 1
-                continue
+                if not fones:
+                    self.stderr.write(f"    [{referencia}] Sem telefone. Ignorado.")
+                    erros += 1
+                    continue
 
-            # Seleciona template pelo período
-            if mov.periodo == "TARDE":
-                template_msg = template_tarde
-            else:
-                template_msg = template_manha
+                if mov.periodo == "TARDE":
+                    template_msg = template_tarde
+                else:
+                    template_msg = template_manha
 
-            if not template_msg:
-                self.stderr.write(f"    [{referencia}] Template para período '{mov.periodo}' não configurado. Ignorado.")
-                erros += 1
-                continue
+                if not template_msg:
+                    self.stderr.write(
+                        f"    [{referencia}] Template para período '{mov.periodo}' não configurado. Ignorado."
+                    )
+                    erros += 1
+                    continue
 
-            try:
-                mensagem = montar_mensagem(template_msg, today, mov.periodo, sigla_pais)
-            except Exception as exc:
-                self.stderr.write(f"    [{referencia}] Erro ao montar mensagem: {exc}")
-                erros += 1
-                continue
+                try:
+                    mensagem = montar_mensagem(template_msg, today, mov.periodo, sigla_pais)
+                except Exception as exc:
+                    self.stderr.write(f"    [{referencia}] Erro ao montar mensagem: {exc}")
+                    erros += 1
+                    continue
 
-            if dry_run:
                 self.stdout.write(
                     f"    [{referencia}] [DRY-RUN] Mensagem para {', '.join(fones)}:\n"
                     f"      {mensagem}"
                 )
                 enviados += 1
                 contagem_periodo[mov.periodo] = contagem_periodo.get(mov.periodo, 0) + 1
-                continue
+        else:
+            sem_tel = contar_pendentes_sem_telefone(filial, today)
+            if sem_tel:
+                self.stderr.write(
+                    f"  Filial '{filial}': {sem_tel} registro(s) sem telefone (não enviáveis por SMS)."
+                )
+                erros += sem_tel
 
-            sucesso_algum = False
-            for fone in fones:
-                resultado = enviar_sms_bulkgate(fone, mensagem, ddi_padrao)
-                if resultado.get("sucesso"):
-                    sucesso_algum = True
-                    self.stdout.write(f"    [{referencia}] SMS enviado para {fone}.")
-                else:
-                    self.stderr.write(
-                        f"    [{referencia}] Falha para {fone}: {resultado.get('erro')}"
+            ronda = 0
+            pausas_sem_progresso = 0
+            ids_sem_retry_definitivo: set[int] = set()
+
+            while ronda < MAX_RONDAS_FILIAL:
+                ronda += 1
+                tentativas = listar_pendentes_com_telefone(filial, today)
+                if not tentativas:
+                    break
+
+                houve_sucesso_nesta_ronda = False
+
+                for mov in tentativas:
+                    if mov.id in ids_sem_retry_definitivo:
+                        continue
+                    pedido = mov.pedido
+                    referencia = pedido.pedido or str(getattr(pedido, "id_vonzu", pedido.pk))
+                    fones = [f.strip() for f in [pedido.fone_dest or "", pedido.fone_dest2 or ""] if f.strip()]
+
+                    if mov.periodo == "TARDE":
+                        template_msg = template_tarde
+                    else:
+                        template_msg = template_manha
+
+                    if not template_msg:
+                        self.stderr.write(
+                            f"    [{referencia}] Template para período '{mov.periodo}' não configurado. Ignorado."
+                        )
+                        erros += 1
+                        ids_sem_retry_definitivo.add(mov.id)
+                        continue
+
+                    try:
+                        mensagem = montar_mensagem(template_msg, today, mov.periodo, sigla_pais)
+                    except Exception as exc:
+                        self.stderr.write(f"    [{referencia}] Erro ao montar mensagem: {exc}")
+                        erros += 1
+                        ids_sem_retry_definitivo.add(mov.id)
+                        continue
+
+                    sucesso_algum = False
+                    for fone in fones:
+
+                        def _on_retry(tentativa, err, seg, ref=referencia, fn=fone):
+                            self.stdout.write(
+                                f"    [{ref}] Reintento SMS {tentativa} para {fn} "
+                                f"(espera {seg}s): {(err or '')[:120]}"
+                            )
+
+                        resultado = enviar_sms_bulkgate_resiliente(
+                            fone,
+                            mensagem,
+                            ddi_padrao,
+                            log_prefix=f"[{referencia}] ",
+                            on_retry=_on_retry,
+                        )
+                        if resultado.get("sucesso"):
+                            sucesso_algum = True
+                            self.stdout.write(f"    [{referencia}] SMS enviado para {fone}.")
+                        else:
+                            self.stderr.write(
+                                f"    [{referencia}] Falha para {fone}: {resultado.get('erro')}"
+                            )
+                            erros += 1
+
+                    if sucesso_algum:
+                        mov.sms_enviado = True
+                        mov.save(update_fields=["sms_enviado"])
+                        enviados += 1
+                        contagem_periodo[mov.periodo] = contagem_periodo.get(mov.periodo, 0) + 1
+                        houve_sucesso_nesta_ronda = True
+
+                pendentes_db = listar_pendentes_com_telefone(filial, today)
+                ainda = [m for m in pendentes_db if m.id not in ids_sem_retry_definitivo]
+                if not ainda and pendentes_db:
+                    self.stdout.write(
+                        f"  Filial '{filial}': {len(pendentes_db)} pendente(s) sem retry automático "
+                        "(template/montagem ou limite de erros)."
                     )
-                    erros += 1
+                    break
+                if not ainda:
+                    break
 
-            if sucesso_algum:
-                mov.sms_enviado = True
-                mov.save(update_fields=["sms_enviado"])
-                enviados += 1
-                contagem_periodo[mov.periodo] = contagem_periodo.get(mov.periodo, 0) + 1
+                if not houve_sucesso_nesta_ronda:
+                    pausas_sem_progresso += 1
+                    if pausas_sem_progresso > MAX_PAUSAS_SEM_PROGRESSO:
+                        self.stderr.write(
+                            f"  [ERRO] Filial '{filial}': limite de pausas sem progresso atingido; "
+                            f"permanecem {len(ainda)} SMS pendente(s) com telefone."
+                        )
+                        logger.error(
+                            "enviar_sms_automatico | filial=%s | pendentes=%s após pausas sem progresso",
+                            filial,
+                            len(ainda),
+                        )
+                        break
+                    self.stdout.write(
+                        f"  Ronda {ronda}: {len(ainda)} pendente(s), sem sucesso nesta ronda; "
+                        f"pausa {PAUSA_SEM_PROGRESSO_SEG}s (quota/rede)..."
+                    )
+                    time.sleep(PAUSA_SEM_PROGRESSO_SEG)
 
         self.stdout.write(
             f"  Filial '{filial}': {enviados} {'simulado(s)' if dry_run else 'enviado(s)'}, {erros} erro(s)."
@@ -273,61 +314,21 @@ class Command(BaseCommand):
         )
 
         # SMS de confirmação para a filial (sms_confirm) — ignorado em dry-run
-        # #region agent log
-        _numero = getattr(filial, "numero", None) or ""
-        _debug_log(
-            "H6",
-            "enviar_sms_automatico.py:_enviar_para_filial",
-            "sms_resumo_auto_gate",
-            {
-                "dry_run": dry_run,
-                "sms_confirm": bool(getattr(filial, "sms_confirm", False)),
-                "numero_configurado": bool(_numero.strip()),
-                "enviados": enviados,
-                "filial_id": getattr(filial, "id", None),
-            },
-        )
-        # #endregion
-        if not dry_run and getattr(filial, "sms_confirm", False) and getattr(filial, "numero", None) and enviados > 0:
+        _numero_resumo = (getattr(filial, "numero", None) or "").strip()
+        if not dry_run and getattr(filial, "sms_confirm", False) and _numero_resumo and enviados > 0:
             partes = [f"SMS automáticos {today.strftime('%d/%m/%Y')}:"]
             for periodo, qtd in sorted(contagem_periodo.items()):
                 horario = HORARIO_PERIODO.get(periodo, periodo)
                 partes.append(f"  {periodo} ({horario}): {qtd}")
             partes.append(f"Total: {enviados}")
             _texto_resumo = "\n".join(partes)
-            # #region agent log
-            _debug_log(
-                "H7",
-                "enviar_sms_automatico.py:_enviar_para_filial",
-                "sms_resumo_auto_bulkgate_attempt",
-                {"resumo_len": len(_texto_resumo), "filial_id": getattr(filial, "id", None)},
+            _resumo_res = enviar_sms_bulkgate_resiliente(
+                _numero_resumo,
+                _texto_resumo,
+                ddi_padrao,
+                log_prefix="[resumo_filial] ",
             )
-            # #endregion
-            _resumo_res = enviar_sms_bulkgate(filial.numero, _texto_resumo, ddi_padrao)
-            # #region agent log
-            _debug_log(
-                "H7",
-                "enviar_sms_automatico.py:_enviar_para_filial",
-                "sms_resumo_auto_bulkgate_result",
-                {
-                    "sucesso": bool(_resumo_res.get("sucesso")),
-                    "erro": (_resumo_res.get("erro") or "")[:200],
-                },
-            )
-            # #endregion
-        elif not dry_run:
-            # #region agent log
-            _skip = []
-            if not getattr(filial, "sms_confirm", False):
-                _skip.append("sms_confirm_false")
-            if not getattr(filial, "numero", None) or not str(filial.numero).strip():
-                _skip.append("numero_vazio")
-            if enviados <= 0:
-                _skip.append("nenhum_enviado")
-            _debug_log(
-                "H6",
-                "enviar_sms_automatico.py:_enviar_para_filial",
-                "sms_resumo_auto_skipped",
-                {"reasons": _skip, "filial_id": getattr(filial, "id", None)},
-            )
-            # #endregion
+            if not _resumo_res.get("sucesso"):
+                _erro_r = _resumo_res.get("erro") or "Erro desconhecido."
+                self.stderr.write(f"  [ERRO] SMS resumo para a filial falhou: {_erro_r}")
+                logger.warning("enviar_sms_automatico | resumo_filial falhou | filial=%s | %s", filial, _erro_r)

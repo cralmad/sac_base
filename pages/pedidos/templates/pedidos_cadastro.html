@@ -236,6 +236,7 @@
                   <th>Valor</th>
                   <th>Motorista</th>
                   <th>Obs</th>
+                  <th class="text-center">Fotos</th>
                   <th class="text-center">Ações</th>
                 </tr>
               </thead>
@@ -600,11 +601,12 @@
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h1 class="modal-title fs-5">Fotos da Devolução</h1>
+        <h1 class="modal-title fs-5" id="modalFotosTitulo">Fotos da Devolução</h1>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <input type="hidden" id="fotos_dev_id">
+        <input type="hidden" id="fotos_reg_id" value="">
+        <input type="hidden" id="fotos_reg_kind" value="dev">
         <div id="fotos-grid" class="row g-2 mb-3"></div>
         <div id="fotos-upload-area">
           <div class="d-flex gap-2 flex-wrap">

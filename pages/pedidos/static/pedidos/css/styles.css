@@ -154,6 +154,20 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+.mov-field-dev {
+  background: #fff3cd;
+  border: 1px solid #ffe69c;
+  border-radius: 6px;
+  padding: 0.3rem 0.45rem;
+}
+.mov-field-dev .mov-field-label {
+  color: #664d03;
+  font-weight: 600;
+}
+.mov-field-dev > span:last-child {
+  color: #664d03;
+  font-weight: 700;
+}
 /* Padding reduzido em telas muito pequenas */
 @media (max-width: 374px) {
   .mov-card {

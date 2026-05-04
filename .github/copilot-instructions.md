@@ -4,6 +4,8 @@ Este documento define padroes de implementacao para o projeto. Em caso de confli
 
 Referencia de padrao: `cadastro_view` (`pages/usuario/views.py`) e dependencias (`usuario.html`, `scriptsuser.js`).
 
+Envio de SMS (manual, automático, BulkGate, elegibilidade): ver secao **## Estrutura para envio do SMS** em `.cursorrules` (nao duplicar aqui).
+
 ---
 
 ## 1) Escopo e prioridade
@@ -53,6 +55,7 @@ Se uma logica pode ser usada por mais de uma tela/app, ela deve ficar em utilita
 - `sac_base/permissions_utils.py`: permissoes e payloads de erro (`build_action_permissions(...)`, `permission_denied_response(...)`, `extract_validation_messages(...)`).
 - `sac_base/smart_filter.py`: `apply_smart_number_filter(...)` e `apply_smart_text_filter(...)`.
 - `pages/filial/services.py`: `get_filiais_escrita_queryset(...)` e `obter_filial_escrita(...)`.
+- `pages/financeiro/services/financeiro_service.py`: `FinanceiroService` (executor do modulo financeiro; ver **`.cursorrules`** — secao *Estrutura Financeira do Projeto*).
 
 ### Regra pratica
 - **MUST:** reutilizar helpers globais existentes.
@@ -242,6 +245,12 @@ heroku config:set BANCO_DE_DADOS="postgres://..." \
 heroku run python manage.py migrate
 heroku run python manage.py collectstatic --noinput
 ```
+
+---
+
+## Modulo financeiro (`pages.financeiro`)
+
+A arquitetura, contratos e MUST deste modulo estao documentados na secao **## Estrutura Financeira do Projeto** em **`.cursorrules`** (fonte unica). Aqui mantem-se apenas o apontamento no mapa de reuso (secao 3).
 
 ---
 

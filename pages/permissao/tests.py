@@ -6,6 +6,7 @@ from django.core.exceptions import PermissionDenied
 from django.test import RequestFactory, TestCase
 
 from pages.auditoria.models import AuditEvent
+from pages.core.models import Pais
 from pages.filial.models import Filial, UsuarioFilial
 from .views import (
 	cadastro_grupo_cons_view,
@@ -83,7 +84,11 @@ class CadastroGrupoViewTests(TestCase):
 			cadastro_grupo_view(request)
 
 	def test_post_salva_permissao_auth_sem_erro_de_content_type(self):
-		self.operador.user_permissions.set([self.perm_view_group, self.perm_add_group])
+		self.operador.user_permissions.set([
+			self.perm_view_group,
+			self.perm_add_group,
+			self.perm_change_group,
+		])
 		payload = {
 			"form": {
 				"cadGrupo": {
@@ -132,6 +137,33 @@ class CadastroGrupoViewTests(TestCase):
 		self.assertEqual(response.status_code, 422)
 		self.assertIn("Permissões inválidas", retorno["mensagens"]["erro"]["conteudo"][0])
 		self.assertFalse(Group.objects.filter(name="OPERACAO").exists())
+
+	def test_post_rejeita_permissao_fora_do_alcance_do_operador(self):
+		self.operador.user_permissions.set([self.perm_view_group, self.perm_add_group])
+		perm_pedidos = Permission.objects.get(
+			content_type__app_label="pedidos",
+			codename="view_pedido",
+		)
+		payload = {
+			"form": {
+				"cadGrupo": {
+					"estado": "novo",
+					"campos": {
+						"id": None,
+						"nome": "Grupo Escopo",
+						"permissoes": ["auth.view_group", f"{perm_pedidos.content_type.app_label}.{perm_pedidos.codename}"],
+					}
+				}
+			}
+		}
+		request = self.build_request("/app/permissao/grupos/", payload)
+
+		response = cadastro_grupo_view(request)
+		retorno = json.loads(response.content)
+
+		self.assertEqual(response.status_code, 403)
+		self.assertIn("só pode atribuir permissões", retorno["mensagens"]["erro"]["conteudo"][0])
+		self.assertFalse(Group.objects.filter(name="GRUPO ESCOPO").exists())
 
 	def test_post_rejeita_exclusao_sem_delete_group(self):
 		self.operador.user_permissions.set([self.perm_view_group, self.perm_add_group])
@@ -241,13 +273,40 @@ class PermissaoUsuarioViewTests(TestCase):
 		)
 		self.grupo_a.permissions.set([self.perm_view_group])
 		self.grupo_b.permissions.set([self.perm_change_group])
-		self.filial_matriz = Filial.objects.create(codigo="MAT", nome="MATRIZ", is_matriz=True, ativa=True)
-		self.filial_a = Filial.objects.create(codigo="FIL01", nome="FILIAL A", is_matriz=False, ativa=True)
+		self.pais_pt = Pais.objects.create(nome="Portugal Test", sigla="PTX", codigo_tel="351")
+		self.filial_matriz = Filial.objects.create(
+			codigo="MAT",
+			nome="MATRIZ",
+			is_matriz=True,
+			ativa=True,
+			pais_atuacao=self.pais_pt,
+		)
+		self.filial_a = Filial.objects.create(
+			codigo="FIL01",
+			nome="FILIAL A",
+			is_matriz=False,
+			ativa=True,
+			pais_atuacao=self.pais_pt,
+		)
 		self.operador.user_permissions.set([
 			self.perm_view_group,
 			self.perm_view_usuario,
 			self.perm_change_usuario,
 		])
+		UsuarioFilial.objects.create(
+			usuario=self.operador,
+			filial=self.filial_matriz,
+			ativo=True,
+			pode_consultar=True,
+			pode_escrever=True,
+		)
+		UsuarioFilial.objects.create(
+			usuario=self.operador,
+			filial=self.filial_a,
+			ativo=True,
+			pode_consultar=True,
+			pode_escrever=True,
+		)
 
 	def build_request(self, path, payload, user=None):
 		request = self.factory.post(

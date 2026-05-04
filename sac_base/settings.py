@@ -125,6 +125,7 @@ INSTALLED_APPS = [
     'pages.zona_entrega',
     'pages.motorista',
     'pages.pedidos',
+    'pages.financeiro',
 ]
 
 MIDDLEWARE = [

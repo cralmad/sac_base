@@ -117,7 +117,7 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
 
     const thead = document.createElement('thead');
     const trHead = document.createElement('tr');
-    ['Referência', 'T', 'Destinatário', 'Telefone(s)', 'Endereço', 'Cidade', 'C. Postal', 'Vol', 'Peso', 'Per.', 'Obs. Rota'].forEach(h => {
+    ['Referência', 'T', 'D', 'Destinatário', 'Telefone(s)', 'Endereço', 'Cidade', 'C. Postal', 'Vol', 'Peso', 'Per.', 'Obs. Rota'].forEach(h => {
       const th = document.createElement('th');
       th.textContent = h;
       trHead.appendChild(th);
@@ -132,6 +132,7 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
       const campos = [
         { val: linha.pedido },
         { val: linha.tipo,   cls: linha.tipo === 'R' ? 'rr-tipo-r' : 'rr-tipo-e' },
+        { val: linha.tem_devolucao ? '\u2022' : '', cls: linha.tem_devolucao ? 'rr-dev-sim' : '' },
         { val: linha.nome_dest },
         { val: linha.fones },
         { val: linha.endereco_dest },

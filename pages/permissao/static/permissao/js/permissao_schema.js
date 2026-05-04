@@ -47,6 +47,11 @@ export const PERMISSOES_SCHEMA = {
     { codename: "pedidos.view_relatorio_gerencial", label: "Acessar Relatório Gerencial de Pedidos" },
     // --- Relatório de Devoluções ---
     { codename: "pedidos.view_relatorio_devolucao", label: "Acessar Relatório de Devoluções" },
+    // --- Relatório de Avaliação ---
+    { codename: "pedidos.view_relatorio_avaliacao", label: "Acessar Relatório de Avaliação" },
+    // --- SMS e E-mail ---
+    { codename: "pedidos.send_sms_tentativaentrega", label: "Enviar SMS (Tentativa de Entrega)" },
+    { codename: "pedidos.send_email_avaliacao", label: "Enviar E-mail de Avaliação" },
     // --- Motoristas ---
     { codename: "motorista.view_motorista",   label: "Visualizar Motorista" },
     { codename: "motorista.add_motorista",    label: "Incluir Motorista" },
@@ -98,6 +103,11 @@ export const PERMISSOES_SCHEMA = {
     { codename: "pedidos.change_carro_tentativaentrega",  label: "Alterar Carro no Mapa / Conferência" },
     // --- Relatório Gerencial de Pedidos ---
     { codename: "pedidos.view_relatorio_gerencial", label: "Acessar Relatório Gerencial de Pedidos" },
+    // --- Relatório de Avaliação ---
+    { codename: "pedidos.view_relatorio_avaliacao", label: "Acessar Relatório de Avaliação" },
+    // --- SMS e E-mail ---
+    { codename: "pedidos.send_sms_tentativaentrega", label: "Enviar SMS (Tentativa de Entrega)" },
+    { codename: "pedidos.send_email_avaliacao", label: "Enviar E-mail de Avaliação" },
     // --- Motoristas ---
     { codename: "motorista.view_motorista",   label: "Visualizar Motorista" },
     { codename: "motorista.add_motorista",    label: "Incluir Motorista" },
