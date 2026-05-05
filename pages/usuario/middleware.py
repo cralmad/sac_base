@@ -16,6 +16,7 @@ ROTAS_PUBLICAS = [
     "/app/usuario/logout/",
     "/static/",
     "/app/logistica/mapa/",  # Mapa público por token JWT — sem login
+    "/app/logistica/avaliacao/",  # Pesquisa pública por token JWT — sem login
 ]
 
 ROTAS_AUTENTICADAS_SEM_FILIAL = [
