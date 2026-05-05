@@ -109,6 +109,10 @@ function _esc(v) {
     .replace(/"/g, '&quot;');
 }
 
+function resolverEstadoExibicao(registro) {
+  return registro?.estado_label || registro?.estado || '';
+}
+
 // ─── Fila de devoluções pendentes ─────────────────────────────────────────────
 let _devQueue      = [];   // [{pedido_id, pedido, tipo, volumes}, ...]
 let _devIndex      = 0;
@@ -276,6 +280,7 @@ function renderizarRelatorio(linhas, dataFmt, totalPedidos) {
   linhas.forEach(linha => {
     const tr = document.createElement('tr');
     if (!linha.segue_para_entrega) tr.classList.add('rg-nao-segue');
+    const estadoExibicao = resolverEstadoExibicao(linha);
 
     const volPartes = (linha.volumes || '').split('/');
     const volNegrito = volPartes.length === 2 && parseInt(volPartes[0], 10) < parseInt(volPartes[1], 10);
@@ -290,7 +295,7 @@ function renderizarRelatorio(linhas, dataFmt, totalPedidos) {
       { val: linha.codpost_dest },
       { val: linha.volumes, bold: volNegrito },
       { val: linha.peso },
-      { val: linha.estado },
+      { val: estadoExibicao },
       { val: linha.mov },
       { val: linha.dev },
       { val: linha.armazem },

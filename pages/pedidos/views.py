@@ -25,7 +25,7 @@ from sac_base.sisvar_builders import (
     build_success_payload,
 )
 
-from .models import ESTADO_CHOICES, INCIDENCIA_CHOICE, INCIDENCIA_ORIG_CHOICE, INCIDENCIA_TIPO_CHOICES, MOTIVO_CHOICES, ORIGEM_CHOICES, PERIODO_CHOICES, TIPO_CHOICES, Devolucao, Incidencia, Pedido, TentativaEntrega
+from .models import ESTADO_CHOICES, INCIDENCIA_CHOICE, INCIDENCIA_ORIG_CHOICE, INCIDENCIA_TIPO_CHOICES, MOTIVO_CHOICES, ORIGEM_CHOICES, PERIODO_CHOICES, TIPO_CHOICES, Devolucao, Incidencia, Pedido, TentativaEntrega, estado_label
 from .serializers import (
     build_pedido_extra_payload,
     serialize_devolucao,
@@ -280,7 +280,7 @@ def pedidos_cadastro_cons_view(request):
             "id_vonzu": p.id_vonzu,
             "pedido": p.pedido or "",
             "tipo": p.tipo,
-            "estado": p.estado or "",
+            "estado": estado_label(p.estado),
             "prev_entrega": p.prev_entrega.isoformat() if p.prev_entrega else "",
             "nome_dest": p.nome_dest or "",
             "cliente": p.cliente.nome if p.cliente_id else "",

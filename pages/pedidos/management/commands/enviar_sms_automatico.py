@@ -23,8 +23,10 @@ Flags de teste:
 """
 
 import logging
+import json
 import time
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from django.core.management.base import BaseCommand
@@ -43,6 +45,24 @@ from sac_base.sms_service import HORARIO_PERIODO, montar_mensagem, enviar_sms_bu
 logger = logging.getLogger(__name__)
 
 LISBON_TZ = ZoneInfo("Europe/Lisbon")
+DEBUG_LOG_PATH = Path("debug-5874e6.log")
+
+
+def _debug_log(hypothesis_id: str, location: str, message: str, data: dict):
+    payload = {
+        "sessionId": "5874e6",
+        "runId": "initial",
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+    }
+    try:
+        with DEBUG_LOG_PATH.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception:
+        return
 
 
 class Command(BaseCommand):
@@ -95,6 +115,21 @@ class Command(BaseCommand):
             self.stdout.write("Nenhuma filial com sms_auto configurado. Saindo.")
             return
 
+        # #region agent log
+        _debug_log(
+            "H1",
+            "enviar_sms_automatico.py:handle",
+            "execucao comando",
+            {
+                "force": force,
+                "dry_run": dry_run,
+                "today": str(today),
+                "now_time": now_time.strftime("%H:%M"),
+                "configs_count": configs.count(),
+            },
+        )
+        # #endregion
+
         total_filiais_enviadas = 0
 
         for cfg in configs:
@@ -104,6 +139,19 @@ class Command(BaseCommand):
             if not force:
                 # Só envia se a hora actual de Lisboa já ultrapassou sms_auto
                 if now_time < sms_time:
+                    # #region agent log
+                    _debug_log(
+                        "H1",
+                        "enviar_sms_automatico.py:handle",
+                        "filial ignorada por horario",
+                        {
+                            "filial_id": filial.id,
+                            "filial_nome": str(filial),
+                            "sms_time": sms_time.strftime("%H:%M"),
+                            "now_time": now_time.strftime("%H:%M"),
+                        },
+                    )
+                    # #endregion
                     self.stdout.write(
                         f"  ↷ Filial '{filial}': horário configurado {sms_time.strftime('%H:%M')} "
                         f"ainda não chegou (agora {now_time.strftime('%H:%M')}). Ignorando."
@@ -145,6 +193,18 @@ class Command(BaseCommand):
                 "pedido", "pedido__filial"
             )
         )
+        # #region agent log
+        _debug_log(
+            "H2",
+            "enviar_sms_automatico.py:_enviar_para_filial",
+            "snapshot pendentes inicial",
+            {
+                "filial_id": filial.id,
+                "today": str(today),
+                "snapshot_count": len(tentativas_snapshot),
+            },
+        )
+        # #endregion
         if not tentativas_snapshot:
             self.stdout.write(
                 f"  Filial '{filial}': sem tentativas elegíveis para {today.strftime('%d/%m/%Y')}."
@@ -194,6 +254,18 @@ class Command(BaseCommand):
         else:
             sem_tel = contar_pendentes_sem_telefone(filial, today)
             if sem_tel:
+                # #region agent log
+                _debug_log(
+                    "H3",
+                    "enviar_sms_automatico.py:_enviar_para_filial",
+                    "pendentes sem telefone",
+                    {
+                        "filial_id": filial.id,
+                        "today": str(today),
+                        "sem_tel": sem_tel,
+                    },
+                )
+                # #endregion
                 self.stderr.write(
                     f"  Filial '{filial}': {sem_tel} registro(s) sem telefone (não enviáveis por SMS)."
                 )
@@ -206,6 +278,19 @@ class Command(BaseCommand):
             while ronda < MAX_RONDAS_FILIAL:
                 ronda += 1
                 tentativas = listar_pendentes_com_telefone(filial, today)
+                # #region agent log
+                _debug_log(
+                    "H4",
+                    "enviar_sms_automatico.py:_enviar_para_filial",
+                    "inicio ronda automatico",
+                    {
+                        "filial_id": filial.id,
+                        "ronda": ronda,
+                        "tentativas_com_telefone": len(tentativas),
+                        "ids_sem_retry_definitivo_count": len(ids_sem_retry_definitivo),
+                    },
+                )
+                # #endregion
                 if not tentativas:
                     break
 
@@ -224,6 +309,19 @@ class Command(BaseCommand):
                         template_msg = template_manha
 
                     if not template_msg:
+                        # #region agent log
+                        _debug_log(
+                            "H5",
+                            "enviar_sms_automatico.py:_enviar_para_filial",
+                            "sem template para periodo",
+                            {
+                                "filial_id": filial.id,
+                                "mov_id": mov.id,
+                                "periodo": mov.periodo,
+                                "referencia": referencia,
+                            },
+                        )
+                        # #endregion
                         self.stderr.write(
                             f"    [{referencia}] Template para período '{mov.periodo}' não configurado. Ignorado."
                         )
@@ -234,6 +332,20 @@ class Command(BaseCommand):
                     try:
                         mensagem = montar_mensagem(template_msg, today, mov.periodo, sigla_pais)
                     except Exception as exc:
+                        # #region agent log
+                        _debug_log(
+                            "H5",
+                            "enviar_sms_automatico.py:_enviar_para_filial",
+                            "erro montagem mensagem",
+                            {
+                                "filial_id": filial.id,
+                                "mov_id": mov.id,
+                                "periodo": mov.periodo,
+                                "referencia": referencia,
+                                "erro": str(exc)[:200],
+                            },
+                        )
+                        # #endregion
                         self.stderr.write(f"    [{referencia}] Erro ao montar mensagem: {exc}")
                         erros += 1
                         ids_sem_retry_definitivo.add(mov.id)
@@ -259,6 +371,19 @@ class Command(BaseCommand):
                             sucesso_algum = True
                             self.stdout.write(f"    [{referencia}] SMS enviado para {fone}.")
                         else:
+                            # #region agent log
+                            _debug_log(
+                                "H4",
+                                "enviar_sms_automatico.py:_enviar_para_filial",
+                                "falha envio bulk",
+                                {
+                                    "filial_id": filial.id,
+                                    "mov_id": mov.id,
+                                    "referencia": referencia,
+                                    "erro": str(resultado.get("erro", ""))[:200],
+                                },
+                            )
+                            # #endregion
                             self.stderr.write(
                                 f"    [{referencia}] Falha para {fone}: {resultado.get('erro')}"
                             )
@@ -267,12 +392,38 @@ class Command(BaseCommand):
                     if sucesso_algum:
                         mov.sms_enviado = True
                         mov.save(update_fields=["sms_enviado"])
+                        # #region agent log
+                        _debug_log(
+                            "H4",
+                            "enviar_sms_automatico.py:_enviar_para_filial",
+                            "sms marcado como enviado",
+                            {
+                                "filial_id": filial.id,
+                                "mov_id": mov.id,
+                                "referencia": referencia,
+                            },
+                        )
+                        # #endregion
                         enviados += 1
                         contagem_periodo[mov.periodo] = contagem_periodo.get(mov.periodo, 0) + 1
                         houve_sucesso_nesta_ronda = True
 
                 pendentes_db = listar_pendentes_com_telefone(filial, today)
                 ainda = [m for m in pendentes_db if m.id not in ids_sem_retry_definitivo]
+                # #region agent log
+                _debug_log(
+                    "H4",
+                    "enviar_sms_automatico.py:_enviar_para_filial",
+                    "fim da ronda",
+                    {
+                        "filial_id": filial.id,
+                        "ronda": ronda,
+                        "pendentes_db": len(pendentes_db),
+                        "pendentes_com_retry": len(ainda),
+                        "houve_sucesso_nesta_ronda": houve_sucesso_nesta_ronda,
+                    },
+                )
+                # #endregion
                 if not ainda and pendentes_db:
                     self.stdout.write(
                         f"  Filial '{filial}': {len(pendentes_db)} pendente(s) sem retry automático "
@@ -285,6 +436,19 @@ class Command(BaseCommand):
                 if not houve_sucesso_nesta_ronda:
                     pausas_sem_progresso += 1
                     if pausas_sem_progresso > MAX_PAUSAS_SEM_PROGRESSO:
+                        # #region agent log
+                        _debug_log(
+                            "H4",
+                            "enviar_sms_automatico.py:_enviar_para_filial",
+                            "limite pausas sem progresso",
+                            {
+                                "filial_id": filial.id,
+                                "ronda": ronda,
+                                "pausas_sem_progresso": pausas_sem_progresso,
+                                "pendentes_restantes": len(ainda),
+                            },
+                        )
+                        # #endregion
                         self.stderr.write(
                             f"  [ERRO] Filial '{filial}': limite de pausas sem progresso atingido; "
                             f"permanecem {len(ainda)} SMS pendente(s) com telefone."
@@ -312,6 +476,20 @@ class Command(BaseCommand):
             erros,
             dry_run,
         )
+        # #region agent log
+        _debug_log(
+            "H4",
+            "enviar_sms_automatico.py:_enviar_para_filial",
+            "resumo final filial",
+            {
+                "filial_id": filial.id,
+                "today": str(today),
+                "enviados": enviados,
+                "erros": erros,
+                "dry_run": dry_run,
+            },
+        )
+        # #endregion
 
         # SMS de confirmação para a filial (sms_confirm) — ignorado em dry-run
         _numero_resumo = (getattr(filial, "numero", None) or "").strip()

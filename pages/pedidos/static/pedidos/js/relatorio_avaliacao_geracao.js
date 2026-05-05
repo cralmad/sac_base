@@ -4,6 +4,7 @@ import { AppLoader } from "/static/js/loader.js";
 const root = document.getElementById("rel-av-ger-root");
 if (root) {
   const urlGeracao = root.dataset.urlGeracao || "";
+  const formBusca = root.querySelector("form[method='get']");
   const btnGerar = document.getElementById("btn-gerar-fila");
   const chkTodos = document.getElementById("chk-todos-geracao");
   const msg = document.getElementById("rel-av-ger-msg");
@@ -88,6 +89,12 @@ if (root) {
           }
         },
       });
+    });
+  }
+
+  if (formBusca) {
+    formBusca.addEventListener("submit", () => {
+      showBusy();
     });
   }
 

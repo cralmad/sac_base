@@ -16,6 +16,7 @@ from pages.pedidos.models import (
     ESTADO_DEFINITIONS,
     ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA,
     MOTIVO_CHOICES,
+    estado_label,
     estado_segue_para_entrega,
     exclude_tentativas_com_data_posterior,
 )
@@ -662,7 +663,7 @@ def relatorio_gerencial_view(request):
             "codpost_dest":   p.codpost_dest or "",
             "volumes":        f"{p.volume_conf or 0}/{p.volume or 0}",
             "peso":           peso_str,
-            "estado":         p.estado or "",
+            "estado":         estado_label(p.estado),
             "mov":            mov_count,
             "dev":            dev_count,
             "tem_devolucao":  dev_count > 0,

@@ -75,10 +75,14 @@
           <td>{% if item.link_ativo %}<span class="badge bg-success">Ativo</span>{% else %}<span class="badge bg-secondary">Inativo</span>{% endif %}</td>
           <td class="text-center">
             {% if not item.respondido_em %}
-            <form method="post" action="/app/logistica/relatorio_avaliacao/{{ item.id }}/enviar">
-              {% csrf_token %}
-              <button class="btn btn-sm btn-outline-primary" type="submit">Reenviar</button>
-            </form>
+            <button
+              class="btn btn-sm btn-outline-primary btn-reenviar"
+              type="button"
+              data-url="/app/logistica/relatorio_avaliacao/{{ item.id }}/enviar"
+              data-referencia="{{ item.pedido.pedido|default:item.pedido.id_vonzu }}"
+            >
+              Reenviar
+            </button>
             {% endif %}
           </td>
         </tr>

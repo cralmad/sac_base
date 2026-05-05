@@ -116,6 +116,10 @@ function preencherMotivosDev() {
   preencherSelect('dev_motivo', motivos, 'Selecione', m => ({ value: m.value, label: m.label }));
 }
 
+function resolverEstadoExibicao(registro) {
+  return registro?.estado_label || registro?.estado || '';
+}
+
 function renderDevolucoes(registros = []) {
   tabelaDevCorpo.innerHTML = '';
   if (!registros.length) {
@@ -820,11 +824,12 @@ function renderMovimentacoes(registros = []) {
 
   registros.forEach(m => {
     const tr = document.createElement('tr');
+    const estadoExibicao = resolverEstadoExibicao(m);
 
     const colunas = [
       m.id,
       m.data_tentativa,
-      m.estado,
+      estadoExibicao,
       m.carro,
       m.motorista_nome,
       m.periodo === 'MANHA' ? 'MANHÃ' : (m.periodo || ''),
@@ -1010,7 +1015,8 @@ function renderPesquisa(registros = []) {
     tdOrigem.appendChild(badge);
     tr.appendChild(tdOrigem);
 
-    [r.id_vonzu, r.pedido, r.tipo, r.estado, r.prev_entrega, r.nome_dest].forEach(valor => {
+    const estadoExibicao = resolverEstadoExibicao(r);
+    [r.id_vonzu, r.pedido, r.tipo, estadoExibicao, r.prev_entrega, r.nome_dest].forEach(valor => {
       const td = document.createElement('td');
       td.textContent = String(valor ?? '');
       tr.appendChild(td);

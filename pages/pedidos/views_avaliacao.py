@@ -5,13 +5,13 @@ import jwt
 from django.conf import settings
 from django.contrib.auth.decorators import login_required, permission_required
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from pages.filial.models import FilialConfig
-from pages.pedidos.models import AvaliacaoPedido, Pedido, ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA
+from pages.pedidos.models import AvaliacaoPedido, Pedido, ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA, estado_label
 from sac_base.email_avaliacao_service import enviar_email_avaliacao, montar_email_avaliacao
 
 _ALGO_JWT = "HS256"
@@ -21,6 +21,16 @@ PERMISSOES_AVALIACAO = {
     "enviar": "pedidos.send_email_avaliacao",
     "gerar_fila": "pedidos.generate_email_queue_avaliacao",
 }
+
+
+def _parse_nota_1_5(payload: dict, chave: str):
+    try:
+        valor = int(payload.get(chave))
+    except (TypeError, ValueError):
+        return None
+    if 1 <= valor <= 5:
+        return valor
+    return None
 
 
 def _gerar_token_avaliacao(avaliacao_id: int) -> str:
@@ -71,6 +81,9 @@ def enviar_email_pedido_avaliacao(*, avaliacao: AvaliacaoPedido, request=None) -
         assunto=assunto,
         corpo=corpo,
         nome_remetente=nome_remetente,
+        link_avaliacao=link,
+        nome_cliente=(pedido.nome_dest or "Cliente"),
+        filial_nome=getattr(filial, "nome", "SacBase"),
     )
 
     avaliacao.email_tentativas += 1
@@ -112,7 +125,7 @@ def relatorio_avaliacao_geracao_view(request):
                     "referencia": pedido.pedido or pedido.id_vonzu,
                     "nome_dest": pedido.nome_dest or "",
                     "email_dest": pedido.email_dest or "",
-                    "estado": pedido.estado or "",
+                    "estado": estado_label(pedido.estado),
                     "ja_na_fila": ja_na_fila,
                 }
             )
@@ -206,15 +219,25 @@ def avaliacao_publica_enviar_view(request, token):
     if faltantes:
         return JsonResponse({"success": False, "mensagem": "Preencha todas as perguntas obrigatórias."}, status=400)
 
+    nota_p3 = _parse_nota_1_5(payload, "p3")
+    nota_p4 = _parse_nota_1_5(payload, "p4")
+    nota_p6 = _parse_nota_1_5(payload, "p6")
+    nota_p9 = _parse_nota_1_5(payload, "p9")
+    if None in (nota_p3, nota_p4, nota_p6, nota_p9):
+        return JsonResponse(
+            {"success": False, "mensagem": "As notas das perguntas objetivas devem estar entre 1 e 5."},
+            status=400,
+        )
+
     avaliacao.p1_entrega_no_prazo = payload.get("p1")
     avaliacao.p2_aviso_antes_chegada = payload.get("p2")
-    avaliacao.p3_educacao_simpatia = int(payload.get("p3"))
-    avaliacao.p4_cuidado_encomenda = int(payload.get("p4"))
+    avaliacao.p3_educacao_simpatia = nota_p3
+    avaliacao.p4_cuidado_encomenda = nota_p4
     avaliacao.p5_equipa_identificada = payload.get("p5")
-    avaliacao.p6_facilidade_processo = int(payload.get("p6"))
+    avaliacao.p6_facilidade_processo = nota_p6
     avaliacao.p7_veiculo_limpo = payload.get("p7")
     avaliacao.p8_esclareceu_duvidas = payload.get("p8")
-    avaliacao.p9_satisfacao_geral = int(payload.get("p9"))
+    avaliacao.p9_satisfacao_geral = nota_p9
     avaliacao.p10_recomendaria = payload.get("p10")
     avaliacao.comentario = (payload.get("comentario") or "").strip() or None
     avaliacao.respondido_em = timezone.now()
@@ -268,7 +291,7 @@ def relatorio_avaliacao_enviar_view(request, avaliacao_id):
     envio = enviar_email_pedido_avaliacao(avaliacao=avaliacao, request=request)
     if not envio.get("sucesso"):
         return JsonResponse({"success": False, "mensagem": envio.get("erro") or "Falha no envio."}, status=400)
-    return redirect("/app/logistica/relatorio_avaliacao/")
+    return JsonResponse({"success": True, "mensagem": "E-mail reenviado com sucesso."})
 
 
 @login_required

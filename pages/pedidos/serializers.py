@@ -2,6 +2,8 @@
 
 from django.utils import timezone
 
+from .models import estado_label
+
 
 def _dt_to_local_input(dt):
     if not dt:
@@ -23,6 +25,7 @@ def serialize_pedido_form(pedido):
         "prev_entrega": pedido.prev_entrega.isoformat() if pedido.prev_entrega else "",
         "dt_entrega": pedido.dt_entrega.isoformat() if pedido.dt_entrega else "",
         "estado": pedido.estado or "",
+        "estado_label": estado_label(pedido.estado),
         "volume": pedido.volume,
         "volume_conf": pedido.volume_conf,
         "nome_dest": pedido.nome_dest or "",
@@ -47,6 +50,7 @@ def serialize_tentativa(reg):
         "pedido_id": reg.pedido_id,
         "data_tentativa": reg.data_tentativa.isoformat() if reg.data_tentativa else "",
         "estado": reg.estado or "",
+        "estado_label": estado_label(reg.estado),
         "carro": reg.carro,
         "motorista_id": reg.motorista_id,
         "motorista_nome": reg.motorista.nome if reg.motorista_id else "",

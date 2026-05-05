@@ -92,6 +92,7 @@ ESTADO_DEFINITIONS = [# valor, label, entrega_efetivamente_concluida, segue_para
 
 # Django choices deve conter pares (valor, label)
 ESTADO_CHOICES = [(valor, label) for valor, label, *_ in ESTADO_DEFINITIONS]
+ESTADO_LABEL_POR_VALOR = {valor: label for valor, label, *_ in ESTADO_DEFINITIONS}
 
 # Estados marcados para uso futuro em identificação de entrega efetivamente concluída
 ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA = {
@@ -107,6 +108,13 @@ ESTADOS_SEGUE_PARA_ENTREGA = {
 def estado_segue_para_entrega(estado: str | None) -> bool:
     """True se o estado da tentativa (TentativaEntrega.estado) indica que segue para entrega."""
     return (estado or "") in ESTADOS_SEGUE_PARA_ENTREGA
+
+
+def estado_label(estado: str | None) -> str:
+    """Retorna o label do estado; fallback para o valor bruto."""
+    if not estado:
+        return ""
+    return ESTADO_LABEL_POR_VALOR.get(estado, estado)
 
 
 def exclude_tentativas_com_data_posterior(qs):

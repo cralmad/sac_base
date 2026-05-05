@@ -25,59 +25,80 @@
 
           <form id="avaliacao-form" data-url-enviar="{% url 'avaliacao_publica_enviar' token=token %}">
             <div class="mb-3">
-              <label class="form-label">1. A entrega foi feita no prazo combinado?</label>
+              <label class="form-label fw-bold">1. A entrega foi feita no prazo combinado?</label>
               <div class="d-flex gap-3">
                 <div class="form-check"><input class="form-check-input" type="radio" name="p1" value="Sim" required><label class="form-check-label">Sim</label></div>
                 <div class="form-check"><input class="form-check-input" type="radio" name="p1" value="Nao"><label class="form-check-label">Não</label></div>
               </div>
             </div>
             <div class="mb-3">
-              <label class="form-label">2. Recebeu aviso antes da chegada da equipa?</label>
+              <label class="form-label fw-bold">2. Recebeu aviso antes da chegada da equipa?</label>
               <div class="d-flex gap-3">
                 <div class="form-check"><input class="form-check-input" type="radio" name="p2" value="Sim" required><label class="form-check-label">Sim</label></div>
                 <div class="form-check"><input class="form-check-input" type="radio" name="p2" value="Nao"><label class="form-check-label">Não</label></div>
               </div>
             </div>
             <div class="mb-3">
-              <label class="form-label">3. Educação e simpatia da equipa:</label>
-              <select class="form-select" name="p3" required>
-                <option value="">Selecione</option>
-                <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
-                <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
-              </select>
+              <label class="form-label fw-bold">3. Educação e simpatia da equipa:</label>
+              <div class="rating-group" role="radiogroup" aria-label="Educação e simpatia da equipa">
+                <input class="rating-input" type="radio" name="p3" id="p3_1" value="1" required>
+                <label class="rating-option" for="p3_1"><span class="emoji">😠</span><span class="nota">1</span><span class="texto">Muito Ruim</span></label>
+                <input class="rating-input" type="radio" name="p3" id="p3_2" value="2">
+                <label class="rating-option" for="p3_2"><span class="emoji">🙁</span><span class="nota">2</span><span class="texto">Ruim</span></label>
+                <input class="rating-input" type="radio" name="p3" id="p3_3" value="3">
+                <label class="rating-option" for="p3_3"><span class="emoji">😐</span><span class="nota">3</span><span class="texto">Regular</span></label>
+                <input class="rating-input" type="radio" name="p3" id="p3_4" value="4">
+                <label class="rating-option" for="p3_4"><span class="emoji">🙂</span><span class="nota">4</span><span class="texto">Bom</span></label>
+                <input class="rating-input" type="radio" name="p3" id="p3_5" value="5">
+                <label class="rating-option" for="p3_5"><span class="emoji">😁</span><span class="nota">5</span><span class="texto">Excelente</span></label>
+              </div>
             </div>
             <div class="mb-3">
-              <label class="form-label">4. Cuidado no manuseio da encomenda:</label>
-              <select class="form-select" name="p4" required>
-                <option value="">Selecione</option>
-                <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
-                <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
-              </select>
+              <label class="form-label fw-bold">4. Cuidado no manuseio da encomenda:</label>
+              <div class="rating-group" role="radiogroup" aria-label="Cuidado no manuseio da encomenda">
+                <input class="rating-input" type="radio" name="p4" id="p4_1" value="1" required>
+                <label class="rating-option" for="p4_1"><span class="emoji">😠</span><span class="nota">1</span><span class="texto">Muito Ruim</span></label>
+                <input class="rating-input" type="radio" name="p4" id="p4_2" value="2">
+                <label class="rating-option" for="p4_2"><span class="emoji">🙁</span><span class="nota">2</span><span class="texto">Ruim</span></label>
+                <input class="rating-input" type="radio" name="p4" id="p4_3" value="3">
+                <label class="rating-option" for="p4_3"><span class="emoji">😐</span><span class="nota">3</span><span class="texto">Regular</span></label>
+                <input class="rating-input" type="radio" name="p4" id="p4_4" value="4">
+                <label class="rating-option" for="p4_4"><span class="emoji">🙂</span><span class="nota">4</span><span class="texto">Bom</span></label>
+                <input class="rating-input" type="radio" name="p4" id="p4_5" value="5">
+                <label class="rating-option" for="p4_5"><span class="emoji">😁</span><span class="nota">5</span><span class="texto">Excelente</span></label>
+              </div>
             </div>
             <div class="mb-3">
-              <label class="form-label">5. A equipa estava identificada/uniformizada?</label>
+              <label class="form-label fw-bold">5. A equipa estava identificada/uniformizada?</label>
               <div class="d-flex gap-3">
                 <div class="form-check"><input class="form-check-input" type="radio" name="p5" value="Sim" required><label class="form-check-label">Sim</label></div>
                 <div class="form-check"><input class="form-check-input" type="radio" name="p5" value="Nao"><label class="form-check-label">Não</label></div>
               </div>
             </div>
             <div class="mb-3">
-              <label class="form-label">6. Quão fácil foi o processo de receber a encomenda?</label>
-              <select class="form-select" name="p6" required>
-                <option value="">Selecione</option>
-                <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
-                <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
-              </select>
+              <label class="form-label fw-bold">6. Quão fácil foi o processo de receber a encomenda?</label>
+              <div class="rating-group" role="radiogroup" aria-label="Facilidade do processo de entrega">
+                <input class="rating-input" type="radio" name="p6" id="p6_1" value="1" required>
+                <label class="rating-option" for="p6_1"><span class="emoji">😠</span><span class="nota">1</span><span class="texto">Muito Ruim</span></label>
+                <input class="rating-input" type="radio" name="p6" id="p6_2" value="2">
+                <label class="rating-option" for="p6_2"><span class="emoji">🙁</span><span class="nota">2</span><span class="texto">Ruim</span></label>
+                <input class="rating-input" type="radio" name="p6" id="p6_3" value="3">
+                <label class="rating-option" for="p6_3"><span class="emoji">😐</span><span class="nota">3</span><span class="texto">Regular</span></label>
+                <input class="rating-input" type="radio" name="p6" id="p6_4" value="4">
+                <label class="rating-option" for="p6_4"><span class="emoji">🙂</span><span class="nota">4</span><span class="texto">Bom</span></label>
+                <input class="rating-input" type="radio" name="p6" id="p6_5" value="5">
+                <label class="rating-option" for="p6_5"><span class="emoji">😁</span><span class="nota">5</span><span class="texto">Excelente</span></label>
+              </div>
             </div>
             <div class="mb-3">
-              <label class="form-label">7. O veículo parecia limpo e organizado?</label>
+              <label class="form-label fw-bold">7. O veículo parecia limpo e organizado?</label>
               <div class="d-flex gap-3">
                 <div class="form-check"><input class="form-check-input" type="radio" name="p7" value="Sim" required><label class="form-check-label">Sim</label></div>
                 <div class="form-check"><input class="form-check-input" type="radio" name="p7" value="Nao"><label class="form-check-label">Não</label></div>
               </div>
             </div>
             <div class="mb-3">
-              <label class="form-label">8. A equipa esclareceu as suas dúvidas no local?</label>
+              <label class="form-label fw-bold">8. A equipa esclareceu as suas dúvidas no local?</label>
               <div class="d-flex gap-3">
                 <div class="form-check"><input class="form-check-input" type="radio" name="p8" value="Sim" required><label class="form-check-label">Sim</label></div>
                 <div class="form-check"><input class="form-check-input" type="radio" name="p8" value="Nao"><label class="form-check-label">Não</label></div>
@@ -85,22 +106,29 @@
               </div>
             </div>
             <div class="mb-3">
-              <label class="form-label">9. Avaliação geral da satisfação:</label>
-              <select class="form-select" name="p9" required>
-                <option value="">Selecione</option>
-                <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
-                <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
-              </select>
+              <label class="form-label fw-bold">9. Avaliação geral da satisfação:</label>
+              <div class="rating-group" role="radiogroup" aria-label="Avaliação geral da satisfação">
+                <input class="rating-input" type="radio" name="p9" id="p9_1" value="1" required>
+                <label class="rating-option" for="p9_1"><span class="emoji">😠</span><span class="nota">1</span><span class="texto">Muito Ruim</span></label>
+                <input class="rating-input" type="radio" name="p9" id="p9_2" value="2">
+                <label class="rating-option" for="p9_2"><span class="emoji">🙁</span><span class="nota">2</span><span class="texto">Ruim</span></label>
+                <input class="rating-input" type="radio" name="p9" id="p9_3" value="3">
+                <label class="rating-option" for="p9_3"><span class="emoji">😐</span><span class="nota">3</span><span class="texto">Regular</span></label>
+                <input class="rating-input" type="radio" name="p9" id="p9_4" value="4">
+                <label class="rating-option" for="p9_4"><span class="emoji">🙂</span><span class="nota">4</span><span class="texto">Bom</span></label>
+                <input class="rating-input" type="radio" name="p9" id="p9_5" value="5">
+                <label class="rating-option" for="p9_5"><span class="emoji">😁</span><span class="nota">5</span><span class="texto">Excelente</span></label>
+              </div>
             </div>
             <div class="mb-3">
-              <label class="form-label">10. Recomendaria o nosso serviço de transporte?</label>
+              <label class="form-label fw-bold">10. Recomendaria o nosso serviço de transporte?</label>
               <div class="d-flex gap-3">
                 <div class="form-check"><input class="form-check-input" type="radio" name="p10" value="Sim" required><label class="form-check-label">Sim</label></div>
                 <div class="form-check"><input class="form-check-input" type="radio" name="p10" value="Nao"><label class="form-check-label">Não</label></div>
               </div>
             </div>
             <div class="mb-3">
-              <label class="form-label">11. Conte-nos mais sobre sua experiência (opcional):</label>
+              <label class="form-label fw-bold">11. Conte-nos mais sobre sua experiência (opcional):</label>
               <textarea class="form-control" name="comentario" rows="4"></textarea>
             </div>
             <button type="submit" class="btn btn-success w-100">Finalizar Avaliação</button>

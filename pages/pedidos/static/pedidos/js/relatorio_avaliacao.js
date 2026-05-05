@@ -101,6 +101,46 @@ if (!root) {
     });
   }
 
+  root.addEventListener("click", async (event) => {
+    const btn = event.target.closest(".btn-reenviar");
+    if (!btn) return;
+
+    const url = btn.dataset.url || "";
+    const referencia = btn.dataset.referencia || "";
+    confirmar({
+      titulo: "Confirmar reenvio",
+      mensagem: `Deseja reenviar o e-mail da avaliação do pedido ${referencia}?`,
+      onConfirmar: async () => {
+        btn.disabled = true;
+        renderMsg("aviso", "Reenviando e-mail...");
+        AppLoader.show();
+        try {
+          const resp = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": getCsrfToken(),
+            },
+            body: JSON.stringify({}),
+          });
+          const json = await resp.json();
+          if (!resp.ok || !json.success) {
+            renderMsg("erro", json.mensagem || "Falha ao reenviar e-mail.");
+            btn.disabled = false;
+            return;
+          }
+          renderMsg("sucesso", json.mensagem || "E-mail reenviado com sucesso.");
+          window.location.reload();
+        } catch {
+          renderMsg("erro", "Erro de comunicação ao reenviar e-mail.");
+          btn.disabled = false;
+        } finally {
+          AppLoader.hide();
+        }
+      },
+    });
+  });
+
   syncBtn();
   syncChkTodos();
 }
