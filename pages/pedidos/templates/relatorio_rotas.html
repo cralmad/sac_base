@@ -70,7 +70,11 @@ table.rr-tabela tr.rr-nao-segue td { background: #e0e0e0 !important; }
   body, .container-xl, .container-fluid { padding: 0 !important; margin: 0 !important; }
   .rr-filtros, #rr-toolbar, .navbar, .sidebar, footer,
   [data-bs-toggle], .btn, #container-mensagens { display: none !important; }
-  .rr-grupo { margin-bottom: .25rem; }
+  .rr-grupo {
+    margin-bottom: .25rem;
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
   .rr-grupo-header {
     background: #1a3a5c !important;
     -webkit-print-color-adjust: exact;

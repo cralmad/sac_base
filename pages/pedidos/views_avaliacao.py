@@ -117,8 +117,14 @@ def relatorio_avaliacao_geracao_view(request):
                 .order_by("pedido", "id")
             )
         pedidos_payload = []
+        pedidos_ids = [p.id for p in pedidos]
+        pedidos_na_fila_ids = set()
+        if pedidos_ids:
+            pedidos_na_fila_ids = set(
+                AvaliacaoPedido.objects.filter(pedido_id__in=pedidos_ids).values_list("pedido_id", flat=True)
+            )
         for pedido in pedidos:
-            ja_na_fila = AvaliacaoPedido.objects.filter(pedido=pedido).exists()
+            ja_na_fila = pedido.id in pedidos_na_fila_ids
             pedidos_payload.append(
                 {
                     "id": pedido.id,
@@ -148,7 +154,6 @@ def relatorio_avaliacao_geracao_view(request):
         ids = [int(i) for i in ids]
     except (TypeError, ValueError):
         return JsonResponse({"success": False, "mensagem": "Lista de IDs inválida."}, status=400)
-
     pedidos = (
         Pedido.objects.filter(
             id__in=ids,
@@ -158,25 +163,33 @@ def relatorio_avaliacao_geracao_view(request):
         .exclude(email_dest__isnull=True)
         .exclude(email_dest="")
     )
+    pedidos_list = list(pedidos)
 
     criados = 0
     existentes = 0
-    for pedido in pedidos:
-        avaliacao, created = AvaliacaoPedido.objects.get_or_create(
-            pedido=pedido,
-            defaults={
-                "origem_geracao": "MANUAL_RELATORIO",
-                "selecionado_para_envio": True,
-            },
+    pedidos_ids = [p.id for p in pedidos_list]
+    existentes_qs = AvaliacaoPedido.objects.filter(pedido_id__in=pedidos_ids).only("id", "pedido_id", "selecionado_para_envio", "token_publico")
+    existentes_map = {a.pedido_id: a for a in existentes_qs}
+    existentes = len(existentes_map)
+
+    faltantes_ids = [pid for pid in pedidos_ids if pid not in existentes_map]
+    if faltantes_ids:
+        AvaliacaoPedido.objects.bulk_create(
+            [
+                AvaliacaoPedido(
+                    pedido_id=pid,
+                    origem_geracao="MANUAL_RELATORIO",
+                    selecionado_para_envio=True,
+                )
+                for pid in faltantes_ids
+            ]
         )
-        if created:
-            _garantir_token_avaliacao(avaliacao)
-            criados += 1
-        else:
-            existentes += 1
-            if not avaliacao.selecionado_para_envio:
-                avaliacao.selecionado_para_envio = True
-                avaliacao.save(update_fields=["selecionado_para_envio", "updated_at"])
+        criados = len(faltantes_ids)
+
+    AvaliacaoPedido.objects.filter(
+        pedido_id__in=list(existentes_map.keys()),
+        selecionado_para_envio=False,
+    ).update(selecionado_para_envio=True, updated_at=timezone.now())
 
     return JsonResponse(
         {
@@ -251,24 +264,34 @@ def avaliacao_publica_enviar_view(request, token):
 @require_GET
 def relatorio_avaliacao_view(request):
     filial_ativa = getattr(request, "filial_ativa", None)
-    qs = AvaliacaoPedido.objects.select_related("pedido").filter(selecionado_para_envio=True).order_by("-id")
-    if filial_ativa:
-        qs = qs.filter(pedido__filial=filial_ativa)
-
     pedido_ref = (request.GET.get("pedido") or "").strip()
     status = (request.GET.get("status") or "").strip()
-    if pedido_ref:
-        qs = qs.filter(pedido__pedido__icontains=pedido_ref)
-    if status == "respondido":
-        qs = qs.filter(respondido_em__isnull=False)
-    elif status == "pendente":
-        qs = qs.filter(respondido_em__isnull=True)
-    elif status == "enviado":
-        qs = qs.filter(email_enviado=True)
-    elif status == "nao_enviado":
-        qs = qs.filter(email_enviado=False)
+    data_inicial = (request.GET.get("data_inicial") or "").strip()
+    data_final = (request.GET.get("data_final") or "").strip()
+    periodo_informado = bool(data_inicial and data_final)
+    filtro_aplicado = periodo_informado
 
-    registros = qs[:200]
+    registros = []
+    if filtro_aplicado:
+        qs = AvaliacaoPedido.objects.select_related("pedido").filter(selecionado_para_envio=True).order_by("-id")
+        if filial_ativa:
+            qs = qs.filter(pedido__filial=filial_ativa)
+        if pedido_ref:
+            qs = qs.filter(pedido__pedido__icontains=pedido_ref)
+        if data_inicial:
+            qs = qs.filter(pedido__prev_entrega__gte=data_inicial)
+        if data_final:
+            qs = qs.filter(pedido__prev_entrega__lte=data_final)
+        if status == "respondido":
+            qs = qs.filter(respondido_em__isnull=False)
+        elif status == "pendente":
+            qs = qs.filter(respondido_em__isnull=True)
+        elif status == "enviado":
+            qs = qs.filter(email_enviado=True)
+        elif status == "nao_enviado":
+            qs = qs.filter(email_enviado=False)
+        registros = qs[:200]
+
     pode_enviar = bool(getattr(request.user, "has_perm", lambda *_: False)("pedidos.send_email_avaliacao"))
     pode_gerar = bool(getattr(request.user, "has_perm", lambda *_: False)("pedidos.generate_email_queue_avaliacao"))
     return render(
@@ -276,7 +299,14 @@ def relatorio_avaliacao_view(request):
         "relatorio_avaliacao.html",
         {
             "registros": registros,
-            "filtros": {"pedido": pedido_ref, "status": status},
+            "filtros": {
+                "pedido": pedido_ref,
+                "status": status,
+                "data_inicial": data_inicial,
+                "data_final": data_final,
+            },
+            "filtro_aplicado": filtro_aplicado,
+            "periodo_informado": periodo_informado,
             "pode_enviar": pode_enviar,
             "pode_gerar": pode_gerar,
         },

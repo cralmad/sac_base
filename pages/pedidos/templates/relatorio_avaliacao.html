@@ -10,6 +10,14 @@
       <label class="form-label mb-0">Pedido</label>
       <input type="text" name="pedido" value="{{ filtros.pedido }}" class="form-control">
     </div>
+    <div class="col-12 col-md-2">
+      <label class="form-label mb-0">Data inicial</label>
+      <input type="date" name="data_inicial" value="{{ filtros.data_inicial }}" class="form-control">
+    </div>
+    <div class="col-12 col-md-2">
+      <label class="form-label mb-0">Data final</label>
+      <input type="date" name="data_final" value="{{ filtros.data_final }}" class="form-control">
+    </div>
     <div class="col-12 col-md-3">
       <label class="form-label mb-0">Status</label>
       <select name="status" class="form-select">
@@ -21,7 +29,7 @@
       </select>
     </div>
     <div class="col-12 col-md-2">
-      <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+      <button type="submit" class="btn btn-primary w-100 show-loader">Filtrar</button>
     </div>
     {% if pode_enviar %}
     <div class="col-12 col-md-3">
@@ -58,6 +66,13 @@
         </tr>
       </thead>
       <tbody>
+        {% if not periodo_informado %}
+        <tr>
+          <td colspan="{% if pode_enviar %}8{% else %}7{% endif %}" class="text-center text-muted">
+            Informe o período completo (data inicial e data final) para consultar.
+          </td>
+        </tr>
+        {% else %}
         {% for item in registros %}
         <tr>
           {% if pode_enviar %}
@@ -89,6 +104,7 @@
         {% empty %}
         <tr><td colspan="{% if pode_enviar %}8{% else %}7{% endif %}" class="text-center text-muted">Nenhuma avaliação encontrada.</td></tr>
         {% endfor %}
+        {% endif %}
       </tbody>
     </table>
   </div>

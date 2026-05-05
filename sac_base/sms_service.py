@@ -72,11 +72,20 @@ _TRANSIENT_ERR_MARKERS = (
     "exhausted",
 )
 
+# BulkGate: quando o erro é explicitamente "quota horária/diária de mensagens esgotada",
+# retries com backoff curto na mesma execução não recuperam — só consomem tempo e chamadas.
+_QUOTA_PERIODO_SEM_RETRY_CURTO = (
+    "hourly transaction messages quota",
+    "daily transaction messages quota",
+)
+
 
 def erro_sms_transiente_para_retry(mensagem_erro: str) -> bool:
     if not mensagem_erro:
         return False
     m = mensagem_erro.lower()
+    if any(marker in m for marker in _QUOTA_PERIODO_SEM_RETRY_CURTO):
+        return False
     return any(k in m for k in _TRANSIENT_ERR_MARKERS)
 
 

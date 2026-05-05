@@ -1,5 +1,6 @@
 from django.test import SimpleTestCase
 
+from sac_base.sms_service import erro_sms_transiente_para_retry
 from sac_base.sisvar_builders import (
     build_error_payload,
     build_form_response,
@@ -123,3 +124,21 @@ class SisvarBuildersTests(SimpleTestCase):
         self.assertTrue(payload["success"])
         self.assertEqual(payload["meta"]["datasets"]["auditoria"]["paginacao"]["page"], 1)
         self.assertEqual(payload["mensagens"]["info"]["conteudo"], ["Consulta pronta"])
+
+
+class SmsBulkGateTransientErrorTests(SimpleTestCase):
+    """Quota horária/diária esgotada não deve ser tratada como transiente para backoff curto."""
+
+    def test_quota_horaria_bulkgate_nao_e_transiente(self):
+        msg = "An hourly transaction messages quota has been exhausted"
+        self.assertFalse(erro_sms_transiente_para_retry(msg))
+
+    def test_quota_diaria_bulkgate_nao_e_transiente(self):
+        msg = "A daily transaction messages quota has been exhausted"
+        self.assertFalse(erro_sms_transiente_para_retry(msg))
+
+    def test_erro_rede_continua_transiente(self):
+        self.assertTrue(erro_sms_transiente_para_retry("Connection timed out"))
+
+    def test_quota_generica_continua_transiente(self):
+        self.assertTrue(erro_sms_transiente_para_retry("Rate limited; try again"))
