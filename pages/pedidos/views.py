@@ -824,6 +824,7 @@ def pedidos_importar_view(request):
     arquivo = request.FILES.get("arquivo_csv")
     filial_id = request.POST.get("filial_id")
     verificar_volumes = request.POST.get("verificar_volumes") == "1"
+    analisar_movimentacoes_dia = request.POST.get("analisar_movimentacoes_dia") == "1"
 
     if not arquivo:
         return JsonResponse(build_error_payload("Arquivo CSV não enviado."), status=400)
@@ -840,7 +841,12 @@ def pedidos_importar_view(request):
     conteudo = arquivo.read()
     nome_arquivo = arquivo.name
 
-    resultado = importar_csv(conteudo, filial, nome_arquivo)
+    resultado = importar_csv(
+        conteudo,
+        filial,
+        nome_arquivo,
+        analisar_movimentacoes_dia=analisar_movimentacoes_dia,
+    )
 
     if not resultado["sucesso"]:
         return JsonResponse(

@@ -6,6 +6,7 @@ import { AppLoader } from '/static/js/loader.js';
 const root = document.getElementById('mapa-root');
 const URL_PONTOS       = root?.dataset?.urlPontos ?? '';
 const URL_SALVAR_COORD = root?.dataset?.urlSalvarCoord ?? '';
+const URL_BUSCAR_LOCAL = root?.dataset?.urlBuscarLocal ?? '';
 const URL_REGEOCODIFICAR = root?.dataset?.urlRegeocodificar ?? '';
 const URL_ROTA         = root?.dataset?.urlRota ?? '';
 const URL_SALVAR       = root?.dataset?.urlSalvar ?? '';
@@ -28,9 +29,6 @@ const mapaContagemLabel   = document.getElementById('mapa-contagem-label');
 const mapaProgressoLabel  = document.getElementById('mapa-progresso-label');
 const mapaProgressoWrapper = document.getElementById('mapa-progresso-wrapper');
 const mapaProgressoBarra  = document.getElementById('mapa-progresso-barra');
-const painel              = document.getElementById('mapa-painel');
-const painelTitulo    = document.getElementById('mapa-painel-titulo');
-const painelCorpo     = document.getElementById('mapa-painel-corpo');
 const listaWrapper    = document.getElementById('mapa-lista-wrapper');
 const listaBadge      = document.getElementById('mapa-lista-badge');
 const listaTbody      = document.getElementById('mapa-lista-tbody');
@@ -42,6 +40,9 @@ let rotasLayer    = null;     // LayerGroup de polylines
 let geojsonData   = null;     // última FeatureCollection carregada
 let depositoCoord = null;     // { lat, lng } da filial ativa, ou null
 let marcadorDeposito = null;  // Leaflet marker do depósito
+let carregamentoPontosEmCurso = false;
+let popupEventsInicializados = false;
+const featByMovId = new Map();
 
 // ─── Inicialização do mapa ───────────────────────────────────────────────────
 
@@ -108,13 +109,20 @@ function conteudoPopup(p) {
     ? `<span class="mapa-geocoding-display">${_esc(p.geocoding_display)}</span><hr style="width:80%;margin:2px auto">`
     : '';
   const carroLabel = p.carro != null ? `Carro ${p.carro}` : 'Sem carro';
+  const editorCarro = podeEditarCarro ? `
+      <div class="input-group input-group-sm flex-shrink-1" style="min-width: 0; max-width: 210px;">
+        <span class="input-group-text">Carro</span>
+        <input type="number" min="1" class="form-control form-control-sm inp-popup-carro"
+               style="max-width:72px"
+               value="${p.carro ?? ''}" data-mov-id="${p.mov_id}">
+        <button class="btn btn-outline-primary btn-popup-salvar-carro" type="button"
+                data-mov-id="${p.mov_id}" title="Salvar carro">Salvar</button>
+      </div>` : '';
   const botoesAcao = (podeEditarCarro || podeMoverMarcador) ? `
       <hr class="my-1">
-      <div class="d-flex gap-1">
-        ${podeEditarCarro ? `<button class="btn btn-sm btn-outline-primary w-50 btn-popup-editar-carro"
-                              data-mov-id="${p.mov_id}" data-carro="${p.carro ?? ''}"
-                              title="Alterar carro"><i class="bi bi-pencil"></i> ${_esc(carroLabel)}</button>` : ''}
-        ${podeMoverMarcador ? `<button class="btn btn-sm btn-outline-warning ${podeEditarCarro ? 'w-50' : 'w-100'} btn-popup-regeocodificar"
+      <div class="d-flex align-items-center gap-1 flex-nowrap">
+        ${editorCarro}
+        ${podeMoverMarcador ? `<button class="btn btn-sm btn-outline-warning btn-popup-regeocodificar flex-shrink-0"
                               data-pedido-id="${p.pedido_id}" data-mov-id="${p.mov_id}"
                               title="Re-geocodificar"><i class="bi bi-arrow-repeat"></i></button>` : ''}
       </div>` : '';
@@ -147,6 +155,7 @@ function renderizarMarcadores(geojson) {
   // Remove marcadores antigos
   for (const m of Object.values(marcadores)) m.remove();
   marcadores = {};
+  featByMovId.clear();
 
   for (const feat of geojson.features) {
     const p = feat.properties;
@@ -160,6 +169,7 @@ function renderizarMarcadores(geojson) {
 
     marker.bindPopup(conteudoPopup(p), { maxWidth: 280 });
     marker.feature = feat;
+    featByMovId.set(String(p.mov_id), feat);
 
     if (podeMoverMarcador) {
       marker.on('dragend', (e) => {
@@ -185,15 +195,28 @@ function renderizarMarcadores(geojson) {
     marcadores[p.mov_id] = marker;
   }
 
-  // Evento delegado nos popups (alterar carro + busca de endereço)
-  mapaLeaflet.on('popupopen', (e) => {
+  if (!popupEventsInicializados) {
+    popupEventsInicializados = true;
+    mapaLeaflet.on('popupopen', (e) => {
     const popup = e.popup.getElement();
     if (!popup) return;
+    const statusEl = popup.querySelector('.mapa-popup-busca-status');
 
-    // Botão editar carro
-    const btnCarro = popup.querySelector('.btn-popup-editar-carro');
-    if (btnCarro) {
-      btnCarro.addEventListener('click', () => abrirPainelCarro(btnCarro.dataset.movId, btnCarro.dataset.carro, e.popup));
+    // Salvar carro inline no popup
+    const btnSalvarCarro = popup.querySelector('.btn-popup-salvar-carro');
+    const inpCarro = popup.querySelector('.inp-popup-carro');
+    if (btnSalvarCarro && inpCarro) {
+      btnSalvarCarro.addEventListener('click', async () => {
+        const movId = btnSalvarCarro.dataset.movId;
+        await salvarCarroNoPopup(movId, inpCarro.value.trim(), e.popup, statusEl);
+      });
+      inpCarro.addEventListener('keydown', async (ev) => {
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          const movId = btnSalvarCarro.dataset.movId;
+          await salvarCarroNoPopup(movId, inpCarro.value.trim(), e.popup, statusEl);
+        }
+      });
     }
 
     // Botão re-geocodificar
@@ -202,7 +225,6 @@ function renderizarMarcadores(geojson) {
       btnRegeo.addEventListener('click', async () => {
         const pedidoId = parseInt(btnRegeo.dataset.pedidoId, 10);
         const movId = btnRegeo.dataset.movId;
-        const statusEl = popup.querySelector('.mapa-popup-busca-status');
         btnRegeo.disabled = true;
         btnRegeo.textContent = '⏳ Geocodificando...';
         try {
@@ -218,7 +240,7 @@ function renderizarMarcadores(geojson) {
           }
           // Actualiza marcador e geojson em memória
           const marker = marcadores[movId];
-          const feat = geojsonData?.features.find(f => String(f.properties.mov_id) === String(movId));
+          const feat = featByMovId.get(String(movId));
           if (marker) marker.setLatLng([data.lat, data.lng]);
           if (feat) {
             feat.geometry.coordinates = [data.lng, data.lat];
@@ -254,7 +276,6 @@ function renderizarMarcadores(geojson) {
     // Busca de endereço para reposicionar pin
     const btnBuscar = popup.querySelector('.btn-popup-buscar-local');
     const inpBusca  = popup.querySelector('.inp-popup-busca-local');
-    const statusEl  = popup.querySelector('.mapa-popup-busca-status');
     if (!btnBuscar || !inpBusca) return;
 
     const executarBusca = async () => {
@@ -264,29 +285,22 @@ function renderizarMarcadores(geojson) {
       btnBuscar.textContent = '\u23f3';
       statusEl.textContent = 'Buscando...';
       try {
-        const resp = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=pt`,
-          { headers: { 'Accept-Language': 'pt-PT,pt' } }
-        );
-        const resultados = await resp.json();
-        if (!resultados.length) {
-          statusEl.textContent = 'Endereço não encontrado.';
-          return;
-        }
-        const novoLat = parseFloat(resultados[0].lat);
-        const novoLng = parseFloat(resultados[0].lon);
-        const displayName = resultados[0].display_name || '';
-        const tipoNom = resultados[0].type || '';
-        const classeNom = resultados[0].class || '';
-        const _TIPOS_MUITO_IMP = new Set(['postcode', 'city', 'town', 'village', 'county', 'municipality', 'state', 'country']);
-        let novaPrec = 'ok';
-        if (_TIPOS_MUITO_IMP.has(tipoNom) || classeNom === 'boundary') {
-          novaPrec = 'muito_impreciso';
-        } else if (classeNom === 'highway' || classeNom === 'place') {
-          novaPrec = 'impreciso';
-        }
         const pedidoId = parseInt(inpBusca.dataset.pedidoId, 10);
         const movId    = inpBusca.dataset.movId;
+        const resp = await fetch(URL_BUSCAR_LOCAL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+          body: JSON.stringify({ pedido_id: pedidoId, query: q }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          statusEl.textContent = data.mensagem || 'Endereço não encontrado.';
+          return;
+        }
+        const novoLat = parseFloat(data.lat);
+        const novoLng = parseFloat(data.lng);
+        const displayName = data.geocoding_display || '';
+        const novaPrec = data.geocoding_precision || '';
 
         // Move o marcador
         const marker = marcadores[movId];
@@ -296,10 +310,15 @@ function renderizarMarcadores(geojson) {
         }
 
         // Salva coordenadas no banco
-        await salvarCoordenadas(pedidoId, novoLat, novoLng, displayName, novaPrec);
+        const salvou = await salvarCoordenadas(pedidoId, novoLat, novoLng, displayName, novaPrec);
+        if (!salvou) {
+          statusEl.textContent = 'Falha ao salvar coordenadas.';
+          statusEl.className = 'mapa-popup-busca-status small text-danger mt-1';
+          return;
+        }
 
         // Atualiza geojson em memória
-        const feat = geojsonData?.features.find(f => String(f.properties.mov_id) === String(movId));
+        const feat = featByMovId.get(String(movId));
         if (feat) {
           feat.geometry.coordinates = [novoLng, novoLat];
           feat.properties.geocoding_display = displayName;
@@ -320,7 +339,8 @@ function renderizarMarcadores(geojson) {
 
     btnBuscar.addEventListener('click', executarBusca);
     inpBusca.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); executarBusca(); } });
-  });
+    });
+  }
 }
 
 // ─── Lista de pedidos ─────────────────────────────────────────────────────────────
@@ -476,6 +496,8 @@ function filtrarPorCarro(carro) {
 // ─── Carregar pontos ─────────────────────────────────────────────────────────
 
 async function carregarPontos(data) {
+  if (carregamentoPontosEmCurso) return;
+  carregamentoPontosEmCurso = true;
   inicializarMapa();
   AppLoader.show();
   avisoGeocoding.classList.remove('d-none');
@@ -524,7 +546,11 @@ async function carregarPontos(data) {
     mapaInfo.classList.remove('d-none');
 
     if (totalSemCoord > 0) {
-      avisoTexto.textContent = `${totalSemCoord} endereço(s) não foram geocodificados e não aparecem no mapa.`;
+      if (result.limite_atingido) {
+        avisoTexto.textContent = `${totalSemCoord} endereço(s) ainda sem coordenadas. O sistema processou um lote parcial para manter performance; recarregue para continuar.`;
+      } else {
+        avisoTexto.textContent = `${totalSemCoord} endereço(s) não foram geocodificados e não aparecem no mapa.`;
+      }
     } else {
       avisoGeocoding.classList.add('d-none');
     }
@@ -533,6 +559,7 @@ async function carregarPontos(data) {
   } catch {
     avisoTexto.textContent = 'Erro de comunicação ao carregar pontos.';
   } finally {
+    carregamentoPontosEmCurso = false;
     AppLoader.hide();
   }
 }
@@ -541,13 +568,14 @@ async function carregarPontos(data) {
 
 async function salvarCoordenadas(pedidoId, lat, lng, geocodingDisplay = '', geocodingPrecision = '') {
   try {
-    await fetch(URL_SALVAR_COORD, {
+    const resp = await fetch(URL_SALVAR_COORD, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ pedido_id: pedidoId, lat, lng, geocoding_display: geocodingDisplay, geocoding_precision: geocodingPrecision }),
     });
+    return resp.ok;
   } catch {
-    // Falha silenciosa — coordenada atualizada localmente de qualquer forma
+    return false;
   }
 }
 
@@ -629,89 +657,56 @@ async function tracarRotas() {
   AppLoader.hide();
 }
 
-// ─── Painel lateral: editar carro ────────────────────────────────────────────
-
-function abrirPainelCarro(movId, carroAtual, popup) {
-  painelTitulo.textContent = `Editar carro — mov. #${movId}`;
-  painelCorpo.replaceChildren();
-
-  const labelEl = document.createElement('label');
-  labelEl.className = 'form-label';
-  labelEl.textContent = 'Número do carro';
-  labelEl.htmlFor = 'painel-carro-input';
-
-  const inputEl = document.createElement('input');
-  inputEl.type = 'number';
-  inputEl.id = 'painel-carro-input';
-  inputEl.className = 'form-control mb-2';
-  inputEl.min = '1';
-  inputEl.value = carroAtual ?? '';
-
-  const btnSalvar = document.createElement('button');
-  btnSalvar.className = 'btn btn-success btn-sm w-100';
-  btnSalvar.innerHTML = '<i class="bi bi-check"></i> Salvar';
-
-  btnSalvar.addEventListener('click', async () => {
-    const novoCarro = inputEl.value.trim();
-    btnSalvar.disabled = true;
-    btnSalvar.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-    AppLoader.show();
-
-    try {
-      const movFeat = geojsonData?.features.find(f => String(f.properties.mov_id) === String(movId));
-      const updatedAt = movFeat?.properties?.updated_at ?? '';
-
-      const resp = await fetch(URL_SALVAR, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
-        body: JSON.stringify({
-          id: movId,
-          carro: novoCarro,
-          obs_rota: movFeat?.properties?.obs_rota ?? '',
-          volume_conf: movFeat?.properties?.volume_conf ?? 0,
-          periodo: movFeat?.properties?.periodo ?? '',
-          updated_at: updatedAt,
-        }),
-      });
-      const data = await resp.json();
-
-      if (resp.status === 409) {
-        btnSalvar.innerHTML = '⚠️ Conflito — recarregue';
-        return;
+async function salvarCarroNoPopup(movId, novoCarro, popupInstance, statusEl) {
+  AppLoader.show();
+  try {
+    const movFeat = featByMovId.get(String(movId));
+    const updatedAt = movFeat?.properties?.updated_at ?? '';
+    const resp = await fetch(URL_SALVAR, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+      body: JSON.stringify({
+        id: movId,
+        carro: novoCarro,
+        obs_rota: movFeat?.properties?.obs_rota ?? '',
+        volume_conf: movFeat?.properties?.volume_conf ?? 0,
+        periodo: movFeat?.properties?.periodo ?? '',
+        updated_at: updatedAt,
+      }),
+    });
+    const data = await resp.json();
+    if (resp.status === 409) {
+      if (statusEl) {
+        statusEl.textContent = 'Conflito de edição, recarregue o mapa.';
+        statusEl.className = 'mapa-popup-busca-status small text-warning mt-1';
       }
-      if (data.success) {
-        // Atualiza no estado local
-        if (movFeat) {
-          const carroNum = novoCarro !== '' ? parseInt(novoCarro, 10) : null;
-          const corNova = _corCarro(carroNum);
-          movFeat.properties.carro = carroNum;
-          movFeat.properties.cor = corNova;
-          movFeat.properties.updated_at = data.updated_at ?? updatedAt;
-
-          // Atualiza ícone do marcador
-          const marker = marcadores[movId];
-          if (marker) marker.setIcon(criarIcone(corNova, carroNum));
-
-          // Fecha popup e painel
-          popup?.close?.();
-        }
-        renderizarLegenda(geojsonData);
-        fecharPainel();
-      } else {
-        btnSalvar.innerHTML = '❌ Erro';
-      }
-    } catch {
-      btnSalvar.innerHTML = '❌ Erro';
-    } finally {
-      AppLoader.hide();
-      setTimeout(() => { btnSalvar.disabled = false; btnSalvar.innerHTML = '<i class="bi bi-check"></i> Salvar'; }, 2000);
+      return;
     }
-  });
+    if (!data.success || !movFeat) {
+      if (statusEl) {
+        statusEl.textContent = data.mensagem || 'Falha ao salvar carro.';
+        statusEl.className = 'mapa-popup-busca-status small text-danger mt-1';
+      }
+      return;
+    }
 
-  painelCorpo.appendChild(labelEl);
-  painelCorpo.appendChild(inputEl);
-  painelCorpo.appendChild(btnSalvar);
-  painel.classList.remove('d-none');
+    const carroNum = novoCarro !== '' ? parseInt(novoCarro, 10) : null;
+    const corNova = _corCarro(carroNum);
+    movFeat.properties.carro = carroNum;
+    movFeat.properties.cor = corNova;
+    movFeat.properties.updated_at = data.updated_at ?? updatedAt;
+    const marker = marcadores[movId];
+    if (marker) {
+      marker.setIcon(criarIcone(corNova, carroNum, movFeat.properties.segue_para_entrega !== false));
+      marker.setPopupContent(conteudoPopup(movFeat.properties));
+      popupInstance.close();
+      marker.openPopup();
+    }
+    renderizarLegenda(geojsonData);
+    renderizarLista(geojsonData);
+  } finally {
+    AppLoader.hide();
+  }
 }
 
 function _corCarro(carro) {
@@ -723,11 +718,6 @@ function _corCarro(carro) {
   ];
   if (carro == null) return "#6c757d";
   return CORES[(parseInt(carro, 10) - 1) % CORES.length];
-}
-
-function fecharPainel() {
-  painel.classList.add('d-none');
-  painelCorpo.replaceChildren();
 }
 
 // ─── Eventos ─────────────────────────────────────────────────────────────────
@@ -744,8 +734,6 @@ btnLimparRotas?.addEventListener('click', () => {
   rotasLayer.clearLayers();
   btnLimparRotas.classList.add('d-none');
 });
-
-document.getElementById('mapa-painel-fechar')?.addEventListener('click', fecharPainel);
 
 // Carrega automaticamente se veio com data da tela anterior
 if (DATA_INICIAL) {

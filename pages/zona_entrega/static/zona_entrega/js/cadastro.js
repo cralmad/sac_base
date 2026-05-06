@@ -402,9 +402,9 @@ form.addEventListener('submit', async (event) => {
 
       updateState(resultado.data);
       renderizarFiliais();
-      hidratarFormulario(nomeForm);
       renderizarFaixas();
       renderizarExcecoes();
+      hidratarFormulario(nomeForm);
     },
   });
 });
@@ -625,17 +625,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     updateState(resultado.data);
     renderizarFiliais();
-    hidratarFormulario(nomeForm);
     renderizarFaixas();
     renderizarExcecoes();
+    hidratarFormulario(nomeForm);
     aplicarPermissoesNaInterface();
     alternarTelas();
   });
 
   renderizarFiliais();
-  hidratarFormulario(nomeForm);
   renderizarFaixas();
   renderizarExcecoes();
+  hidratarFormulario(nomeForm);
   aplicarPermissoesNaInterface();
   AppLoader.hide();
 });

@@ -1,8 +1,10 @@
 import csv
 import io
+import logging
 import re
 
-from django.db import transaction
+from django.core.exceptions import ValidationError
+from django.db import DatabaseError, IntegrityError, transaction
 from django.utils import timezone
 
 from pages.cad_cliente.models import Cliente
@@ -11,6 +13,8 @@ from pages.pedidos.models import Pedido, TentativaEntrega
 from sac_base.coercion import parse_date, parse_datetime, parse_decimal, parse_int
 
 from .normalizacao import normalizar_estado
+
+logger = logging.getLogger(__name__)
 
 TIPO_MAP = {
     "delivery": "ENTREGA",
@@ -213,8 +217,95 @@ def _resolver_fks(filial, linhas_dedup, ids_sem_alteracao=None):
     return resultado, avisos
 
 
+def _validar_data_unica_para_analise(linhas_resolvidas):
+    datas_prev_entrega = {dados.get("prev_entrega") for _, dados in linhas_resolvidas}
+    if len(datas_prev_entrega) != 1 or None in datas_prev_entrega:
+        return None
+    return next(iter(datas_prev_entrega))
+
+
+def _coletar_pedidos_movimentacao_ausentes_no_arquivo(filial, data_base, id_vonzus_importados):
+    ausentes = []
+    pedidos_vistos = set()
+    tentativas_dia = (
+        TentativaEntrega.objects
+        .filter(
+            pedido__filial=filial,
+            data_tentativa=data_base,
+        )
+        .select_related("pedido")
+        .order_by("pedido_id", "id")
+    )
+    for tentativa in tentativas_dia:
+        if tentativa.pedido_id in pedidos_vistos:
+            continue
+        pedidos_vistos.add(tentativa.pedido_id)
+
+        pedido = tentativa.pedido
+        if pedido.id_vonzu in id_vonzus_importados:
+            continue
+
+        ausentes.append({
+            "pedido_id": pedido.id,
+            "id_vonzu": pedido.id_vonzu,
+            "pedido_ref": pedido.pedido or "",
+            "estado_movimentacao": tentativa.estado or "",
+        })
+    return ausentes
+
+
+def _montar_dados_volumes_agrupados(linhas_norm):
+    agrupados = {}
+    ordem_ids = []
+    detalhes = []
+
+    for _num_linha, dados in linhas_norm:
+        id_vonzu = dados["id_vonzu"]
+        if id_vonzu not in agrupados:
+            agrupados[id_vonzu] = {
+                "referencia": dados.get("pedido") or str(id_vonzu),
+                "peso": str(dados.get("peso") or ""),
+                "volume": dados.get("volume"),
+                "artigos": [],
+            }
+            ordem_ids.append(id_vonzu)
+        else:
+            if not agrupados[id_vonzu]["referencia"] and dados.get("pedido"):
+                agrupados[id_vonzu]["referencia"] = dados["pedido"]
+            if not agrupados[id_vonzu]["peso"] and dados.get("peso") is not None:
+                agrupados[id_vonzu]["peso"] = str(dados["peso"])
+            if agrupados[id_vonzu]["volume"] is None and dados.get("volume") is not None:
+                agrupados[id_vonzu]["volume"] = dados["volume"]
+
+        artigos_linha = _parse_description(dados.get("description_raw", ""))
+        if artigos_linha:
+            agrupados[id_vonzu]["artigos"].extend(artigos_linha)
+
+        detalhes.append({
+            "id_vonzu": id_vonzu,
+            "referencia": dados.get("pedido") or str(id_vonzu),
+            "qtd_artigos_linha": len(artigos_linha),
+            "description_vazia": not bool((dados.get("description_raw") or "").strip()),
+        })
+
+    dados_volumes = [
+        {
+            "referencia": agrupados[id_vonzu]["referencia"],
+            "peso": agrupados[id_vonzu]["peso"],
+            "volume": agrupados[id_vonzu]["volume"],
+            "artigos": agrupados[id_vonzu]["artigos"],
+        }
+        for id_vonzu in ordem_ids
+        if agrupados[id_vonzu]["artigos"]
+    ]
+    return dados_volumes, detalhes
+
+
 def _gerar_relatorio(nome_arquivo, filial, total_lidas, ignoradas,
-                     criados, atualizados, sem_alteracao, tentativas, avisos):
+                     criados, atualizados, sem_alteracao, tentativas, avisos,
+                     analise_movimentacao_ativada=False,
+                     data_analise=None,
+                     pedidos_mov_ausentes_no_arquivo=None):
     agora = timezone.localtime(timezone.now()).strftime("%Y-%m-%d %H:%M:%S")
     linhas = [
         "=== RELATÓRIO DE IMPORTAÇÃO DE PEDIDOS ===",
@@ -238,10 +329,27 @@ def _gerar_relatorio(nome_arquivo, filial, total_lidas, ignoradas,
     else:
         linhas.append("(nenhum)")
     linhas.append("")
+    if analise_movimentacao_ativada:
+        linhas.append("--- ANÁLISE: MOVIMENTAÇÕES DO DIA AUSENTES NO ARQUIVO ---")
+        linhas.append(f"Data analisada:                  {data_analise.isoformat() if data_analise else '-'}")
+        pedidos_mov_ausentes_no_arquivo = pedidos_mov_ausentes_no_arquivo or []
+        if pedidos_mov_ausentes_no_arquivo:
+            linhas.append(f"({len(pedidos_mov_ausentes_no_arquivo)} pedido(s) encontrado(s))")
+            for item in pedidos_mov_ausentes_no_arquivo:
+                referencia = item["pedido_ref"] or "-"
+                linhas.append(
+                    f"  pedido_id={item['pedido_id']:>8} | "
+                    f"id_vonzu={item['id_vonzu']:>10} | "
+                    f"referência={referencia} | "
+                    f"estado_mov={item['estado_movimentacao'] or '-'}"
+                )
+        else:
+            linhas.append("(nenhum pedido com movimentação no dia ficou fora do arquivo)")
+    linhas.append("")
     return "\n".join(linhas)
 
 
-def importar_csv(conteudo_bytes, filial, nome_arquivo):
+def importar_csv(conteudo_bytes, filial, nome_arquivo, analisar_movimentacoes_dia=False):
     """Importa um arquivo CSV VONZU para a filial indicada.
 
     Regras:
@@ -259,8 +367,13 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
     """
     try:
         linhas_raw = _parse_csv_bytes(conteudo_bytes)
-    except Exception as exc:
-        return {"sucesso": False, "erros": [f"Erro ao ler CSV: {exc}"], "relatorio": "", "stats": {}}
+    except ValueError:
+        return {
+            "sucesso": False,
+            "erros": ["Erro ao ler CSV: conteúdo inválido ou codificação não suportada."],
+            "relatorio": "",
+            "stats": {},
+        }
 
     if not linhas_raw:
         return {"sucesso": False, "erros": ["O arquivo CSV está vazio ou sem dados."], "relatorio": "", "stats": {}}
@@ -285,18 +398,30 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
     # Pré-identifica pedidos já existentes com mesmo atualizacao (sem_alteracao)
     # para suprimir avisos de FK em linhas que não serão escritas.
     id_vonzus_all = [d["id_vonzu"] for _, d in linhas_dedup]
+    dados_por_id_vonzu = {d["id_vonzu"]: d for _, d in linhas_dedup}
     ids_sem_alteracao = set()
     for p in Pedido.objects.filter(filial=filial, id_vonzu__in=id_vonzus_all).only("id_vonzu", "atualizacao"):
         atz = p.atualizacao
         if atz is not None and atz.tzinfo is None:
             atz = timezone.make_aware(atz)
-        # Encontra os dados normalizados para comparar
-        for _, d in linhas_dedup:
-            if d["id_vonzu"] == p.id_vonzu and d["atualizacao"] == atz:
-                ids_sem_alteracao.add(p.id_vonzu)
-                break
+        dados_csv = dados_por_id_vonzu.get(p.id_vonzu)
+        if dados_csv and dados_csv["atualizacao"] == atz:
+            ids_sem_alteracao.add(p.id_vonzu)
 
     linhas_resolvidas, avisos_fk = _resolver_fks(filial, linhas_dedup, ids_sem_alteracao)
+    data_analise_movimentacao = None
+    pedidos_mov_ausentes_no_arquivo = []
+    if analisar_movimentacoes_dia:
+        data_analise_movimentacao = _validar_data_unica_para_analise(linhas_resolvidas)
+        if not data_analise_movimentacao:
+            return {
+                "sucesso": False,
+                "erros": [
+                    "Para analisar movimentações do dia, o arquivo deve conter pedidos com apenas uma data válida em '*Data'.",
+                ],
+                "relatorio": "",
+                "stats": {},
+            }
 
     criados = atualizados = sem_alteracao = tentativas = 0
 
@@ -307,6 +432,29 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
                 p.id_vonzu: p
                 for p in Pedido.objects.filter(filial=filial, id_vonzu__in=id_vonzus)
             }
+            datas_prev_por_pedido_id = {}
+            for _num_linha, dados in linhas_resolvidas:
+                pedido_existente = existentes.get(dados["id_vonzu"])
+                data_prev = dados.get("prev_entrega")
+                if pedido_existente and data_prev:
+                    datas_prev_por_pedido_id.setdefault(pedido_existente.id, set()).add(data_prev)
+
+            tentativas_existentes_map = {}
+            if datas_prev_por_pedido_id:
+                pedido_ids = list(datas_prev_por_pedido_id.keys())
+                todas_datas_prev = {
+                    data_prev
+                    for datas in datas_prev_por_pedido_id.values()
+                    for data_prev in datas
+                }
+                tentativas_existentes_qs = TentativaEntrega.objects.filter(
+                    pedido_id__in=pedido_ids,
+                    data_tentativa__in=todas_datas_prev,
+                ).only("id", "pedido_id", "data_tentativa", "estado", "motorista_id", "dt_entrega")
+                tentativas_existentes_map = {
+                    (t.pedido_id, t.data_tentativa): t
+                    for t in tentativas_existentes_qs
+                }
 
             novos_pedidos = []
             novos_dados = []
@@ -379,10 +527,9 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
                     atualizados += 1
 
                     if nova_prev_entrega:
-                        tentativa_existente = TentativaEntrega.objects.filter(
-                            pedido=existente,
-                            data_tentativa=nova_prev_entrega,
-                        ).first()
+                        tentativa_existente = tentativas_existentes_map.get(
+                            (existente.id, nova_prev_entrega)
+                        )
 
                         if tentativa_existente:
                             tentativa_existente.estado = dados["estado"]
@@ -427,8 +574,22 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
             if novas_tentativas:
                 TentativaEntrega.objects.bulk_create(novas_tentativas)
 
-    except Exception as exc:
-        return {"sucesso": False, "erros": [f"Erro ao salvar dados: {exc}"], "relatorio": "", "stats": {}}
+    except (ValidationError, IntegrityError, DatabaseError) as exc:
+        logger.error(exc, exc_info=True)
+        return {
+            "sucesso": False,
+            "erros": ["Erro ao salvar dados da importação. Tente novamente."],
+            "relatorio": "",
+            "stats": {},
+        }
+
+    if analisar_movimentacoes_dia:
+        id_vonzus_importados = {dados["id_vonzu"] for _, dados in linhas_resolvidas}
+        pedidos_mov_ausentes_no_arquivo = _coletar_pedidos_movimentacao_ausentes_no_arquivo(
+            filial=filial,
+            data_base=data_analise_movimentacao,
+            id_vonzus_importados=id_vonzus_importados,
+        )
 
     relatorio_volumes = _gerar_relatorio(
         nome_arquivo=nome_arquivo,
@@ -440,19 +601,13 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo):
         sem_alteracao=sem_alteracao,
         tentativas=tentativas,
         avisos=avisos_fk,
+        analise_movimentacao_ativada=analisar_movimentacoes_dia,
+        data_analise=data_analise_movimentacao,
+        pedidos_mov_ausentes_no_arquivo=pedidos_mov_ausentes_no_arquivo,
     )
 
     # Relatório de volumes: todos os pedidos que têm Description no CSV
-    dados_volumes = []
-    for _num_linha, dados in linhas_resolvidas:
-        artigos = _parse_description(dados.get("description_raw", ""))
-        if artigos:
-            dados_volumes.append({
-                "referencia": dados.get("pedido") or str(dados["id_vonzu"]),
-                "peso": str(dados.get("peso") or ""),
-                "volume": dados.get("volume"),
-                "artigos": artigos,
-            })
+    dados_volumes, _detalhes_linhas_volumes = _montar_dados_volumes_agrupados(linhas_norm)
 
     return {
         "sucesso": True,

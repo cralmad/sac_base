@@ -284,6 +284,53 @@ class ImportadorCSVTests(TestCase):
         from decimal import Decimal
         self.assertEqual(p.peso, Decimal("920.150"))
 
+    def test_analise_movimentacoes_exige_data_unica_no_csv(self):
+        csv_bytes = _make_csv(
+            _csv_row(id="7001", data="2026-04-13"),
+            _csv_row(id="7002", data="2026-04-14"),
+        )
+        resultado = importar_csv(
+            csv_bytes,
+            self.filial,
+            "test.csv",
+            analisar_movimentacoes_dia=True,
+        )
+        self.assertFalse(resultado["sucesso"])
+        self.assertIn("apenas uma data válida", resultado["erros"][0])
+
+    def test_analise_movimentacoes_lista_pedido_ausente_no_arquivo(self):
+        pedido_existente = Pedido.objects.create(
+            filial=self.filial,
+            origem="IMPORTADO",
+            id_vonzu=8888,
+            pedido="REF_EXISTENTE",
+            tipo="ENTREGA",
+            criado=timezone.make_aware(datetime(2026, 4, 10, 10, 0, 0)),
+            atualizacao=timezone.make_aware(datetime(2026, 4, 10, 10, 0, 0)),
+            prev_entrega=date(2026, 4, 13),
+            dt_entrega=None,
+            estado="created",
+            volume=1,
+            nome_dest="Destino",
+        )
+        TentativaEntrega.objects.create(
+            pedido=pedido_existente,
+            data_tentativa=date(2026, 4, 13),
+            estado="assigned",
+            periodo="TARDE",
+        )
+
+        csv_bytes = _make_csv(_csv_row(id="1001", data="2026-04-13"))
+        resultado = importar_csv(
+            csv_bytes,
+            self.filial,
+            "test.csv",
+            analisar_movimentacoes_dia=True,
+        )
+        self.assertTrue(resultado["sucesso"])
+        self.assertIn("MOVIMENTAÇÕES DO DIA AUSENTES NO ARQUIVO", resultado["relatorio"])
+        self.assertIn("id_vonzu=      8888", resultado["relatorio"])
+
 
 class PedidosViewTests(TestCase):
     def setUp(self):

@@ -75,6 +75,17 @@ For full Heroku env lists, scheduler jobs, and long checklists, see `.github/cop
 - Safe pagination caps (e.g. `page_size` max 200).
 - Respect CSP middleware; avoid widening CSP without justification.
 
+## Database Efficiency & Performance
+The AI must prioritize performance and resource optimization in all database interactions (SQL, NoSQL, or ORMs).
+
+### Mandatory Guidelines:
+- **Prioritize Batch Operations:** Never generate loops that execute individual queries, inserts, or updates. Always use bulk operations like `insertMany`, `updateMany`, `bulkWrite`, or multi-value SQL inserts.
+- **Eliminate N+1 Problems:** When fetching related data, use Eager Loading (Joins, Includes, or Lookups) instead of executing additional queries inside a result loop.
+- **Set-Based Operations:** Prefer commands that delegate logic to the database engine (e.g., `UPDATE ... WHERE ...`) rather than fetching data to the application, modifying it in memory, and saving it back record-by-record.
+- **Selective Column Fetching:** Avoid `SELECT *`. Explicitly request only the columns necessary for the current task to minimize network overhead and memory usage.
+- **Mandatory Pagination:** For queries that could return large datasets, always implement or suggest pagination (Limit/Offset or Cursor-based).
+- **Connection Management:** Ensure that database connections or transactions are properly closed and handled to prevent leaks and overhead.
+
 ---
 
 ## Estrutura para envio do SMS

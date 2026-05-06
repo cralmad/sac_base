@@ -35,6 +35,21 @@
 
           <div class="row g-3 mt-1">
             <div class="col-12">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="analisar_movimentacoes_dia" name="analisar_movimentacoes_dia">
+                <label class="form-check-label d-flex align-items-center gap-1" for="analisar_movimentacoes_dia">
+                  <span>Analisar movimentações do dia vs arquivo</span>
+                  <span
+                    class="text-primary"
+                    role="button"
+                    tabindex="0"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    data-bs-title="Quando marcado, compara os pedidos do arquivo com as movimentações de entrega da data importada. Pedidos com movimentação no dia e ausentes no arquivo são incluídos no relatório. Exige arquivo com apenas uma data de previsão.">
+                    <i class="bi bi-question-circle"></i>
+                  </span>
+                </label>
+              </div>
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" id="verificar_volumes" name="verificar_volumes">
                 <label class="form-check-label d-flex align-items-center gap-1" for="verificar_volumes">

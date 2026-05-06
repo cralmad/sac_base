@@ -12,6 +12,7 @@
 <div id="mapa-root" class="container-xl my-3"
      data-url-pontos="{% url 'mapa_conferencia_pontos' %}"
      data-url-salvar-coord="{% url 'mapa_conferencia_salvar_coord' %}"
+     data-url-buscar-local="{% url 'mapa_conferencia_buscar_local' %}"
      data-url-regeocodificar="{% url 'mapa_conferencia_regeocodificar' %}"
      data-url-rota="{% url 'mapa_conferencia_rota' %}"
      data-url-salvar="{% url 'relatorio_conferencia_salvar' %}"
@@ -96,15 +97,6 @@
         <tbody id="mapa-lista-tbody"></tbody>
       </table>
     </div>
-  </div>
-
-  {# Painel lateral de detalhes #}
-  <div id="mapa-painel" class="mapa-painel d-none">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <strong id="mapa-painel-titulo">Detalhes</strong>
-      <button type="button" class="btn-close btn-sm" id="mapa-painel-fechar" aria-label="Fechar"></button>
-    </div>
-    <div id="mapa-painel-corpo"></div>
   </div>
 
 </div>

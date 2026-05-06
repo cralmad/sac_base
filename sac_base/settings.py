@@ -13,8 +13,6 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 from pathlib import Path
 import os
 import json
-import time
-import uuid
 import dj_database_url
 from datetime import timedelta
 
@@ -36,23 +34,6 @@ def env_list(name, default=None):
         return list(default or [])
 
     return [item.strip() for item in value.split(",") if item.strip()]
-
-
-def _debug_log_env(hypothesis_id: str, location: str, message: str, data: dict):
-    # #region agent log
-    payload = {
-        "sessionId": "55bb5a",
-        "runId": "env-check",
-        "hypothesisId": hypothesis_id,
-        "id": f"log_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}",
-        "timestamp": int(time.time() * 1000),
-        "location": location,
-        "message": message,
-        "data": data,
-    }
-    with open("debug-55bb5a.log", "a", encoding="utf-8") as f:
-        f.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    # #endregion
 
 
 URL_BD = os.environ.get('BANCO_DE_DADOS') or os.environ.get('DATABASE_URL')
@@ -290,39 +271,10 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # E-mail (SMTP)
 _email_auto_raw = os.environ.get("EMAIL_AUTO")
 _email_auto_cfg = {}
-# #region agent log
-_debug_log_env(
-    "H1",
-    "settings.py:email_auto:init",
-    "email_auto_raw_detected",
-    {
-        "has_email_auto": bool(_email_auto_raw),
-        "email_auto_length": len(_email_auto_raw or ""),
-        "email_auto_first_char": (_email_auto_raw[:1] if _email_auto_raw else ""),
-        "email_auto_prefix_safe": (_email_auto_raw[:12] if _email_auto_raw else ""),
-    },
-)
-# #endregion
 if _email_auto_raw:
     try:
         _email_auto_cfg = json.loads(_email_auto_raw)
-        # #region agent log
-        _debug_log_env(
-            "H2",
-            "settings.py:email_auto:parse",
-            "email_auto_json_parse_ok",
-            {"parsed_keys": sorted(list(_email_auto_cfg.keys()))[:20]},
-        )
-        # #endregion
     except json.JSONDecodeError as exc:
-        # #region agent log
-        _debug_log_env(
-            "H1",
-            "settings.py:email_auto:parse",
-            "email_auto_json_parse_error",
-            {"error": str(exc)},
-        )
-        # #endregion
         raise RuntimeError("EMAIL_AUTO inválida: JSON malformado.") from exc
 
 
@@ -341,19 +293,4 @@ DEFAULT_FROM_EMAIL = _email_cfg("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "no-rep
 EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', 20))
 EMAIL_SUBJECT_PREFIX = os.environ.get('EMAIL_SUBJECT_PREFIX', '')
 APP_BASE_URL = _email_cfg("APP_BASE_URL", "http://127.0.0.1:8000")
-# #region agent log
-_debug_log_env(
-    "H3",
-    "settings.py:email_auto:applied",
-    "email_settings_effective",
-    {
-        "email_host": EMAIL_HOST,
-        "email_port": EMAIL_PORT,
-        "email_use_tls": EMAIL_USE_TLS,
-        "has_email_user": bool(EMAIL_HOST_USER),
-        "has_email_password": bool(EMAIL_HOST_PASSWORD),
-        "default_from_email_set": bool(DEFAULT_FROM_EMAIL),
-        "app_base_url": APP_BASE_URL,
-    },
-)
-# #endregion
+AVALIACAO_TOKEN_SECRET = _email_cfg("AVALIACAO_TOKEN_SECRET", SECRET_KEY)

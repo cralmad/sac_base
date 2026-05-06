@@ -87,6 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const filialId = document.getElementById('filial_id').value;
     const arquivoInput = document.getElementById('arquivo_csv');
     const verificarVolumes = document.getElementById('verificar_volumes')?.checked ? '1' : '0';
+    const analisarMovimentacoesDia = document.getElementById('analisar_movimentacoes_dia')?.checked ? '1' : '0';
 
     if (!filialId) {
       definirMensagem('erro', 'Selecione uma filial.');
@@ -101,6 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
     formData.append('filial_id', filialId);
     formData.append('arquivo_csv', arquivoInput.files[0]);
     formData.append('verificar_volumes', verificarVolumes);
+    formData.append('analisar_movimentacoes_dia', analisarMovimentacoesDia);
 
     AppLoader.show();
     btnBaixar.classList.add('d-none');

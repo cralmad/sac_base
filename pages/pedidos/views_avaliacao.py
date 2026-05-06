@@ -38,11 +38,11 @@ def _gerar_token_avaliacao(avaliacao_id: int) -> str:
         "avaliacao_id": int(avaliacao_id),
         "exp": timezone.now() + timedelta(days=180),
     }
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm=_ALGO_JWT)
+    return jwt.encode(payload, settings.AVALIACAO_TOKEN_SECRET, algorithm=_ALGO_JWT)
 
 
 def _validar_token_avaliacao(token: str) -> int:
-    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[_ALGO_JWT])
+    payload = jwt.decode(token, settings.AVALIACAO_TOKEN_SECRET, algorithms=[_ALGO_JWT])
     return int(payload["avaliacao_id"])
 
 
@@ -50,11 +50,19 @@ def _garantir_token_avaliacao(avaliacao: AvaliacaoPedido):
     if not avaliacao.token_publico:
         avaliacao.token_publico = _gerar_token_avaliacao(avaliacao.id)
         avaliacao.save(update_fields=["token_publico", "updated_at"])
+    else:
+        try:
+            _validar_token_avaliacao(avaliacao.token_publico)
+        except Exception:
+            avaliacao.token_publico = _gerar_token_avaliacao(avaliacao.id)
+            avaliacao.save(update_fields=["token_publico", "updated_at"])
     return avaliacao
 
 
 def _montar_link_publico(request, token: str) -> str:
     base = (settings.APP_BASE_URL or "").rstrip("/")
+    if base:
+        return f"{base}/app/logistica/avaliacao/{token}/"
     if request is not None:
         return request.build_absolute_uri(f"/app/logistica/avaliacao/{token}/")
     return f"{base}/app/logistica/avaliacao/{token}/"
@@ -68,6 +76,13 @@ def enviar_email_pedido_avaliacao(*, avaliacao: AvaliacaoPedido, request=None) -
         return {"sucesso": False, "erro": "Pedido ainda não está concluído para envio de pesquisa."}
     if not avaliacao.selecionado_para_envio:
         return {"sucesso": False, "erro": "Avaliação não está selecionada para envio."}
+    app_base_url = (settings.APP_BASE_URL or "").strip().lower()
+    usa_dominio_remoto = app_base_url.startswith("http") and "127.0.0.1" not in app_base_url and "localhost" not in app_base_url
+    if usa_dominio_remoto and settings.AVALIACAO_TOKEN_SECRET == "django-dev-sac-base-insecure-key":
+        return {
+            "sucesso": False,
+            "erro": "Configuração inválida: defina AVALIACAO_TOKEN_SECRET (ou DJANGO_SECRET_KEY) para assinar links de avaliação destinados a domínio remoto.",
+        }
 
     avaliacao = _garantir_token_avaliacao(avaliacao)
     filial = pedido.filial
