@@ -129,6 +129,7 @@ function conteudoPopup(p) {
   return `
     <div class="mapa-popup">
       <div class="d-flex align-items-center gap-1"><strong>${_esc(p.referencia)}</strong> <span class="text-muted small">(${_esc(p.tipo)})</span>${dotHtml}</div>
+      ${p.tem_devolucao ? '<div class="alert alert-warning py-1 px-2 my-1 small mb-1">Atenção: pedido com devolução associada.</div>' : ''}
       ${displayLine}<span class="small">${_esc(p.endereco)}, <em>${_esc(p.codpost)} ${_esc(p.cidade)}</em></span><br>
       <div class="d-flex justify-content-between gap-2">
         <span>Vol: <b>${p.volume_conf ?? '—'}</b>/<b>${p.volume ?? '—'}</b> ${conf}</span>
@@ -374,6 +375,13 @@ function renderizarLista(geojson) {
     btnRef.title = 'Ver no mapa';
     btnRef.addEventListener('click', () => focarMarcador(p.mov_id));
     tdRef.appendChild(btnRef);
+    if (p.tem_devolucao) {
+      const badgeDev = document.createElement('span');
+      badgeDev.className = 'badge text-bg-warning ms-2';
+      badgeDev.textContent = 'Devolucao';
+      badgeDev.title = 'Pedido com devolucao associada';
+      tdRef.appendChild(badgeDev);
+    }
     tr.appendChild(tdRef);
 
     // Tipo

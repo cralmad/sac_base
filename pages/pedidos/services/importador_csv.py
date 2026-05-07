@@ -290,6 +290,7 @@ def _montar_dados_volumes_agrupados(linhas_norm):
 
     dados_volumes = [
         {
+            "id_vonzu": id_vonzu,
             "referencia": agrupados[id_vonzu]["referencia"],
             "peso": agrupados[id_vonzu]["peso"],
             "volume": agrupados[id_vonzu]["volume"],
@@ -299,6 +300,48 @@ def _montar_dados_volumes_agrupados(linhas_norm):
         if agrupados[id_vonzu]["artigos"]
     ]
     return dados_volumes, detalhes
+
+
+def parse_csv_artigos_sem_persistir(conteudo_bytes):
+    """Parseia CSV VONZU e retorna artigos agrupados sem persistir em BD."""
+    try:
+        linhas_raw = _parse_csv_bytes(conteudo_bytes)
+    except ValueError:
+        return {
+            "sucesso": False,
+            "erros": ["Erro ao ler CSV: conteúdo inválido ou codificação não suportada."],
+            "pedidos": [],
+        }
+
+    if not linhas_raw:
+        return {
+            "sucesso": False,
+            "erros": ["O arquivo CSV está vazio ou sem dados."],
+            "pedidos": [],
+        }
+
+    todos_erros = []
+    linhas_norm = []
+    for num_linha, row in linhas_raw:
+        dados, erros = _normalizar_linha(num_linha, row)
+        if erros:
+            todos_erros.extend(erros)
+        else:
+            linhas_norm.append((num_linha, dados))
+
+    if todos_erros:
+        return {
+            "sucesso": False,
+            "erros": todos_erros,
+            "pedidos": [],
+        }
+
+    dados_volumes, _detalhes = _montar_dados_volumes_agrupados(linhas_norm)
+    return {
+        "sucesso": True,
+        "erros": [],
+        "pedidos": dados_volumes,
+    }
 
 
 def _gerar_relatorio(nome_arquivo, filial, total_lidas, ignoradas,

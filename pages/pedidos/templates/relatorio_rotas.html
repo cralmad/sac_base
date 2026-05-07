@@ -45,14 +45,29 @@ table.rr-tabela td {
 .rr-obs    { color: #555; font-size: .78rem; font-style: italic; }
 .rr-periodo-MANHA { color: #b55a00; font-weight: 600; }
 .rr-periodo-TARDE { color: #0055a5; font-weight: 600; }
-.rr-dev-sim {
-  color: #842029;
-  font-weight: 700;
-  text-align: center;
-  font-size: 1.2rem;
-  line-height: 1;
-}
+.rr-dev-ref { color: #842029; font-weight: 700; }
 table.rr-tabela tr.rr-nao-segue td { background: #e0e0e0 !important; }
+.rr-subgrupo-faixa td {
+  background: #eef3f8;
+  color: #1a3a5c;
+  font-weight: 700;
+}
+.rr-ref-wrap { display: inline-flex; align-items: center; gap: .35rem; }
+.rr-ref-dev { background: #fff3cd; padding: 0 .25rem; border-radius: .2rem; }
+.rr-artigos-toggle { color: #1a3a5c; text-decoration: none; }
+.rr-artigos-toggle:hover { color: #0d2f52; }
+.rr-artigos-toggle i { font-weight: 700; font-size: 1.05rem; }
+.rr-artigos-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: .15rem;
+}
+.rr-artigos-table th,
+.rr-artigos-table td {
+  border: 1px solid #dee2e6;
+  padding: .2rem .35rem;
+  font-size: .78rem;
+}
 
 /* ── Multi-select de motoristas ── */
 #rr-motoristas {
@@ -91,6 +106,9 @@ table.rr-tabela tr.rr-nao-segue td { background: #e0e0e0 !important; }
   .rr-tipo-e, .rr-tipo-r { font-weight: 700; }
   h1 { font-size: .85rem !important; margin-bottom: .15rem !important; }
   #rr-titulo-data { font-size: 7.5pt; }
+  .rr-grupo-header .rr-badge-totais { display: none !important; }
+  .rr-artigos-toggle { display: none !important; }
+  tr.d-none { display: table-row !important; }
 }
 </style>
 {% endblock %}
@@ -98,7 +116,8 @@ table.rr-tabela tr.rr-nao-segue td { background: #e0e0e0 !important; }
 {% block content %}
 <div class="container-xl my-3" id="rr-root"
      data-url-buscar="{% url 'relatorio_rotas' %}"
-     data-url-link="{% url 'mapa_publico_gerar_link' %}">
+     data-url-link="{% url 'mapa_publico_gerar_link' %}"
+     data-url-importar-artigos="{% url 'relatorio_rotas_importar_artigos' %}">
 
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
     <h1 class="h4 mb-0"><i class="bi bi-truck me-2"></i>Rotas por <span id="rr-titulo-agrup">Carro</span></h1>
@@ -161,7 +180,13 @@ table.rr-tabela tr.rr-nao-segue td { background: #e0e0e0 !important; }
           <i class="bi bi-printer"></i>
         </button>
       </div>
+      <div class="col-12 col-md-2 d-flex gap-2">
+        <button type="button" id="rr-btn-importar-artigos" class="btn btn-outline-primary w-100" data-bs-toggle="modal" data-bs-target="#rr-modal-importar-artigos">
+          <i class="bi bi-upload"></i> Importar artigos
+        </button>
+      </div>
     </form>
+    <div id="rr-importacao-status" class="small text-muted mt-2"></div>
   </div>
 
   <!-- Resultado -->
@@ -174,6 +199,31 @@ table.rr-tabela tr.rr-nao-segue td { background: #e0e0e0 !important; }
   </div>
 
   <div id="rr-vazio" class="text-center text-muted d-none">Nenhum registro encontrado.</div>
+</div>
+
+<div class="modal fade" id="rr-modal-importar-artigos" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Importar artigos dos pedidos</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label" for="rr-arquivo-artigos">Arquivo CSV</label>
+        <input type="file" id="rr-arquivo-artigos" class="form-control" accept=".csv,text/csv">
+        <div class="form-text">
+          Use o mesmo formato da importação de pedidos (incluindo a coluna Description).
+          Os dados ficam apenas nesta página enquanto ela estiver aberta.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="rr-btn-confirmar-importacao" class="btn btn-primary">
+          <i class="bi bi-upload"></i> Importar
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}
 

@@ -14,6 +14,7 @@ urlpatterns = [
     path('app/', include('pages.zona_entrega.urls')),
     path('app/', include('pages.motorista.urls')),
     path('app/', include('pages.pedidos.urls')),
+    path('app/', include('pages.financeiro.urls')),
     path('app/', include('pages.permissao.urls')),
     path('app/', include('pages.auditoria.urls')),
     path('', include('pages.home.urls')),

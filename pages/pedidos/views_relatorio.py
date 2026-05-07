@@ -8,6 +8,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from datetime import datetime
 from collections import defaultdict
 from itertools import groupby
+from decimal import Decimal
 
 from pages.pedidos.models import (
     TentativaEntrega,
@@ -21,6 +22,7 @@ from pages.pedidos.models import (
     exclude_tentativas_com_data_posterior,
 )
 from pages.motorista.models import Motorista
+from pages.zona_entrega.models import ZonaEntrega
 from pages.pedidos.services.sms_relatorio import (
     complemento_verificacao_solicitacao,
     estado_verificacao_sms_dia,
@@ -29,6 +31,7 @@ from pages.pedidos.services.sms_relatorio import (
     queryset_tentativas_envio_manual_por_ids,
     sigla_pais_operacao_filial,
 )
+from pages.pedidos.services.importador_csv import parse_csv_artigos_sem_persistir
 from sac_base.permissions_utils import build_action_permissions
 from sac_base.sisvar_builders import build_sisvar_payload
 from sac_base.sms_service import montar_mensagem
@@ -221,6 +224,70 @@ PERMISSOES_ROTAS = {
     "acessar": "pedidos.view_tentativaentrega",
 }
 
+
+def _normalizar_cp7_num(codigo_postal):
+    digitos = "".join(c for c in str(codigo_postal or "") if c.isdigit())
+    if len(digitos) < 4:
+        return None, None
+    cp4 = int(digitos[:4])
+    cp7 = int(digitos[:7] if len(digitos) >= 7 else digitos)
+    return cp4, cp7
+
+
+def _carregar_regras_zona_por_filial(filial):
+    if not filial:
+        return []
+    zonas = (
+        ZonaEntrega.objects
+        .filter(filial=filial, is_deleted=False, ativa=True)
+        .prefetch_related("faixas_postais", "excecoes_postais")
+        .order_by("-prioridade", "descricao")
+    )
+    regras = []
+    for zona in zonas:
+        faixas = [f for f in zona.faixas_postais.all() if f.ativa]
+        excecoes = [e for e in zona.excecoes_postais.all() if e.ativa]
+        regras.append({
+            "zona": zona,
+            "faixas": faixas,
+            "excecoes": excecoes,
+        })
+    return regras
+
+
+def _resolver_zona_e_faixa_entrega(codigo_postal, regras_zona):
+    cp4, cp7 = _normalizar_cp7_num(codigo_postal)
+    if cp4 is None or cp7 is None:
+        return "", ""
+
+    for regra in regras_zona:
+        inclui_excecao = False
+        exclui_excecao = False
+        codigo_excecao_incluir = ""
+        for exc in regra["excecoes"]:
+            if exc.cp7_num == cp7:
+                if exc.tipo_excecao == "INCLUIR":
+                    inclui_excecao = True
+                    codigo_excecao_incluir = exc.codigo_postal
+                elif exc.tipo_excecao == "EXCLUIR":
+                    exclui_excecao = True
+        if inclui_excecao:
+            faixa_exc = f"EXC {codigo_excecao_incluir}"
+            return regra["zona"].descricao, faixa_exc
+        if exclui_excecao:
+            continue
+
+        for faixa in regra["faixas"]:
+            if faixa.tipo_intervalo == "CP4":
+                if faixa.cp4_inicial and faixa.cp4_final and int(faixa.cp4_inicial) <= cp4 <= int(faixa.cp4_final):
+                    faixa_desc = f"CP4 {faixa.codigo_postal_inicial}-{faixa.codigo_postal_final}"
+                    return regra["zona"].descricao, faixa_desc
+            else:
+                if faixa.cp7_inicial_num <= cp7 <= faixa.cp7_final_num:
+                    faixa_desc = f"CP7 {faixa.codigo_postal_inicial}-{faixa.codigo_postal_final}"
+                    return regra["zona"].descricao, faixa_desc
+    return "", ""
+
 @login_required
 @permission_required(PERMISSOES_ROTAS["acessar"], raise_exception=True)
 @csrf_protect
@@ -299,6 +366,8 @@ def relatorio_rotas_view(request):
             dq = dq.filter(pedido__filial=filial_ativa)
         pedidos_com_devolucao = set(dq.values_list("pedido_id", flat=True).distinct())
 
+    regras_zona = _carregar_regras_zona_por_filial(filial_ativa)
+
     grupos = []
     for grupo_key, items in groupby(movs, key=key_fn):
         linhas = []
@@ -324,8 +393,10 @@ def relatorio_rotas_view(request):
                     peso_str = str(p.peso)
             segue_para_entrega = estado_segue_para_entrega(mov.estado)
             tem_tentativa_posterior = p.id in pedidos_com_tentativa_posterior
+            zona_entrega, faixa_entrega = _resolver_zona_e_faixa_entrega(p.codpost_dest, regras_zona)
             linhas.append({
                 "pedido": p.pedido or str(p.id_vonzu),
+                "id_vonzu": p.id_vonzu,
                 "tipo": tipo_abrev,
                 "nome_dest": p.nome_dest or "",
                 "fones": fones,
@@ -335,6 +406,8 @@ def relatorio_rotas_view(request):
                 "volumes": f"{p.volume_conf or 0}/{p.volume or 0}",
                 "peso": peso_str,
                 "periodo": mov.periodo or "",
+                "zona_entrega": zona_entrega,
+                "faixa_entrega": faixa_entrega,
                 "obs_rota": p.obs_rota or "",
                 "segue_para_entrega": segue_para_entrega,
                 "nao_segue_para_entrega": (not segue_para_entrega) or tem_tentativa_posterior,
@@ -354,6 +427,31 @@ def relatorio_rotas_view(request):
         "data_fmt": dt.strftime("%d/%m/%Y"),
         "agrupamento": agrupamento,
     })
+
+
+@login_required
+@permission_required(PERMISSOES_ROTAS["acessar"], raise_exception=True)
+@csrf_protect
+@require_POST
+def relatorio_rotas_importar_artigos_view(request):
+    arquivo = request.FILES.get("arquivo_csv")
+    if not arquivo:
+        return JsonResponse({"success": False, "mensagem": "Arquivo CSV não enviado."}, status=400)
+
+    if not arquivo.name.lower().endswith(".csv"):
+        return JsonResponse({"success": False, "mensagem": "O arquivo deve ter extensão .csv."}, status=400)
+
+    resultado = parse_csv_artigos_sem_persistir(arquivo.read())
+    if not resultado["sucesso"]:
+        return JsonResponse(
+            {
+                "success": False,
+                "mensagens": {"erro": {"conteudo": resultado["erros"], "ignorar": False}},
+            },
+            status=422,
+        )
+
+    return JsonResponse({"success": True, "pedidos": resultado["pedidos"]})
 
 
 # ─── Relatório de Envio de SMS ────────────────────────────────────────────────
@@ -632,9 +730,11 @@ def relatorio_gerencial_view(request):
             datas_por_pedido[pid].add(d)
 
     linhas = []
+    total_peso = Decimal("0")
     for mov in movs:
         p = mov.pedido
         tipo_abrev = "R" if (p.tipo or "").upper() == "RECOLHA" else "E"
+        peso_valor = p.peso if p.peso is not None else Decimal("0")
         peso_str = ""
         if p.peso is not None:
             try:
@@ -653,6 +753,15 @@ def relatorio_gerencial_view(request):
             armazem = ""
         datas_ped = datas_por_pedido.get(p.id, ())
         tem_tentativa_posterior = any(td > mov.data_tentativa for td in datas_ped)
+        incluir_linha = True
+        if armazem_filtro == "sim" and armazem != "SIM":
+            incluir_linha = False
+        elif armazem_filtro == "nao" and armazem == "SIM":
+            incluir_linha = False
+
+        if not incluir_linha:
+            continue
+
         linhas.append({
             "pedido_id":      p.id,
             "pedido":         p.pedido or str(p.id_vonzu),
@@ -670,10 +779,7 @@ def relatorio_gerencial_view(request):
             "armazem":        armazem,
             "segue_para_entrega": estado_segue_para_entrega(mov.estado) and not tem_tentativa_posterior,
         })
-        if armazem_filtro == "sim" and armazem != "SIM":
-            linhas.pop()
-        elif armazem_filtro == "nao" and armazem == "SIM":
-            linhas.pop()
+        total_peso += peso_valor
 
     data_fmt = dt_ini.strftime("%d/%m/%Y")
     if dt_ini != dt_fim:
@@ -684,6 +790,7 @@ def relatorio_gerencial_view(request):
         "linhas": linhas,
         "data_fmt": data_fmt,
         "total_pedidos": len(linhas),
+        "total_peso": format(total_peso, "f").rstrip("0").rstrip(".") or "0",
     })
 
 

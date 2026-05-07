@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}SacBase - Registro Financeiro{% endblock %}
+{% block page_title %}Registro Financeiro Manual{% endblock %}
+
+{% block content %}
+  <form id="cadRegistroFinanceiro" data-form-lock="cadRegistroFinanceiro" method="POST">
+    {% csrf_token %}
+    <div class="container-xl my-3 mx-auto">
+      <div class="row g-3">
+        <div class="col-12 col-md-4">
+          <label class="form-label mb-0" for="filial_id">Matriz/Filial</label>
+          <select name="filial_id" id="filial_id" class="form-select" required>
+            <option value="">Selecione</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label mb-0" for="tipo">Tipo</label>
+          <select name="tipo" id="tipo" class="form-select" required></select>
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label mb-0" for="contraparte_tipo">Tipo de Contraparte</label>
+          <select name="contraparte_tipo" id="contraparte_tipo" class="form-select">
+            <option value="">Sem contraparte</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-5">
+          <label class="form-label mb-0" for="contraparte_id">Contraparte</label>
+          <select name="contraparte_id" id="contraparte_id" class="form-select">
+            <option value="">Selecione</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label mb-0" for="plano_contas_id">Plano de Contas</label>
+          <select name="plano_contas_id" id="plano_contas_id" class="form-select" required>
+            <option value="">Selecione</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label mb-0" for="valor">Valor</label>
+          <input id="valor" name="valor" type="text" class="form-control smart-input" data-allow="0-9,." required>
+        </div>
+        <div class="col-12 col-md-9">
+          <label class="form-label mb-0" for="observacao">Observação</label>
+          <input id="observacao" name="observacao" type="text" class="form-control" maxlength="1000">
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-actions">
+      <button id="btn-salvar" class="btn btn-primary d-none" data-show-on="novo,editar" type="submit">
+        <i class="bi bi-save"></i> Salvar
+      </button>
+      <button id="btn-editar" type="button" data-show-on="visualizar" class="btn btn-warning d-none">
+        <i class="bi bi-pencil"></i> Editar
+      </button>
+      <button id="btn-novo" type="button" data-show-on="visualizar" class="btn btn-success d-none">
+        <i class="bi bi-plus-circle"></i> Novo
+      </button>
+      <button id="btn-excluir" type="button" data-show-on="visualizar" class="btn btn-danger d-none">
+        <i class="bi bi-x-circle"></i> Cancelar Título
+      </button>
+      <button id="btn-cancelar" type="button" data-show-on="novo,editar" class="btn btn-outline-secondary d-none">
+        <i class="bi bi-x-circle"></i> Cancelar
+      </button>
+      <button type="button" id="btn-abrir-pesquisa" class="btn btn-secondary d-none">
+        <i class="bi bi-search"></i> Pesquisar
+      </button>
+    </div>
+  </form>
+
+  <div id="div-pesquisa" class="container-xl d-none mt-3">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <span>Consultar Registros Financeiros</span>
+        <button type="button" id="btn-fechar" class="btn-close btn-close-white"></button>
+      </div>
+      <div class="card-body">
+        <form id="consRegistroFinanceiro" method="POST">
+          <div class="row g-3">
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0">Matriz/Filial</label>
+              <select name="filial_cons" id="filial_cons" class="form-select">
+                <option value="">Todas</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-2">
+              <label class="form-label mb-0">Tipo</label>
+              <select name="tipo_cons" id="tipo_cons" class="form-select">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0">Plano</label>
+              <select name="plano_cons" id="plano_cons" class="form-select">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-2">
+              <label class="form-label mb-0">Status</label>
+              <select name="status_cons" id="status_cons" class="form-select">
+                <option value="">Todos</option>
+                <option value="aberto">Aberto</option>
+                <option value="parcial">Parcial</option>
+                <option value="liquidado">Liquidado</option>
+                <option value="cancelado">Cancelado</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-3 d-grid gap-2 d-md-flex align-items-end">
+              <button type="submit" class="btn btn-success">Filtrar</button>
+              <button type="button" class="btn btn-outline-danger" id="btn-voltar">Voltar</button>
+            </div>
+          </div>
+        </form>
+
+        <div class="table-responsive mt-4">
+          <table class="table table-hover table-sm border">
+            <thead class="table-dark">
+              <tr>
+                <th>ID</th>
+                <th>Filial</th>
+                <th>Tipo</th>
+                <th>Plano</th>
+                <th>Valor</th>
+                <th>Saldo</th>
+                <th>Status</th>
+                <th class="text-center">Ação</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-registro-financeiro-corpo"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="{% static 'financeiro/js/registro_manual.js' %}"></script>
+{% endblock %}

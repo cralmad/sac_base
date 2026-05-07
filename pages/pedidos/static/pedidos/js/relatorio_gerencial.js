@@ -246,7 +246,7 @@ async function _salvarDevolucao() {
 }
 
 // ─── Renderizar tabela única (sem agrupamento) ────────────────────────────────
-function renderizarRelatorio(linhas, dataFmt, totalPedidos) {
+function renderizarRelatorio(linhas, dataFmt, totalPedidos, totalPeso) {
   resultado.replaceChildren();
   vazio.classList.add('d-none');
   totalBar.classList.add('d-none');
@@ -261,7 +261,7 @@ function renderizarRelatorio(linhas, dataFmt, totalPedidos) {
 
   tituloData.textContent = `Período: ${dataFmt}`;
 
-  totalBar.textContent = `Total: ${totalPedidos} registro(s)`;
+  totalBar.textContent = `Total: ${totalPedidos} registro(s) | Peso total: ${totalPeso || 0}`;
   totalBar.classList.remove('d-none');
 
   const table = document.createElement('table');
@@ -375,7 +375,12 @@ async function buscar() {
       return;
     }
 
-    renderizarRelatorio(json.linhas || [], json.data_fmt || '', json.total_pedidos || 0);
+    renderizarRelatorio(
+      json.linhas || [],
+      json.data_fmt || '',
+      json.total_pedidos || 0,
+      json.total_peso || 0,
+    );
   } catch {
     definirMensagem('erro', 'Erro de comunicação com o servidor.', false);
   } finally {

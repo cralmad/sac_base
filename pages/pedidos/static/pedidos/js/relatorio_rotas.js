@@ -5,6 +5,7 @@ import { validateSmartNumber, getMultiSelectValues } from '/static/js/smart_filt
 const root       = document.getElementById('rr-root');
 const URL_BUSCAR = root?.dataset?.urlBuscar ?? '';
 const URL_LINK   = root?.dataset?.urlLink   ?? '';
+const URL_IMPORTAR_ARTIGOS = root?.dataset?.urlImportarArtigos ?? '';
 
 const form       = document.getElementById('rr-form');
 const inpData    = document.getElementById('rr-data');
@@ -20,6 +21,16 @@ const loader     = document.getElementById('rr-loader');
 const vazio      = document.getElementById('rr-vazio');
 const tituloData = document.getElementById('rr-titulo-data');
 const btnImprimir = document.getElementById('rr-btn-imprimir');
+const arquivoArtigosEl = document.getElementById('rr-arquivo-artigos');
+const btnConfirmarImportacao = document.getElementById('rr-btn-confirmar-importacao');
+const importacaoStatusEl = document.getElementById('rr-importacao-status');
+const modalImportarArtigosEl = document.getElementById('rr-modal-importar-artigos');
+const modalImportarArtigos = modalImportarArtigosEl ? new bootstrap.Modal(modalImportarArtigosEl) : null;
+
+let artigosPorIdVonzu = new Map();
+let artigosPorReferencia = new Map();
+let totalPedidosComArtigos = 0;
+let totalArtigosImportados = 0;
 
 // ─── Popula select de motoristas a partir da sisVar ───────────────────────────
 function preencherMotoristas() {
@@ -54,6 +65,112 @@ function _esc(v) {
     .replace(/"/g, '&quot;');
 }
 
+function atualizarResumoImportacao() {
+  if (!importacaoStatusEl) return;
+  if (!totalPedidosComArtigos) {
+    importacaoStatusEl.textContent = 'Nenhum artigo importado.';
+    return;
+  }
+  importacaoStatusEl.textContent = `Artigos importados: ${totalPedidosComArtigos} pedido(s), ${totalArtigosImportados} item(ns).`;
+}
+
+function normalizarReferencia(valor) {
+  return String(valor ?? '').trim();
+}
+
+function obterArtigosDaLinha(linha) {
+  const idVonzu = Number.parseInt(linha?.id_vonzu, 10);
+  if (Number.isInteger(idVonzu) && artigosPorIdVonzu.has(idVonzu)) {
+    return artigosPorIdVonzu.get(idVonzu);
+  }
+  const referencia = normalizarReferencia(linha?.pedido);
+  if (referencia && artigosPorReferencia.has(referencia)) {
+    return artigosPorReferencia.get(referencia);
+  }
+  return null;
+}
+
+function pesoParaNumero(valor) {
+  const texto = String(valor ?? '').trim().replace(',', '.');
+  if (!texto) return 0;
+  const numero = Number.parseFloat(texto);
+  return Number.isFinite(numero) ? numero : 0;
+}
+
+function formatarPeso(total) {
+  return total.toLocaleString('pt-PT', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function volumePedidoParaNumero(valorVolumes) {
+  const texto = String(valorVolumes ?? '').trim();
+  if (!texto) return 0;
+  const partes = texto.split('/');
+  const volumePedido = partes.length >= 2 ? partes[1] : partes[0];
+  const numero = Number.parseInt(String(volumePedido).trim(), 10);
+  return Number.isFinite(numero) ? numero : 0;
+}
+
+function agruparLinhasSemCarroPorFaixa(linhas) {
+  const mapa = new Map();
+  (linhas || []).forEach(linha => {
+    const zona = String(linha?.zona_entrega || '').trim() || 'Sem zona de entrega';
+    const faixa = String(linha?.faixa_entrega || '').trim() || 'Sem faixa de entrega';
+    const chave = `${zona}|||${faixa}`;
+    if (!mapa.has(chave)) mapa.set(chave, { zona, faixa, itens: [] });
+    mapa.get(chave).itens.push(linha);
+  });
+  return Array.from(mapa.values())
+    .sort((a, b) => {
+      if (a.zona === 'Sem zona de entrega') return 1;
+      if (b.zona === 'Sem zona de entrega') return -1;
+      const cmpZona = a.zona.localeCompare(b.zona, 'pt');
+      if (cmpZona !== 0) return cmpZona;
+      return a.faixa.localeCompare(b.faixa, 'pt');
+    })
+    .map(grupo => ({ zona: grupo.zona, faixa: grupo.faixa, itens: grupo.itens }));
+}
+
+function resumoZonasSemCarro(linhas) {
+  const mapa = new Map();
+  (linhas || []).forEach(linha => {
+    const zona = String(linha?.zona_entrega || '').trim() || 'Sem zona';
+    const atual = mapa.get(zona) || { pedidos: 0, peso: 0, volume: 0 };
+    atual.pedidos += 1;
+    atual.peso += pesoParaNumero(linha?.peso);
+    atual.volume += volumePedidoParaNumero(linha?.volumes);
+    mapa.set(zona, atual);
+  });
+  if (!mapa.size) return '0 zonas';
+  const partes = Array.from(mapa.entries())
+    .sort((a, b) => b[1].pedidos - a[1].pedidos || a[0].localeCompare(b[0], 'pt'))
+    .map(([zona, dados]) => `${zona} (${dados.pedidos} • ${formatarPeso(dados.peso)} kg • ${dados.volume} vol)`);
+  return `${mapa.size} zona(s): ${partes.join(', ')}`;
+}
+
+function aplicarDadosImportados(pedidos) {
+  artigosPorIdVonzu = new Map();
+  artigosPorReferencia = new Map();
+  totalPedidosComArtigos = 0;
+  totalArtigosImportados = 0;
+
+  (pedidos || []).forEach(pedido => {
+    const artigos = Array.isArray(pedido?.artigos) ? pedido.artigos : [];
+    if (!artigos.length) return;
+    totalPedidosComArtigos += 1;
+    totalArtigosImportados += artigos.length;
+    const idVonzu = Number.parseInt(pedido.id_vonzu, 10);
+    if (Number.isInteger(idVonzu)) {
+      artigosPorIdVonzu.set(idVonzu, artigos);
+    }
+    const referencia = normalizarReferencia(pedido.referencia);
+    if (referencia) {
+      artigosPorReferencia.set(referencia, artigos);
+    }
+  });
+
+  atualizarResumoImportacao();
+}
+
 // ─── Renderizar grupos ────────────────────────────────────────────────────────
 function renderizarGrupos(grupos, dataFmt, agrupamento) {
   resultado.replaceChildren();
@@ -85,13 +202,26 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
     spanData.style.fontWeight = 'normal';
     spanData.style.opacity = '0.85';
 
-    const spanTotal = document.createElement('span');
-    spanTotal.className = 'rr-badge ms-auto';
-    spanTotal.textContent = `${grupo.total} pedido(s)`;
+    const pesoTotalGrupo = (grupo.linhas || []).reduce((acc, linha) => acc + pesoParaNumero(linha.peso), 0);
+    const volumeTotalGrupo = (grupo.linhas || []).reduce((acc, linha) => acc + volumePedidoParaNumero(linha.volumes), 0);
+
+    const spanTotalPedidos = document.createElement('span');
+    spanTotalPedidos.className = 'rr-badge rr-badge-pedidos ms-auto';
+    spanTotalPedidos.textContent = `${grupo.total} pedido(s)`;
+
+    const spanTotaisExtras = document.createElement('span');
+    spanTotaisExtras.className = 'rr-badge rr-badge-totais';
+    const resumoExtras = `${formatarPeso(pesoTotalGrupo)} kg • ${volumeTotalGrupo} vol`;
+    if (agrupamento === 'carro' && grupo.carro === '\u2014') {
+      spanTotaisExtras.textContent = `${resumoExtras} • ${resumoZonasSemCarro(grupo.linhas || [])}`;
+    } else {
+      spanTotaisExtras.textContent = resumoExtras;
+    }
 
     header.appendChild(spanLabel);
     header.appendChild(spanData);
-    header.appendChild(spanTotal);
+    header.appendChild(spanTotalPedidos);
+    header.appendChild(spanTotaisExtras);
 
     const btnCopiarRefs = document.createElement('button');
     btnCopiarRefs.type = 'button';
@@ -117,7 +247,7 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
 
     const thead = document.createElement('thead');
     const trHead = document.createElement('tr');
-    ['Referência', 'T', 'D', 'Destinatário', 'Telefone(s)', 'Endereço', 'Cidade', 'C. Postal', 'Vol', 'Peso', 'Per.', 'Obs. Rota'].forEach(h => {
+    ['Referência', 'T', 'Destinatário', 'Telefone(s)', 'Endereço', 'Cidade', 'C. Postal', 'Vol', 'Peso', 'Per.', 'Obs. Rota'].forEach(h => {
       const th = document.createElement('th');
       th.textContent = h;
       trHead.appendChild(th);
@@ -125,14 +255,15 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
     thead.appendChild(trHead);
 
     const tbody = document.createElement('tbody');
-    grupo.linhas.forEach(linha => {
+
+    const renderizarLinhaPedido = (linha) => {
       const tr = document.createElement('tr');
       if (linha.nao_segue_para_entrega ?? !linha.segue_para_entrega) tr.classList.add('rr-nao-segue');
+      const artigosLinha = obterArtigosDaLinha(linha);
 
       const campos = [
         { val: linha.pedido },
         { val: linha.tipo,   cls: linha.tipo === 'R' ? 'rr-tipo-r' : 'rr-tipo-e' },
-        { val: linha.tem_devolucao ? '\u2022' : '', cls: linha.tem_devolucao ? 'rr-dev-sim' : '' },
         { val: linha.nome_dest },
         { val: linha.fones },
         { val: linha.endereco_dest },
@@ -152,8 +283,120 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
         tr.appendChild(td);
       });
 
+      if (artigosLinha?.length) {
+        const tdRef = tr.children[0];
+        tdRef.textContent = '';
+        const refWrap = document.createElement('div');
+        refWrap.className = 'rr-ref-wrap';
+
+        const btnExpandir = document.createElement('button');
+        btnExpandir.type = 'button';
+        btnExpandir.className = 'btn btn-sm btn-link p-0 rr-artigos-toggle';
+        btnExpandir.title = `Mostrar produtos (${artigosLinha.length})`;
+        btnExpandir.innerHTML = '<i class="bi bi-chevron-right"></i>';
+        refWrap.appendChild(btnExpandir);
+
+        const refTexto = document.createElement('span');
+        refTexto.textContent = linha.pedido ?? '';
+        refWrap.appendChild(refTexto);
+
+        if (linha.tem_devolucao) {
+          refWrap.classList.add('rr-ref-dev');
+          const devBadge = document.createElement('span');
+          devBadge.className = 'rr-dev-ref';
+          devBadge.textContent = '(Dev)';
+          refWrap.appendChild(devBadge);
+        }
+
+        tdRef.appendChild(refWrap);
+      } else if (linha.tem_devolucao) {
+        const tdRef = tr.children[0];
+        tdRef.textContent = '';
+        const refWrap = document.createElement('div');
+        refWrap.className = 'rr-ref-wrap';
+        refWrap.classList.add('rr-ref-dev');
+        const refTexto = document.createElement('span');
+        refTexto.textContent = linha.pedido ?? '';
+        refWrap.appendChild(refTexto);
+        const devBadge = document.createElement('span');
+        devBadge.className = 'rr-dev-ref';
+        devBadge.textContent = '(Dev)';
+        refWrap.appendChild(devBadge);
+        tdRef.appendChild(refWrap);
+      }
+
       tbody.appendChild(tr);
-    });
+
+      if (artigosLinha?.length) {
+        const trArtigos = document.createElement('tr');
+        trArtigos.className = 'd-none';
+        const tdArtigos = document.createElement('td');
+        tdArtigos.colSpan = 11;
+
+        const artigosWrapper = document.createElement('div');
+        artigosWrapper.className = 'rr-artigos';
+        const tableArtigos = document.createElement('table');
+        tableArtigos.className = 'rr-artigos-table';
+        const headArtigos = document.createElement('thead');
+        const trHeadArtigos = document.createElement('tr');
+        ['Produto', 'Quantidade', 'Código'].forEach(titulo => {
+          const th = document.createElement('th');
+          th.textContent = titulo;
+          trHeadArtigos.appendChild(th);
+        });
+        headArtigos.appendChild(trHeadArtigos);
+        tableArtigos.appendChild(headArtigos);
+
+        const bodyArtigos = document.createElement('tbody');
+        artigosLinha.forEach(artigo => {
+          const trItem = document.createElement('tr');
+          const tdDescricao = document.createElement('td');
+          tdDescricao.textContent = artigo.descricao ?? '';
+          const tdQuantidade = document.createElement('td');
+          tdQuantidade.textContent = String(artigo.quantidade ?? '');
+          const tdCodigo = document.createElement('td');
+          tdCodigo.textContent = artigo.cod_fornecedor ?? '';
+          trItem.appendChild(tdDescricao);
+          trItem.appendChild(tdQuantidade);
+          trItem.appendChild(tdCodigo);
+          bodyArtigos.appendChild(trItem);
+        });
+        tableArtigos.appendChild(bodyArtigos);
+
+        artigosWrapper.appendChild(tableArtigos);
+        tdArtigos.appendChild(artigosWrapper);
+        trArtigos.appendChild(tdArtigos);
+        tbody.appendChild(trArtigos);
+
+        const btnExpandir = tr.querySelector('.rr-artigos-toggle');
+        const icone = btnExpandir?.querySelector('i');
+        btnExpandir?.addEventListener('click', () => {
+          const aberto = !trArtigos.classList.contains('d-none');
+          trArtigos.classList.toggle('d-none', aberto);
+          if (icone) {
+            icone.className = aberto ? 'bi bi-chevron-right' : 'bi bi-chevron-down';
+          }
+        });
+      }
+    };
+
+    if (agrupamento === 'carro' && grupo.carro === '\u2014') {
+      const subgrupos = agruparLinhasSemCarroPorFaixa(grupo.linhas || []);
+      subgrupos.forEach(subgrupo => {
+        const trSubgrupo = document.createElement('tr');
+        trSubgrupo.className = 'rr-subgrupo-faixa';
+        const tdSubgrupo = document.createElement('td');
+        tdSubgrupo.colSpan = 11;
+        const pesoSubgrupo = subgrupo.itens.reduce((acc, linha) => acc + pesoParaNumero(linha.peso), 0);
+        const volumeSubgrupo = subgrupo.itens.reduce((acc, linha) => acc + volumePedidoParaNumero(linha.volumes), 0);
+        tdSubgrupo.textContent = `${subgrupo.zona} • ${subgrupo.faixa} • ${subgrupo.itens.length} pedido(s) • ${formatarPeso(pesoSubgrupo)} kg • ${volumeSubgrupo} vol`;
+        trSubgrupo.appendChild(tdSubgrupo);
+        tbody.appendChild(trSubgrupo);
+        subgrupo.itens.forEach(renderizarLinhaPedido);
+      });
+    } else {
+      (grupo.linhas || []).forEach(renderizarLinhaPedido);
+    }
 
     table.appendChild(thead);
     table.appendChild(tbody);
@@ -170,6 +413,51 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
   });
 
   btnImprimir.disabled = false;
+}
+
+async function importarArtigos() {
+  clearMessages();
+  if (!URL_IMPORTAR_ARTIGOS) {
+    definirMensagem('erro', 'URL de importação não configurada.', false);
+    return;
+  }
+  const arquivo = arquivoArtigosEl?.files?.[0];
+  if (!arquivo) {
+    definirMensagem('erro', 'Selecione um arquivo CSV para importar.', false);
+    return;
+  }
+  if (!arquivo.name.toLowerCase().endsWith('.csv')) {
+    definirMensagem('erro', 'O arquivo deve ter extensão .csv.', false);
+    return;
+  }
+
+  btnConfirmarImportacao.disabled = true;
+  AppLoader.show();
+  try {
+    const formData = new FormData();
+    formData.append('arquivo_csv', arquivo);
+
+    const resp = await fetch(URL_IMPORTAR_ARTIGOS, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCsrfToken() },
+      body: formData,
+    });
+    const json = await resp.json();
+    if (!json.success) {
+      const erros = json?.mensagens?.erro?.conteudo;
+      definirMensagem('erro', Array.isArray(erros) && erros.length ? erros[0] : (json.mensagem || 'Erro ao importar artigos.'), false);
+      return;
+    }
+    aplicarDadosImportados(json.pedidos || []);
+    definirMensagem('sucesso', 'Artigos importados com sucesso.', false);
+    arquivoArtigosEl.value = '';
+    modalImportarArtigos?.hide();
+  } catch {
+    definirMensagem('erro', 'Erro de comunicação ao importar artigos.', false);
+  } finally {
+    btnConfirmarImportacao.disabled = false;
+    AppLoader.hide();
+  }
 }
 
 // ─── Copiar referências do grupo (ref1, ref2, …) ────────────────────────────
@@ -304,4 +592,6 @@ async function buscar() {
 // ─── Eventos ──────────────────────────────────────────────────────────────────
 form.addEventListener('submit', e => { e.preventDefault(); buscar(); });
 btnImprimir.addEventListener('click', () => window.print());
+btnConfirmarImportacao?.addEventListener('click', importarArtigos);
 preencherMotoristas();
+atualizarResumoImportacao();

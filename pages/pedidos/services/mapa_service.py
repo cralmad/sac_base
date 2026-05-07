@@ -5,7 +5,7 @@ import unicodedata
 import requests as http_requests
 from django.db import transaction
 
-from pages.pedidos.models import TentativaEntrega, estado_segue_para_entrega
+from pages.pedidos.models import Devolucao, TentativaEntrega, estado_segue_para_entrega
 
 logger = logging.getLogger(__name__)
 
@@ -271,6 +271,14 @@ def montar_payload_mapa(filial, data_tentativa):
             .values_list("pedido_id", flat=True)
             .distinct()
         )
+    pedidos_com_devolucao = set()
+    if pedido_ids:
+        pedidos_com_devolucao = set(
+            Devolucao.objects
+            .filter(pedido_id__in=pedido_ids, pedido__filial=filial)
+            .values_list("pedido_id", flat=True)
+            .distinct()
+        )
 
     features = []
     for mov in movs:
@@ -302,6 +310,7 @@ def montar_payload_mapa(filial, data_tentativa):
                     estado_segue_para_entrega(mov.estado)
                     and (pedido.id not in pedidos_com_tentativa_posterior)
                 ),
+                "tem_devolucao": pedido.id in pedidos_com_devolucao,
                 "updated_at": mov.updated_at.isoformat(),
             },
         })
