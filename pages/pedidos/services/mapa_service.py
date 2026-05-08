@@ -36,6 +36,101 @@ _PALAVRAS_GENERICAS_END = frozenset({
 })
 
 
+def _cp_quatro_digitos(codpost):
+    return "".join(c for c in (codpost or "") if c.isdigit())[:4]
+
+
+_MAX_AREA_CP_MEMO = 128
+_AREA_CP_MEMO = {}
+
+
+def _buscar_area_referencia_codigo_postal(codpost_limpo):
+    """Área administrativa oficial do CP em PT (sem cidade), via Nominatim estruturado."""
+    cp = (codpost_limpo or "").strip()
+    if len(_cp_quatro_digitos(cp)) < 4:
+        return None
+    try:
+        resp = http_requests.get(
+            NOMINATIM_URL,
+            params={
+                "postalcode": cp,
+                "countrycodes": "pt",
+                "format": "json",
+                "limit": 1,
+                "addressdetails": 1,
+            },
+            headers=NOMINATIM_HEADERS,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        js = resp.json()
+    except (http_requests.RequestException, ValueError):
+        return None
+    if not js:
+        return None
+    addr = js[0].get("address") or {}
+    if not addr:
+        return None
+    return {
+        "county": (addr.get("county") or "").strip(),
+        "town": (addr.get("town") or addr.get("village") or "").strip(),
+        "iso3166_2": (addr.get("ISO3166-2-lvl6") or "").strip().upper(),
+    }
+
+
+def _obter_area_referencia_cp(codpost_limpo):
+    cp = (codpost_limpo or "").strip()
+    if len(_cp_quatro_digitos(cp)) < 4:
+        return None
+    if cp in _AREA_CP_MEMO:
+        return _AREA_CP_MEMO[cp]
+    time.sleep(1.1)
+    area = _buscar_area_referencia_codigo_postal(cp)
+    if len(_AREA_CP_MEMO) >= _MAX_AREA_CP_MEMO:
+        _AREA_CP_MEMO.clear()
+    _AREA_CP_MEMO[cp] = area
+    return area
+
+
+def _resultado_incoerente_area_do_cp(resultado, area_ref):
+    """
+    True se distrito/concelho (ISO3166-2 ou county) do resultado Nominatim
+    difere da área onde o código postal está oficialmente localizado.
+    Cobre casos em que o hit não traz postcode em address mas o ponto está noutro distrito.
+    """
+    if not area_ref or not any(area_ref.values()):
+        return False
+    addr = resultado.get("address") or {}
+    ref_iso = (area_ref.get("iso3166_2") or "").strip().upper()
+    res_iso = (addr.get("ISO3166-2-lvl6") or "").strip().upper()
+    if ref_iso and res_iso and ref_iso != res_iso:
+        return True
+    ref_co = _normalizar_texto(area_ref.get("county") or "")
+    res_co = _normalizar_texto(addr.get("county") or "")
+    if ref_co and res_co and ref_co != res_co:
+        return True
+    return False
+
+
+def _ajustar_precisao_coerencia_area_cp(precisao, resultado, area_ref):
+    if not area_ref or precisao == "muito_impreciso":
+        return precisao
+    if _resultado_incoerente_area_do_cp(resultado, area_ref):
+        return "muito_impreciso"
+    return precisao
+
+
+def _rescue_deve_ignorar_candidato(resultado, precision, codpost_limpo, area_ref):
+    """No resgate, não fixar ponto claramente incoerente com o CP ou com a área do CP."""
+    if precision != "muito_impreciso":
+        return False
+    if _resultado_cp_diverge_referencia(resultado, codpost_limpo):
+        return True
+    if area_ref and _resultado_incoerente_area_do_cp(resultado, area_ref):
+        return True
+    return False
+
+
 def cor_carro(carro):
     if carro is None:
         return "#6c757d"
@@ -56,7 +151,14 @@ def _palavras_significativas(texto):
     return {p for p in partes if len(p) >= 4 and not p.isdigit() and p not in _PALAVRAS_GENERICAS_END}
 
 
-def determinar_precisao(resultado, codpost_original, cidade_original=None, endereco_original=None):
+def determinar_precisao(
+    resultado,
+    codpost_original,
+    cidade_original=None,
+    endereco_original=None,
+    *,
+    modo_rescue=False,
+):
     tipo = resultado.get("type", "")
     classe = resultado.get("class", "")
     address = resultado.get("address", {})
@@ -99,6 +201,11 @@ def determinar_precisao(resultado, codpost_original, cidade_original=None, ender
             return "impreciso"
         return "ok"
 
+    if modo_rescue:
+        if classe == "boundary" and tipo == "administrative" and cidade_ref:
+            if cidade_no_display or (cidade_geo and (cidade_ref in cidade_geo or cidade_geo in cidade_ref)):
+                return "impreciso"
+
     if tipo in _GEOCODING_TIPOS_MUITO_IMPRECISOS or classe == "boundary":
         return "muito_impreciso"
     if classe in _GEOCODING_CLASSES_MUITO_IMPRECISAS:
@@ -122,11 +229,12 @@ def _score_precisao(precisao):
     return 1
 
 
-def _selecionar_melhor_resultado(resultados, codpost, cidade, endereco):
+def _selecionar_melhor_resultado(resultados, codpost, cidade, endereco, *, modo_rescue=False, area_ref=None):
     melhor = None
     melhor_score = -1
     for item in resultados:
-        precisao = determinar_precisao(item, codpost, cidade, endereco)
+        precisao = determinar_precisao(item, codpost, cidade, endereco, modo_rescue=modo_rescue)
+        precisao = _ajustar_precisao_coerencia_area_cp(precisao, item, area_ref)
         score = _score_precisao(precisao)
         if score > melhor_score:
             melhor = (item, precisao)
@@ -136,14 +244,88 @@ def _selecionar_melhor_resultado(resultados, codpost, cidade, endereco):
     return melhor
 
 
-def geocodificar(endereco, codpost, cidade):
+def _resultado_cp_diverge_referencia(resultado, codpost_original):
+    """True se há CP na resposta OSM e os 4 dígitos diferem do pedido — sítio errado."""
+    cp_ref = _cp_quatro_digitos(codpost_original)
+    if len(cp_ref) < 4:
+        return False
+    addr = resultado.get("address") or {}
+    cp_geo = _cp_quatro_digitos(addr.get("postcode") or "")
+    return bool(cp_geo) and cp_geo != cp_ref
+
+
+def _geocodificar_rescue_apos_muito_impreciso(endereco, codpost_limpo, cidade_limpa, area_ref=None):
+    """
+    Estratégia de correção só quando o caminho legado devolveu muito_impreciso:
+    pesquisa estruturada CP+cidade, depois texto livre com rejeição por CP incoerente.
+    """
     consultas = []
-    if endereco and cidade:
-        consultas.append(f"{endereco}, {cidade}, Portugal")
-    if codpost and cidade:
-        consultas.append(f"{codpost} {cidade} Portugal")
-    if codpost:
-        consultas.append(f"{codpost} Portugal")
+    if endereco and cidade_limpa:
+        consultas.append(f"{endereco}, {cidade_limpa}, Portugal")
+    if codpost_limpo and cidade_limpa:
+        consultas.append(f"{codpost_limpo} {cidade_limpa} Portugal")
+    if codpost_limpo:
+        consultas.append(f"{codpost_limpo} Portugal")
+
+    tentativas = []
+    if codpost_limpo and cidade_limpa:
+        tentativas.append(
+            ("structured_pc_city", {"postalcode": codpost_limpo, "city": cidade_limpa, "countrycodes": "pt"}),
+        )
+    for q in consultas:
+        tentativas.append(("free_text", q))
+
+    for entrada in tentativas:
+        time.sleep(1.1)
+        if entrada[0] == "structured_pc_city":
+            params = {"format": "json", "limit": 3, "addressdetails": 1, **entrada[1]}
+            q_label = f"structured:{entrada[1].get('postalcode', '')}|{entrada[1].get('city', '')}"
+        else:
+            params = {
+                "q": entrada[1],
+                "format": "json",
+                "limit": 3,
+                "countrycodes": "pt",
+                "addressdetails": 1,
+            }
+            q_label = entrada[1][:200]
+        try:
+            resp = http_requests.get(NOMINATIM_URL, params=params, headers=NOMINATIM_HEADERS, timeout=10)
+            resp.raise_for_status()
+            resultados = resp.json()
+        except http_requests.RequestException as exc:
+            logger.warning("Geocoding rescue falhou para '%s': %s", q_label, exc)
+            continue
+        except ValueError:
+            logger.warning("Geocoding rescue retornou JSON inválido para '%s'", q_label)
+            continue
+
+        if not resultados:
+            continue
+        melhor = _selecionar_melhor_resultado(
+            resultados, codpost_limpo, cidade_limpa, endereco, modo_rescue=True, area_ref=area_ref,
+        )
+        if not melhor:
+            continue
+        r, precision = melhor
+        if _rescue_deve_ignorar_candidato(r, precision, codpost_limpo, area_ref):
+            continue
+        return float(r["lat"]), float(r["lon"]), (r.get("display_name", "") or ""), precision
+
+    return None, None, None, None
+
+
+def geocodificar(endereco, codpost, cidade):
+    codpost_limpo = (codpost or "").strip()
+    cidade_limpa = (cidade or "").strip()
+    area_ref = _obter_area_referencia_cp(codpost_limpo)
+    consultas = []
+    if endereco and cidade_limpa:
+        consultas.append(f"{endereco}, {cidade_limpa}, Portugal")
+    if codpost_limpo and cidade_limpa:
+        consultas.append(f"{codpost_limpo} {cidade_limpa} Portugal")
+    if codpost_limpo:
+        consultas.append(f"{codpost_limpo} Portugal")
 
     for q in consultas:
         time.sleep(1.1)
@@ -165,11 +347,21 @@ def geocodificar(endereco, codpost, cidade):
 
         if not resultados:
             continue
-        melhor = _selecionar_melhor_resultado(resultados, codpost, cidade, endereco)
+        melhor = _selecionar_melhor_resultado(
+            resultados, codpost_limpo, cidade_limpa, endereco, area_ref=area_ref,
+        )
         if not melhor:
             continue
         r, precision = melhor
-        return float(r["lat"]), float(r["lon"]), (r.get("display_name", "") or ""), precision
+        lat, lng = float(r["lat"]), float(r["lon"])
+        display = (r.get("display_name", "") or "")
+        if precision == "muito_impreciso":
+            rescued = _geocodificar_rescue_apos_muito_impreciso(
+                endereco, codpost_limpo, cidade_limpa, area_ref=area_ref,
+            )
+            if rescued[0] is not None:
+                return rescued
+        return lat, lng, display, precision
 
     return None, None, None, None
 
@@ -192,7 +384,13 @@ def buscar_local_para_pedido(pedido, query):
 
     if not resultados:
         return None
-    melhor = _selecionar_melhor_resultado(resultados, pedido.codpost_dest, pedido.cidade_dest, pedido.endereco_dest)
+    melhor = _selecionar_melhor_resultado(
+        resultados,
+        pedido.codpost_dest,
+        pedido.cidade_dest,
+        pedido.endereco_dest,
+        area_ref=_obter_area_referencia_cp((pedido.codpost_dest or "").strip()),
+    )
     if not melhor:
         return None
     r, precision = melhor

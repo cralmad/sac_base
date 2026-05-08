@@ -58,10 +58,13 @@ function inicializarMapa() {
 
 // ─── Ícone de pin colorido ────────────────────────────────────────────────────
 
-function criarIcone(cor, carro, segueParaEntrega = true) {
-  const badge = segueParaEntrega ? '' : `
+function criarIcone(cor, carro, segueParaEntrega = true, geocodingPrecision = '') {
+  const badgeEntrega = segueParaEntrega ? '' : `
       <circle cx="22" cy="6" r="6" fill="#dc3545" stroke="#fff" stroke-width="1.5"/>
       <text x="22" y="10" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" font-weight="bold" fill="#fff">!</text>`;
+  const badgeMuitoImpreciso = geocodingPrecision === 'muito_impreciso' ? `
+      <circle cx="6" cy="6" r="6" fill="#dc3545" stroke="#fff" stroke-width="1.5"/>
+      <text x="6" y="10" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" font-weight="bold" fill="#fff">?</text>` : '';
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="28" height="38" viewBox="0 0 28 38">
       <path d="M14 0C6.3 0 0 6.3 0 14c0 9.6 14 24 14 24s14-14.4 14-24C28 6.3 21.7 0 14 0z"
@@ -69,7 +72,7 @@ function criarIcone(cor, carro, segueParaEntrega = true) {
       <text x="14" y="18" text-anchor="middle" dominant-baseline="middle"
             font-family="Arial,sans-serif" font-size="10" font-weight="bold"
             fill="#fff">${carro != null ? carro : '?'}</text>
-      ${badge}
+      ${badgeMuitoImpreciso}${badgeEntrega}
     </svg>`;
   return L.divIcon({
     html: svg,
@@ -163,7 +166,7 @@ function renderizarMarcadores(geojson) {
     const [lng, lat] = feat.geometry.coordinates;
 
     const marker = L.marker([lat, lng], {
-      icon: criarIcone(p.cor, p.carro, p.segue_para_entrega !== false),
+      icon: criarIcone(p.cor, p.carro, p.segue_para_entrega !== false, p.geocoding_precision || ''),
       draggable: podeMoverMarcador,
       title: p.referencia,
     });
@@ -186,7 +189,14 @@ function renderizarMarcadores(geojson) {
           onConfirmar: async () => {
             marker.setLatLng([novoLat, novoLng]);
             feat.geometry.coordinates = [novoLng, novoLat];
-            await salvarCoordenadas(p.pedido_id, novoLat, novoLng);
+            const ok = await salvarCoordenadas(p.pedido_id, novoLat, novoLng);
+            if (ok) {
+              feat.properties.geocoding_display = '';
+              feat.properties.geocoding_precision = '';
+              marker.setIcon(
+                criarIcone(feat.properties.cor, feat.properties.carro, feat.properties.segue_para_entrega !== false, ''),
+              );
+            }
           },
         });
       });
@@ -247,6 +257,11 @@ function renderizarMarcadores(geojson) {
             feat.geometry.coordinates = [data.lng, data.lat];
             feat.properties.geocoding_display = data.geocoding_display;
             feat.properties.geocoding_precision = data.geocoding_precision;
+          }
+          if (marker && feat) {
+            marker.setIcon(
+              criarIcone(feat.properties.cor, feat.properties.carro, feat.properties.segue_para_entrega !== false, feat.properties.geocoding_precision || ''),
+            );
           }
           // Mostra feedback antes de substituir o DOM do popup
           if (statusEl) {
@@ -324,7 +339,12 @@ function renderizarMarcadores(geojson) {
           feat.geometry.coordinates = [novoLng, novoLat];
           feat.properties.geocoding_display = displayName;
           feat.properties.geocoding_precision = novaPrec;
-          if (marker) marker.setPopupContent(conteudoPopup(feat.properties));
+          if (marker) {
+            marker.setIcon(
+              criarIcone(feat.properties.cor, feat.properties.carro, feat.properties.segue_para_entrega !== false, feat.properties.geocoding_precision || ''),
+            );
+            marker.setPopupContent(conteudoPopup(feat.properties));
+          }
         }
 
         statusEl.textContent = `\u2713 Posicionado em: ${displayName.slice(0, 60)}...`;
@@ -705,7 +725,9 @@ async function salvarCarroNoPopup(movId, novoCarro, popupInstance, statusEl) {
     movFeat.properties.updated_at = data.updated_at ?? updatedAt;
     const marker = marcadores[movId];
     if (marker) {
-      marker.setIcon(criarIcone(corNova, carroNum, movFeat.properties.segue_para_entrega !== false));
+      marker.setIcon(
+        criarIcone(corNova, carroNum, movFeat.properties.segue_para_entrega !== false, movFeat.properties.geocoding_precision || ''),
+      );
       marker.setPopupContent(conteudoPopup(movFeat.properties));
       popupInstance.close();
       marker.openPopup();
