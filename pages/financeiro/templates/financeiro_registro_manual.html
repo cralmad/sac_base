@@ -16,34 +16,78 @@
           </select>
         </div>
         <div class="col-12 col-md-3">
+          <label class="form-label mb-0" for="data_emissao">Data de Emissão</label>
+          <input id="data_emissao" name="data_emissao" type="date" class="form-control" required>
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label mb-0" for="data_vencimento">Data de Vencimento</label>
+          <input id="data_vencimento" name="data_vencimento" type="date" class="form-control" required>
+        </div>
+        <div class="col-12 col-md-3">
           <label class="form-label mb-0" for="tipo">Tipo</label>
           <select name="tipo" id="tipo" class="form-select" required></select>
         </div>
         <div class="col-12 col-md-3">
           <label class="form-label mb-0" for="contraparte_tipo">Tipo de Contraparte</label>
-          <select name="contraparte_tipo" id="contraparte_tipo" class="form-select">
-            <option value="">Sem contraparte</option>
+          <select name="contraparte_tipo" id="contraparte_tipo" class="form-select" required>
+            <option value="">Selecione</option>
           </select>
         </div>
         <div class="col-12 col-md-5">
           <label class="form-label mb-0" for="contraparte_id">Contraparte</label>
-          <select name="contraparte_id" id="contraparte_id" class="form-select">
-            <option value="">Selecione</option>
-          </select>
-        </div>
-        <div class="col-12 col-md-4">
-          <label class="form-label mb-0" for="plano_contas_id">Plano de Contas</label>
-          <select name="plano_contas_id" id="plano_contas_id" class="form-select" required>
+          <select name="contraparte_id" id="contraparte_id" class="form-select" required>
             <option value="">Selecione</option>
           </select>
         </div>
         <div class="col-12 col-md-3">
-          <label class="form-label mb-0" for="valor">Valor</label>
-          <input id="valor" name="valor" type="text" class="form-control smart-input" data-allow="0-9,." required>
+          <label class="form-label mb-0" for="plano_n2_id">Setor</label>
+          <select
+            name="plano_n2_id"
+            id="plano_n2_id"
+            class="form-select"
+            data-hierarchy="planoConta"
+            data-hierarchy-root>
+            <option value="">Selecione</option>
+          </select>
         </div>
-        <div class="col-12 col-md-9">
+        <div class="col-12 col-md-3">
+          <label class="form-label mb-0" for="plano_n3_id">Subsetor</label>
+          <select
+            name="plano_n3_id"
+            id="plano_n3_id"
+            class="form-select"
+            data-hierarchy="planoConta"
+            data-select-depends="plano_n2_id">
+            <option value="">Selecione</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label mb-0" for="plano_n4_id">Ativo</label>
+          <select
+            name="plano_n4_id"
+            id="plano_n4_id"
+            class="form-select"
+            data-hierarchy="planoConta"
+            data-select-depends="plano_n2_id,plano_n3_id"
+            required>
+            <option value="">Selecione</option>
+          </select>
+        </div>
+        <input type="hidden" name="plano_contas_id" id="plano_contas_id">
+        <div class="col-12 col-md-3">
+          <label class="form-label mb-0" for="valor">Valor</label>
+          <input id="valor" name="valor" type="text" class="form-control smart-input" data-allow="0-9," required>
+        </div>
+        <div class="col-12 col-md-6">
           <label class="form-label mb-0" for="observacao">Observação</label>
           <input id="observacao" name="observacao" type="text" class="form-control" maxlength="1000">
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label mb-0" for="status_exibicao">Status</label>
+          <div id="status_exibicao" class="border rounded px-3 py-2 bg-light">
+            <span id="status_badge" class="badge text-bg-secondary">—</span>
+          </div>
+          <input type="hidden" name="status" id="status" value="">
         </div>
       </div>
     </div>
@@ -60,6 +104,9 @@
       </button>
       <button id="btn-excluir" type="button" data-show-on="visualizar" class="btn btn-danger d-none">
         <i class="bi bi-x-circle"></i> Cancelar Título
+      </button>
+      <button id="btn-excluir-permanente" type="button" data-show-on="visualizar" class="btn btn-outline-danger d-none">
+        <i class="bi bi-trash"></i> Excluir permanentemente
       </button>
       <button id="btn-cancelar" type="button" data-show-on="novo,editar" class="btn btn-outline-secondary d-none">
         <i class="bi bi-x-circle"></i> Cancelar
@@ -85,10 +132,26 @@
                 <option value="">Todas</option>
               </select>
             </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0">Data Emissão</label>
+              <input type="date" name="data_emissao_cons" id="data_emissao_cons" class="form-control">
+            </div>
             <div class="col-12 col-md-2">
               <label class="form-label mb-0">Tipo</label>
               <select name="tipo_cons" id="tipo_cons" class="form-select">
                 <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-2">
+              <label class="form-label mb-0">Tipo Contraparte</label>
+              <select name="contraparte_tipo_cons" id="contraparte_tipo_cons" class="form-select">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0">Contraparte</label>
+              <select name="contraparte_id_cons" id="contraparte_id_cons" class="form-select">
+                <option value="">Todas</option>
               </select>
             </div>
             <div class="col-12 col-md-4">

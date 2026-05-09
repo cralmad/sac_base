@@ -1,18 +1,24 @@
 import logging
 
 from django.contrib.auth.decorators import permission_required
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.shortcuts import render
 
+from pages.cad_cliente.models import Cliente
 from pages.filial.services import get_filiais_escrita_queryset
 from pages.filial.models import Filial
 from pages.financeiro.models import RegistroFinanceiro, RegistroFinanceiroTipo
+from pages.motorista.models import Motorista
+from sac_base.coercion import parse_date, parse_int
 from pages.financeiro.services.registro_manual import (
     cancelar_registro_manual,
     campos_iniciais_registro,
+    excluir_registro_manual_permanente,
     listar_contrapartes,
     listar_filiais_escrita,
+    listar_planos_cascata,
     listar_planos_nivel4,
     salvar_registro_manual,
     serializar_registro,
@@ -30,6 +36,10 @@ from sac_base.sisvar_builders import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _formatar_decimal_br(valor):
+    return f"{valor:.2f}".replace(".", ",")
 
 PERMISSOES_REGISTRO_FINANCEIRO = {
     "acessar": "financeiro.view_registrofinanceiro",
@@ -51,16 +61,27 @@ def registro_manual_view(request):
             "id": {"type": "integer", "required": False, "value": None},
             "filial_id": {"type": "string", "required": True, "value": ""},
             "tipo": {"type": "string", "required": True, "value": RegistroFinanceiroTipo.ENTRADA},
-            "contraparte_tipo": {"type": "string", "required": False, "value": ""},
-            "contraparte_id": {"type": "string", "required": False, "value": ""},
+            "contraparte_tipo": {"type": "string", "required": True, "value": ""},
+            "contraparte_id": {"type": "string", "required": True, "value": ""},
+            "plano_n2_id": {"type": "string", "required": False, "value": ""},
+            "plano_n3_id": {"type": "string", "required": False, "value": ""},
+            "plano_n4_id": {"type": "string", "required": False, "value": ""},
             "plano_contas_id": {"type": "string", "required": True, "value": ""},
+            "data_emissao": {"type": "string", "required": True, "value": ""},
+            "data_vencimento": {"type": "string", "required": True, "value": ""},
             "valor": {"type": "string", "required": True, "value": ""},
             "observacao": {"type": "string", "maxlength": 1000, "required": False, "value": ""},
             "status": {"type": "string", "required": False, "value": "aberto"},
+            "permite_editar": {"type": "boolean", "required": False, "value": True},
+            "permite_cancelar": {"type": "boolean", "required": False, "value": True},
+            "permite_excluir_permanente": {"type": "boolean", "required": False, "value": False},
         },
         nome_form_cons: {
             "filial_cons": {"type": "string", "required": False, "value": ""},
+            "data_emissao_cons": {"type": "string", "required": False, "value": ""},
             "tipo_cons": {"type": "string", "required": False, "value": ""},
+            "contraparte_tipo_cons": {"type": "string", "required": False, "value": ""},
+            "contraparte_id_cons": {"type": "string", "required": False, "value": ""},
             "plano_cons": {"type": "string", "required": False, "value": ""},
             "status_cons": {"type": "string", "required": False, "value": ""},
             "id_selecionado": {"type": "integer", "required": False, "value": None},
@@ -85,7 +106,10 @@ def registro_manual_view(request):
                 nome_form_cons: build_form_state(
                     campos={
                         "filial_cons": filial_ativa_id,
+                        "data_emissao_cons": "",
                         "tipo_cons": "",
+                        "contraparte_tipo_cons": "",
+                        "contraparte_id_cons": "",
                         "plano_cons": "",
                         "status_cons": "",
                         "id_selecionado": None,
@@ -96,6 +120,7 @@ def registro_manual_view(request):
             datasets={
                 "filiais_escrita": filiais_escrita,
                 "planos_nivel4": listar_planos_nivel4(),
+                "planos_contas": listar_planos_cascata(),
                 "tipos_registro_financeiro": [
                     {"value": val, "label": label}
                     for val, label in RegistroFinanceiroTipo.choices
@@ -155,7 +180,7 @@ def registro_manual_cons_view(request):
     usuario = getattr(request, "user", None)
     filiais_ids = list(get_filiais_escrita_queryset(usuario).values_list("id", flat=True))
     campos = request.sisvar_front.get("form", {}).get(nome_form_cons, {}).get("campos", {})
-    id_sel = campos.get("id_selecionado")
+    id_sel = parse_int(campos.get("id_selecionado"), context="form")
     if id_sel:
         registro = RegistroFinanceiro.objects.filter(id=id_sel, filial_id__in=filiais_ids).first()
         if not registro:
@@ -173,6 +198,23 @@ def registro_manual_cons_view(request):
         queryset = queryset.filter(filial_id=campos.get("filial_cons"))
     if campos.get("tipo_cons"):
         queryset = queryset.filter(tipo=campos.get("tipo_cons"))
+    data_emissao = parse_date(campos.get("data_emissao_cons"))
+    if campos.get("data_emissao_cons") and not data_emissao:
+        return JsonResponse(build_error_payload("Data de emissão inválida no filtro."), status=400)
+    if data_emissao:
+        queryset = queryset.filter(data_emissao=data_emissao)
+    contraparte_tipo = (campos.get("contraparte_tipo_cons") or "").strip().lower()
+    contraparte_id = parse_int(campos.get("contraparte_id_cons"), context="form")
+    if contraparte_tipo:
+        if contraparte_tipo == "cliente":
+            ct = ContentType.objects.get_for_model(Cliente)
+        elif contraparte_tipo == "motorista":
+            ct = ContentType.objects.get_for_model(Motorista)
+        else:
+            return JsonResponse(build_error_payload("Tipo de contraparte inválido no filtro."), status=400)
+        queryset = queryset.filter(contraparte_content_type_id=ct.id)
+        if contraparte_id:
+            queryset = queryset.filter(contraparte_object_id=contraparte_id)
     if campos.get("plano_cons"):
         queryset = queryset.filter(plano_contas_id=campos.get("plano_cons"))
     if campos.get("status_cons"):
@@ -182,9 +224,9 @@ def registro_manual_cons_view(request):
             "id": r.id,
             "filial": f"{r.filial.codigo} - {r.filial.nome}",
             "tipo": r.tipo,
-            "plano": f"{r.plano_contas.codigo} - {r.plano_contas.nome}",
-            "valor": str(r.valor),
-            "valor_rest": str(r.valor_rest),
+            "plano": r.plano_contas.nome,
+            "valor": _formatar_decimal_br(r.valor),
+            "valor_rest": _formatar_decimal_br(r.valor_rest),
             "status": r.status,
         }
         for r in queryset.order_by("-id")[:300]
@@ -205,11 +247,42 @@ def registro_manual_cancelar_view(request):
         .get("id")
     )
     try:
-        cancelar_registro_manual(usuario=usuario, registro_id=registro_id, filiais_escrita_ids=filiais_ids)
+        registro = cancelar_registro_manual(usuario=usuario, registro_id=registro_id, filiais_escrita_ids=filiais_ids)
     except ValidationError as exc:
         mensagens = exc.messages if hasattr(exc, "messages") else [str(exc)]
         return JsonResponse(build_error_payload(mensagens), status=422)
     except Exception as exc:
         logger.error(exc, exc_info=True)
         return JsonResponse(build_error_payload("Falha ao cancelar registro financeiro."), status=500)
-    return JsonResponse(build_success_payload("Registro financeiro cancelado com sucesso!"))
+    return JsonResponse(
+        build_form_response(
+            form_id="cadRegistroFinanceiro",
+            estado="visualizar",
+            update=None,
+            campos=serializar_registro(registro),
+            mensagem_sucesso="Registro financeiro cancelado com sucesso!",
+        )
+    )
+
+
+@permission_required(PERMISSOES_REGISTRO_FINANCEIRO["excluir"], raise_exception=True)
+def registro_manual_excluir_permanente_view(request):
+    if request.method != "POST":
+        return json_method_not_allowed(["POST"])
+    usuario = getattr(request, "user", None)
+    filiais_ids = list(get_filiais_escrita_queryset(usuario).values_list("id", flat=True))
+    registro_id = (
+        request.sisvar_front.get("form", {})
+        .get("cadRegistroFinanceiro", {})
+        .get("campos", {})
+        .get("id")
+    )
+    try:
+        excluir_registro_manual_permanente(usuario=usuario, registro_id=registro_id, filiais_escrita_ids=filiais_ids)
+    except ValidationError as exc:
+        mensagens = exc.messages if hasattr(exc, "messages") else [str(exc)]
+        return JsonResponse(build_error_payload(mensagens), status=422)
+    except Exception as exc:
+        logger.error(exc, exc_info=True)
+        return JsonResponse(build_error_payload("Falha ao excluir registro financeiro."), status=500)
+    return JsonResponse(build_success_payload("Registro financeiro excluído permanentemente."))

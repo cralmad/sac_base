@@ -6,7 +6,6 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods, require_POST
 from datetime import datetime
-from collections import defaultdict
 from itertools import groupby
 from decimal import Decimal
 
@@ -679,60 +678,58 @@ def relatorio_gerencial_view(request):
     if (dt_fim - dt_ini).days > 90:
         return JsonResponse({"success": False, "mensagem": "O período máximo é de 90 dias."}, status=400)
 
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse({"success": False, "mensagem": "Filial ativa não encontrada na sessão."}, status=403)
+
     qs = (
-        TentativaEntrega.objects
-        .select_related("pedido")
-        .filter(data_tentativa__range=(dt_ini, dt_fim))
+        Pedido.objects
+        .filter(
+            filial=filial_ativa,
+            prev_entrega__range=(dt_ini, dt_fim),
+        )
     )
 
-    qs = apply_smart_number_filter(qs, "pedido__id_vonzu", id_vonzu_str)
-    qs = apply_smart_text_filter(qs, "pedido__pedido", referencia_str)
+    qs = apply_smart_number_filter(qs, "id_vonzu", id_vonzu_str)
+    qs = apply_smart_text_filter(qs, "pedido", referencia_str)
 
     if estados_lista:
-        qs = qs.filter(pedido__estado__in=estados_lista)
+        qs = qs.filter(estado__in=estados_lista)
 
     if tipo_filtro in ("ENTREGA", "RECOLHA"):
-        qs = qs.filter(pedido__tipo=tipo_filtro)
+        qs = qs.filter(tipo=tipo_filtro)
 
     if conferencia_filtro == "conferido":
-        qs = qs.filter(pedido__volume_conf=F("pedido__volume"))
+        qs = qs.filter(volume_conf=F("volume"))
     elif conferencia_filtro == "divergente":
-        qs = qs.exclude(pedido__volume_conf=F("pedido__volume"))
+        qs = qs.exclude(volume_conf=F("volume"))
 
-    qs = qs.order_by("data_tentativa", "pedido__codpost_dest", "pedido__pedido")
+    qs = qs.order_by("prev_entrega", "codpost_dest", "pedido", "id")
 
-    movs = list(qs)
-    pedido_ids = {m.pedido_id for m in movs}
+    pedidos = list(qs)
+    pedido_ids = [p.id for p in pedidos]
 
     mov_counts = {}
     dev_counts = {}
     if pedido_ids:
         mov_counts = dict(
             TentativaEntrega.objects
-            .filter(pedido_id__in=pedido_ids)
+            .filter(pedido__filial=filial_ativa, pedido_id__in=pedido_ids)
             .values("pedido_id")
             .annotate(cnt=Count("id"))
             .values_list("pedido_id", "cnt")
         )
         dev_counts = dict(
             Devolucao.objects
-            .filter(pedido_id__in=pedido_ids)
+            .filter(pedido__filial=filial_ativa, pedido_id__in=pedido_ids)
             .values("pedido_id")
             .annotate(cnt=Count("id"))
             .values_list("pedido_id", "cnt")
         )
 
-    datas_por_pedido = defaultdict(set)
-    if pedido_ids:
-        for pid, d in TentativaEntrega.objects.filter(pedido_id__in=pedido_ids).values_list(
-            "pedido_id", "data_tentativa"
-        ):
-            datas_por_pedido[pid].add(d)
-
     linhas = []
     total_peso = Decimal("0")
-    for mov in movs:
-        p = mov.pedido
+    for p in pedidos:
         tipo_abrev = "R" if (p.tipo or "").upper() == "RECOLHA" else "E"
         peso_valor = p.peso if p.peso is not None else Decimal("0")
         peso_str = ""
@@ -751,8 +748,6 @@ def relatorio_gerencial_view(request):
             armazem = "SIM" if (estado_concluido and dev_count == 0) else ""
         else:
             armazem = ""
-        datas_ped = datas_por_pedido.get(p.id, ())
-        tem_tentativa_posterior = any(td > mov.data_tentativa for td in datas_ped)
         incluir_linha = True
         if armazem_filtro == "sim" and armazem != "SIM":
             incluir_linha = False
@@ -767,7 +762,7 @@ def relatorio_gerencial_view(request):
             "pedido":         p.pedido or str(p.id_vonzu),
             "id_vonzu":       p.id_vonzu,
             "tipo":           tipo_abrev,
-            "data_tentativa": mov.data_tentativa.strftime("%d/%m/%Y"),
+            "data_tentativa": p.prev_entrega.strftime("%d/%m/%Y") if p.prev_entrega else "",
             "cidade_dest":    p.cidade_dest or "",
             "codpost_dest":   p.codpost_dest or "",
             "volumes":        f"{p.volume_conf or 0}/{p.volume or 0}",
@@ -777,7 +772,7 @@ def relatorio_gerencial_view(request):
             "dev":            dev_count,
             "tem_devolucao":  dev_count > 0,
             "armazem":        armazem,
-            "segue_para_entrega": estado_segue_para_entrega(mov.estado) and not tem_tentativa_posterior,
+            "segue_para_entrega": estado_segue_para_entrega(p.estado),
         })
         total_peso += peso_valor
 

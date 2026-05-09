@@ -23,6 +23,10 @@ export function buttonAllowedByPermission({ buttonId, state, canExecute }) {
     return canExecute("excluir");
   }
 
+  if (buttonId === "btn-excluir-permanente") {
+    return canExecute("excluir");
+  }
+
   if (buttonId === "btn-salvar" || buttonId === "btn-cancelar") {
     if (state === "novo") {
       return canExecute("incluir");

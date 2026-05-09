@@ -2,6 +2,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from pages.auditoria.models import AuditFieldsMixin
 from pages.filial.models import Filial
@@ -142,6 +143,8 @@ class RegistroFinanceiro(AuditFieldsMixin, models.Model):
     valor = models.DecimalField(max_digits=12, decimal_places=2)
     valor_fat = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     valor_rest = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    data_emissao = models.DateField(default=timezone.localdate)
+    data_vencimento = models.DateField(default=timezone.localdate)
     plano_contas = models.ForeignKey(
         PlanoContas,
         on_delete=models.PROTECT,
