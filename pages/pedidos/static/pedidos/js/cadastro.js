@@ -747,7 +747,7 @@ function preencherMotoristasFilial(filialId) {
           if (!select) return;
           const opt = document.createElement('option');
           opt.value = m.id;
-          opt.textContent = `${m.codigo || '-'} - ${m.nome}`;
+          opt.textContent = m.nome;
           select.appendChild(opt);
         });
       });

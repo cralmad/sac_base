@@ -203,8 +203,19 @@ App Django **`pages.financeiro`**. Objetivo: titulos (`RegistroFinanceiro`), eve
 2. **Transacao:** operacoes que alterem RF + FAT + PAR no mesmo fluxo dentro de **`transaction.atomic()`**.
 3. **Nao** gravar `valor_fat`/`valor_rest` a partir de views/forms; apenas o executor apos consolidar through (e futuras parcelas liquidadas, se a regra evoluir).
 
+### Relatório de registros (entrada/saída)
+
+| Peça | Ficheiro |
+|------|----------|
+| Rota | `pages/financeiro/urls.py` — `financeiro/relatorio/registros/` |
+| View | `pages/financeiro/views_relatorio.py` — GET template + POST JSON `{ filtros, agrupamento }` |
+| Serviço | `pages/financeiro/services/relatorio_registros.py` — exclui `TRANSFERENCIA`; origem manual = sem `referencia`; automático = `verbose_name` + id da `referencia` |
+| Front | `pages/financeiro/templates/financeiro_relatorio_registros.html`, `static/financeiro/js/relatorio_registros.js` |
+| Deep link manual | `GET .../registro/manual/?visualizar=<id>` (apenas RF sem `referencia`) |
+
 ### Testes
 
 - `pages/financeiro/tests/test_financeiro_service.py` (waterfall, recalculo de agregados, teto parcelas vs formas).
+- `pages/financeiro/tests/test_relatorio_registros.py` (filtros e exclusão de transferência).
 
 ---

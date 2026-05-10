@@ -14,6 +14,8 @@ from sac_base.sisvar_builders import build_error_payload, build_form_response, b
 from .models import Motorista
 
 
+_MOTORISTA_CATEGORIAS_SCHEMA = [Motorista.Categoria.LIGEIRO, Motorista.Categoria.PESADO]
+
 PERMISSOES_MOTORISTA = {
     "acessar": "motorista.view_motorista",
     "consultar": "motorista.view_motorista",
@@ -43,6 +45,7 @@ def build_campos_iniciais():
         "codigo": "",
         "nome": "",
         "telefone": "",
+        "categoria": "",
         "ativa": True,
     }
 
@@ -54,6 +57,7 @@ def serializar_form_motorista(motorista):
         "codigo": motorista.codigo,
         "nome": motorista.nome,
         "telefone": motorista.telefone,
+        "categoria": motorista.categoria,
         "ativa": motorista.ativa,
     }
 
@@ -81,6 +85,13 @@ def cadastro_motorista_view(request):
             "codigo": {"type": "string", "maxlength": 20, "required": False, "value": ""},
             "nome": {"type": "string", "maxlength": 100, "minlength": 3, "required": True, "value": ""},
             "telefone": {"type": "string", "maxlength": 20, "minlength": 8, "required": True, "value": ""},
+            "categoria": {
+                "type": "string",
+                "maxlength": 10,
+                "required": True,
+                "allowed": _MOTORISTA_CATEGORIAS_SCHEMA,
+                "value": "",
+            },
             "ativa": {"type": "boolean", "required": False, "value": True},
         },
         nome_form_cons: {
@@ -138,6 +149,7 @@ def cadastro_motorista_view(request):
     codigo = (campos.get("codigo") or "").strip().upper()
     nome = (campos.get("nome") or "").strip().upper()
     telefone = (campos.get("telefone") or "").strip()
+    categoria = (campos.get("categoria") or "").strip().upper()
     ativa = bool(campos.get("ativa", True))
     filiais_escrita_ids = list(get_filiais_escrita_queryset(usuario).values_list("id", flat=True))
 
@@ -149,6 +161,7 @@ def cadastro_motorista_view(request):
                     codigo=codigo,
                     nome=nome,
                     telefone=telefone,
+                    categoria=categoria,
                     ativa=ativa,
                 )
                 before = {}
@@ -166,6 +179,7 @@ def cadastro_motorista_view(request):
                 motorista.codigo = codigo
                 motorista.nome = nome
                 motorista.telefone = telefone
+                motorista.categoria = categoria
                 motorista.ativa = ativa
             else:
                 return JsonResponse(build_error_payload(f"Estado inválido: '{estado}'"), status=400)
@@ -246,6 +260,7 @@ def cadastro_motorista_cons_view(request):
             "codigo": motorista.codigo,
             "nome": motorista.nome,
             "telefone": motorista.telefone,
+            "categoria": motorista.get_categoria_display(),
             "ativa": motorista.ativa,
         }
         for motorista in queryset

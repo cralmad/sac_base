@@ -75,6 +75,11 @@ export const PERMISSOES_SCHEMA = {
   ],
 
   FINANCEIRO: [
+    // --- Registro Financeiro (cadastro manual, relatório /app/financeiro/relatorio/registros/, mod_finan) ---
+    { codename: "financeiro.view_registrofinanceiro",   label: "Visualizar Registro Financeiro e relatório de registros" },
+    { codename: "financeiro.add_registrofinanceiro",    label: "Incluir Registro Financeiro" },
+    { codename: "financeiro.change_registrofinanceiro", label: "Editar Registro Financeiro" },
+    { codename: "financeiro.delete_registrofinanceiro", label: "Excluir Registro Financeiro" },
     // --- Cadastro de Clientes ---
     { codename: "cad_cliente.view_cliente",   label: "Visualizar Cliente" },
     { codename: "cad_cliente.add_cliente",    label: "Incluir Cliente" },

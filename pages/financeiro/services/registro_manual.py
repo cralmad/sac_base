@@ -110,6 +110,31 @@ def listar_planos_cascata():
     ]
 
 
+def _plano_n234_por_folha_id(plano_contas_id: int | None) -> tuple[str, str, str]:
+    """Resolve níveis 2–4 do plano a partir do id do nível 4 (ativo) para hidratação da cascata no front."""
+    if not plano_contas_id:
+        return "", "", ""
+    chain: list[PlanoContas] = []
+    cur_id: int | None = int(plano_contas_id)
+    seen: set[int] = set()
+    while cur_id and cur_id not in seen and len(seen) < 8:
+        seen.add(cur_id)
+        plano = PlanoContas.objects.filter(id=cur_id).only("id", "nivel", "pai_id").first()
+        if not plano:
+            break
+        chain.append(plano)
+        cur_id = plano.pai_id
+    chain.reverse()
+    n2 = next((p for p in chain if p.nivel == 2), None)
+    n3 = next((p for p in chain if p.nivel == 3), None)
+    n4 = next((p for p in chain if p.nivel == 4), None)
+    return (
+        str(n2.id) if n2 else "",
+        str(n3.id) if n3 else "",
+        str(n4.id) if n4 else "",
+    )
+
+
 def campos_iniciais_registro():
     hoje = timezone.localdate().isoformat()
     return {
@@ -144,13 +169,17 @@ def serializar_registro(registro: RegistroFinanceiro):
             contraparte_tipo = "motorista"
         contraparte_id = str(registro.contraparte_object_id or "")
     flags = _flags_acoes_ui(registro)
+    pn2, pn3, pn4 = _plano_n234_por_folha_id(registro.plano_contas_id)
     return {
         "id": registro.id,
-        "filial_id": registro.filial_id,
+        "filial_id": str(registro.filial_id) if registro.filial_id is not None else "",
         "tipo": registro.tipo,
         "contraparte_tipo": contraparte_tipo,
         "contraparte_id": contraparte_id,
-        "plano_contas_id": registro.plano_contas_id,
+        "plano_n2_id": pn2,
+        "plano_n3_id": pn3,
+        "plano_n4_id": pn4,
+        "plano_contas_id": str(registro.plano_contas_id) if registro.plano_contas_id else "",
         "data_emissao": registro.data_emissao.isoformat() if registro.data_emissao else "",
         "data_vencimento": registro.data_vencimento.isoformat() if registro.data_vencimento else "",
         "valor": _formatar_decimal_br(registro.valor),
@@ -177,7 +206,7 @@ def listar_contrapartes():
         for c in Cliente.objects.filter(is_deleted=False).order_by("nome")[:500]
     ]
     motoristas = [
-        {"id": m.id, "label": f"{(m.codigo or '').strip()} - {m.nome}".strip(" -")}
+        {"id": m.id, "label": m.nome}
         for m in Motorista.objects.filter(is_deleted=False, ativa=True).order_by("nome")[:500]
     ]
     return {

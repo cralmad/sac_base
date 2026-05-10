@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}SacBase — Relatório de registros financeiros{% endblock %}
+{% block page_title %}Relatório — Registros financeiros{% endblock %}
+
+{% block estilo %}
+<style>
+/* Mesmo vocabulário visual que relatorio_logistica_motorista (rlm-* → rfin-*) */
+.rfin-filtros { background: #f8f9fa; border-radius: .5rem; padding: 1rem; }
+.rfin-grupo { margin-bottom: .75rem; border: 1px solid #dee2e6; border-radius: .375rem; overflow: hidden; }
+.rfin-grupo-header {
+  background: #1a3a5c;
+  color: #fff;
+  padding: .4rem .75rem;
+  font-weight: 600;
+  font-size: .95rem;
+}
+.rfin-grupo-subheader {
+  background: #e9f0f7;
+  color: #1a3a5c;
+  padding: .35rem .75rem;
+  border-top: 1px solid #c8d8e8;
+  font-weight: 600;
+  font-size: .88rem;
+}
+.rfin-badge { background: rgba(255,255,255,.2); border-radius: .25rem; padding: .1rem .45rem; font-size: .78rem; margin-left: .35rem; }
+.rfin-grupo-subheader .rfin-badge { background: rgba(26,58,92,.12); color: #1a3a5c; }
+table.rfin-tabela { width: 100%; border-collapse: collapse; font-size: .85rem; }
+table.rfin-tabela th, table.rfin-tabela td { border: 1px solid #dee2e6; padding: .28rem .45rem; vertical-align: top; }
+table.rfin-tabela th { background: #f1f5f9; color: #334155; font-weight: 600; }
+#rel_fin_print_meta { font-size: .9rem; color: #334155; line-height: 1.35; }
+@media print {
+  @page { size: A4 landscape; margin: 4mm 6mm; }
+  /* Evita páginas fantasmas (altura 100vh / overlays / quebras “avoid” em blocos grandes). */
+  html, body {
+    height: auto !important;
+    min-height: 0 !important;
+    background: #fff !important;
+  }
+  main {
+    min-height: 0 !important;
+  }
+  #global-loader,
+  #modal-confirmacao,
+  .modal,
+  .modal-backdrop {
+    display: none !important;
+  }
+  main > h1.mb-4 { margin-bottom: .35rem !important; font-size: 1rem !important; }
+  .rfin-filtros, .navbar, .sidebar, #navbase, #sidebarOffcanvas, .sidebar-wrapper, footer, .d-print-none, #container-mensagens, .no-print { display: none !important; }
+  main.py-4 { padding-top: .25rem !important; padding-bottom: .25rem !important; }
+  #rfin-root.container-xl { margin-top: 0 !important; margin-bottom: 0 !important; }
+  #rel_fin_print_area { margin-top: 0 !important; }
+  #rel_fin_resultado { margin-top: .25rem !important; }
+  #rel_fin_resultado > :last-child { margin-bottom: 0 !important; }
+  #rel_fin_print_meta {
+    font-size: .72rem;
+    color: #000;
+    margin-bottom: .35rem !important;
+    padding-bottom: .25rem !important;
+    border-bottom: 1px solid #999 !important;
+    white-space: normal;
+  }
+  /*
+   * Ramos intermediários: podem partir entre páginas.
+   * Folhas (cabeçalho + tabela): se não couber no fim da página, o UA move o bloco para a página seguinte.
+   * Não aplicar avoid no .rfin-grupo genérico — só em .rfin-grupo-folha — para não agrupar árvores inteiras.
+   */
+  .rfin-grupo {
+    margin-bottom: .45rem;
+    break-inside: auto;
+    page-break-inside: auto;
+    overflow: visible !important;
+  }
+  .rfin-grupo-folha {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+  .rfin-grupo-header, .rfin-grupo-subheader {
+    break-after: avoid;
+    page-break-after: avoid;
+    padding: .22rem .45rem !important;
+    font-size: .75rem !important;
+  }
+  .rfin-badge { font-size: .65rem !important; padding: .05rem .3rem !important; margin-left: .2rem !important; }
+  table.rfin-tabela {
+    font-size: .68rem;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+  thead { display: table-header-group; }
+  table.rfin-tabela th, table.rfin-tabela td { padding: .15rem .3rem !important; }
+  table.rfin-tabela tbody tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  table.rfin-tabela a { color: inherit !important; text-decoration: none !important; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-xl my-3" id="rfin-root">
+  <div class="rfin-filtros mb-3 no-print">
+    <form id="filtroRelatorioFinanceiro" class="row g-3 align-items-end">
+      <div class="col-12 col-md-4">
+        <label class="form-label mb-0" for="rel_fin_filial_id">Matriz/Filial</label>
+        <select id="rel_fin_filial_id" name="filial_id" class="form-select" required>
+          <option value="">Selecione</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label mb-0" for="rel_fin_data_ini">Emissão (início)</label>
+        <input type="date" id="rel_fin_data_ini" name="data_emissao_ini" class="form-control" required>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label mb-0" for="rel_fin_data_fim">Emissão (fim)</label>
+        <input type="date" id="rel_fin_data_fim" name="data_emissao_fim" class="form-control" required>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label mb-0" for="rel_fin_tipo">Tipo</label>
+        <select id="rel_fin_tipo" name="tipo" class="form-select">
+          <option value="">Entrada e saída</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label mb-0" for="rel_fin_ct_tipo">Tipo contraparte</label>
+        <select id="rel_fin_ct_tipo" name="contraparte_tipo" class="form-select">
+          <option value="">Todos</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label mb-0" for="rel_fin_ct_id">Contraparte</label>
+        <select id="rel_fin_ct_id" name="contraparte_id" class="form-select">
+          <option value="">Todas</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label mb-0" for="rel_fin_obs">Observação (contém)</label>
+        <input type="text" id="rel_fin_obs" name="observacao" class="form-control" maxlength="500" placeholder="Parte do texto">
+      </div>
+      <div class="col-12">
+        <span class="form-label d-block mb-1">Agrupamento adicional (opcional)</span>
+        <div class="d-flex flex-wrap gap-3">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="rel_fin_ag_venc" name="agrup_vencimento">
+            <label class="form-check-label" for="rel_fin_ag_venc">Data de vencimento</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="rel_fin_ag_ct" name="agrup_contraparte">
+            <label class="form-check-label" for="rel_fin_ag_ct">Contraparte</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="rel_fin_ag_ativo" name="agrup_ativo">
+            <label class="form-check-label" for="rel_fin_ag_ativo">Ativo (plano)</label>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
+        <button type="submit" class="btn btn-primary" id="rel_fin_btn_gerar">
+          <i class="bi bi-search"></i> Gerar relatório
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="rel_fin_btn_imprimir" disabled>
+          <i class="bi bi-printer"></i> Imprimir
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div id="rel_fin_print_area">
+    <div id="rel_fin_print_meta" class="d-none d-print-block mb-2 pb-2 border-bottom"></div>
+    <div id="rel_fin_mensagem" class="alert d-none mt-3 no-print" role="alert"></div>
+    <div id="rel_fin_resumo" class="small text-muted mt-3 d-none no-print"></div>
+    <div id="rel_fin_resultado" class="mt-3"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="{% static 'financeiro/js/relatorio_registros.js' %}"></script>
+{% endblock %}

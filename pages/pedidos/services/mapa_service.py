@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 NOMINATIM_HEADERS = {"User-Agent": "sac-base-mapa/1.0"}
+NOMINATIM_MIN_INTERVAL_SECONDS = 1.1
 MAX_GEOCODE_POR_REQUISICAO = 12
 MAX_GEOCODE_SEGUNDOS = 20
 
@@ -42,6 +43,17 @@ def _cp_quatro_digitos(codpost):
 
 _MAX_AREA_CP_MEMO = 128
 _AREA_CP_MEMO = {}
+_ULTIMA_CHAMADA_NOMINATIM_MONO = 0.0
+
+
+def _throttle_nominatim():
+    """Limita taxa de requests ao Nominatim sem impor sleep fixo desnecessário."""
+    global _ULTIMA_CHAMADA_NOMINATIM_MONO
+    agora = time.monotonic()
+    delta = agora - _ULTIMA_CHAMADA_NOMINATIM_MONO
+    if _ULTIMA_CHAMADA_NOMINATIM_MONO > 0 and delta < NOMINATIM_MIN_INTERVAL_SECONDS:
+        time.sleep(NOMINATIM_MIN_INTERVAL_SECONDS - delta)
+    _ULTIMA_CHAMADA_NOMINATIM_MONO = time.monotonic()
 
 
 def _buscar_area_referencia_codigo_postal(codpost_limpo):
@@ -84,7 +96,7 @@ def _obter_area_referencia_cp(codpost_limpo):
         return None
     if cp in _AREA_CP_MEMO:
         return _AREA_CP_MEMO[cp]
-    time.sleep(1.1)
+    _throttle_nominatim()
     area = _buscar_area_referencia_codigo_postal(cp)
     if len(_AREA_CP_MEMO) >= _MAX_AREA_CP_MEMO:
         _AREA_CP_MEMO.clear()
@@ -166,6 +178,8 @@ def determinar_precisao(
 
     cp_ref = "".join(c for c in (codpost_original or "") if c.isdigit())[:4]
     cp_geo = "".join(c for c in (address.get("postcode") or "") if c.isdigit())[:4]
+    cp_prefix_ref = cp_ref[:2] if len(cp_ref) >= 2 else ""
+    cp_prefix_geo = cp_geo[:2] if len(cp_geo) >= 2 else ""
 
     road_geo = address.get("road") or address.get("pedestrian") or address.get("path") or ""
     palavras_geo = _palavras_significativas(road_geo)
@@ -182,6 +196,10 @@ def determinar_precisao(
     )
 
     if cp_geo:
+        # Regra dura inicial: divergência nos 2 primeiros dígitos do CP
+        # indica região distinta e deve sempre ser muito impreciso.
+        if cp_prefix_ref and cp_prefix_geo and cp_prefix_ref != cp_prefix_geo:
+            return "muito_impreciso"
         if cp_ref == cp_geo:
             if tipo in _GEOCODING_TIPOS_MUITO_IMPRECISOS:
                 return "impreciso" if palavras_ref else "ok"
@@ -192,7 +210,7 @@ def determinar_precisao(
             return "ok"
 
         cp_diverge = cp_ref != cp_geo if cp_ref else False
-        cp_muito_diverge = cp_diverge and bool(cp_ref) and cp_ref[0] != cp_geo[0]
+        cp_muito_diverge = cp_diverge and bool(cp_prefix_ref) and bool(cp_prefix_geo) and cp_prefix_ref != cp_prefix_geo
         if cp_muito_diverge or (cp_diverge and cidade_diverge):
             return "muito_impreciso"
         if cp_diverge or cidade_diverge:
@@ -276,7 +294,7 @@ def _geocodificar_rescue_apos_muito_impreciso(endereco, codpost_limpo, cidade_li
         tentativas.append(("free_text", q))
 
     for entrada in tentativas:
-        time.sleep(1.1)
+        _throttle_nominatim()
         if entrada[0] == "structured_pc_city":
             params = {"format": "json", "limit": 3, "addressdetails": 1, **entrada[1]}
             q_label = f"structured:{entrada[1].get('postalcode', '')}|{entrada[1].get('city', '')}"
@@ -315,10 +333,10 @@ def _geocodificar_rescue_apos_muito_impreciso(endereco, codpost_limpo, cidade_li
     return None, None, None, None
 
 
-def geocodificar(endereco, codpost, cidade):
+def geocodificar(endereco, codpost, cidade, *, permitir_rescue=True):
     codpost_limpo = (codpost or "").strip()
     cidade_limpa = (cidade or "").strip()
-    area_ref = _obter_area_referencia_cp(codpost_limpo)
+    area_ref = None
     consultas = []
     if endereco and cidade_limpa:
         consultas.append(f"{endereco}, {cidade_limpa}, Portugal")
@@ -327,8 +345,8 @@ def geocodificar(endereco, codpost, cidade):
     if codpost_limpo:
         consultas.append(f"{codpost_limpo} Portugal")
 
-    for q in consultas:
-        time.sleep(1.1)
+    for query_index, q in enumerate(consultas):
+        _throttle_nominatim()
         try:
             resp = http_requests.get(
                 NOMINATIM_URL,
@@ -355,7 +373,9 @@ def geocodificar(endereco, codpost, cidade):
         r, precision = melhor
         lat, lng = float(r["lat"]), float(r["lon"])
         display = (r.get("display_name", "") or "")
-        if precision == "muito_impreciso":
+        if precision == "muito_impreciso" and permitir_rescue:
+            if area_ref is None:
+                area_ref = _obter_area_referencia_cp(codpost_limpo)
             rescued = _geocodificar_rescue_apos_muito_impreciso(
                 endereco, codpost_limpo, cidade_limpa, area_ref=area_ref,
             )
@@ -421,6 +441,7 @@ def montar_payload_mapa(filial, data_tentativa):
     geocoding_falhou = 0
     atualizar = []
     ja_processados = set()
+    geocode_cache = {}
     geocoding_processados = 0
     limite_atingido = False
     geocode_t0 = time.monotonic()
@@ -435,7 +456,19 @@ def montar_payload_mapa(filial, data_tentativa):
             continue
         ja_processados.add(pedido.id)
         geocoding_processados += 1
-        lat, lng, display_name, precision = geocodificar(pedido.endereco_dest, pedido.codpost_dest, pedido.cidade_dest)
+        cache_key = (
+            (pedido.endereco_dest or "").strip().lower(),
+            (pedido.codpost_dest or "").strip().lower(),
+            (pedido.cidade_dest or "").strip().lower(),
+        )
+        geocode_item_t0 = time.monotonic()
+        if cache_key in geocode_cache:
+            lat, lng, display_name, precision = geocode_cache[cache_key]
+        else:
+            lat, lng, display_name, precision = geocodificar(
+                pedido.endereco_dest, pedido.codpost_dest, pedido.cidade_dest, permitir_rescue=False,
+            )
+            geocode_cache[cache_key] = (lat, lng, display_name, precision)
         if lat is None:
             geocoding_falhou += 1
             continue

@@ -51,6 +51,12 @@ class SchemaValidator:
                 else:
                     self._add_error(field, "Valor booleano inválido")
 
+            # 7. Lista fechada de valores permitidos
+            if 'allowed' in rules:
+                allowed = rules['allowed']
+                if str(value).strip() not in allowed:
+                    self._add_error(field, "Valor inválido")
+
         return len(self.errors) == 0
 
     def _add_error(self, field, message):

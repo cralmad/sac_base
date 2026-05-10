@@ -6,10 +6,12 @@ from pages.financeiro.views import (
     registro_manual_excluir_permanente_view,
     registro_manual_view,
 )
+from pages.financeiro.views_relatorio import relatorio_registros_financeiros_view
 
 urlpatterns = [
     path("financeiro/registro/manual/", registro_manual_view),
     path("financeiro/registro/manual/cons", registro_manual_cons_view),
     path("financeiro/registro/manual/cancelar", registro_manual_cancelar_view),
     path("financeiro/registro/manual/excluir-permanente", registro_manual_excluir_permanente_view),
+    path("financeiro/relatorio/registros/", relatorio_registros_financeiros_view),
 ]

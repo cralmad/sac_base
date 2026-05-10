@@ -65,6 +65,7 @@ class MotoristaViewTests(TestCase):
                         'codigo': 'MOT001',
                         'nome': 'JOAO MOTORISTA',
                         'telefone': '+351912345678',
+                        'categoria': 'LIGEIRO',
                         'ativa': True,
                     }
                 }

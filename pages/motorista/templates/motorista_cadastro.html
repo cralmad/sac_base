@@ -41,6 +41,14 @@
             <label for="ativa" class="form-check-label">Ativa</label>
           </div>
         </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label mb-0" for="categoria">Categoria</label>
+          <select name="categoria" id="categoria" class="form-select" required>
+            <option value="">Selecione</option>
+            <option value="LIGEIRO">Ligeiro</option>
+            <option value="PESADO">Pesado</option>
+          </select>
+        </div>
         <div class="col-12 col-md-4">
           <label class="form-label mb-0">Telefone</label>
           <input type="text" name="telefone" class="form-control smart-input" data-allow="0-9 +\-" maxlength="20" minlength="8" required>
@@ -113,6 +121,7 @@
                 <th>Código</th>
                 <th>Nome</th>
                 <th>Telefone</th>
+                <th>Categoria</th>
                 <th>Ativa</th>
                 <th class="text-center">Ação</th>
               </tr>

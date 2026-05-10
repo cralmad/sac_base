@@ -6,11 +6,20 @@ from pages.filial.models import Filial
 
 
 class Motorista(AuditFieldsMixin, SoftDeleteMixin, models.Model):
+    class Categoria(models.TextChoices):
+        LIGEIRO = "LIGEIRO", "Ligeiro"
+        PESADO = "PESADO", "Pesado"
+
     id = models.BigAutoField(primary_key=True)
     filial = models.ForeignKey(Filial, on_delete=models.PROTECT, related_name="motoristas")
     codigo = models.CharField(max_length=20, null=True, blank=True)
     nome = models.CharField(max_length=100)
     telefone = models.CharField(max_length=20)
+    categoria = models.CharField(
+        max_length=10,
+        choices=Categoria.choices,
+        default=Categoria.LIGEIRO,
+    )
     ativa = models.BooleanField(default=True)
 
     class Meta:
@@ -34,6 +43,8 @@ class Motorista(AuditFieldsMixin, SoftDeleteMixin, models.Model):
         self.codigo = (self.codigo or "").strip().upper()
         self.nome = (self.nome or "").strip().upper()
         self.telefone = (self.telefone or "").strip()
+        if self.categoria:
+            self.categoria = str(self.categoria).strip().upper()
         self.full_clean()
         super().save(*args, **kwargs)
 

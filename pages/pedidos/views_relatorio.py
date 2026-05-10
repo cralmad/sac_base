@@ -21,7 +21,10 @@ from pages.pedidos.models import (
     exclude_tentativas_com_data_posterior,
 )
 from pages.motorista.models import Motorista
-from pages.zona_entrega.models import ZonaEntrega
+from pages.pedidos.services.zona_entrega_pedido import (
+    carregar_regras_zona_por_filial,
+    resolver_zona_e_faixa_entrega,
+)
 from pages.pedidos.services.sms_relatorio import (
     complemento_verificacao_solicitacao,
     estado_verificacao_sms_dia,
@@ -224,69 +227,6 @@ PERMISSOES_ROTAS = {
 }
 
 
-def _normalizar_cp7_num(codigo_postal):
-    digitos = "".join(c for c in str(codigo_postal or "") if c.isdigit())
-    if len(digitos) < 4:
-        return None, None
-    cp4 = int(digitos[:4])
-    cp7 = int(digitos[:7] if len(digitos) >= 7 else digitos)
-    return cp4, cp7
-
-
-def _carregar_regras_zona_por_filial(filial):
-    if not filial:
-        return []
-    zonas = (
-        ZonaEntrega.objects
-        .filter(filial=filial, is_deleted=False, ativa=True)
-        .prefetch_related("faixas_postais", "excecoes_postais")
-        .order_by("-prioridade", "descricao")
-    )
-    regras = []
-    for zona in zonas:
-        faixas = [f for f in zona.faixas_postais.all() if f.ativa]
-        excecoes = [e for e in zona.excecoes_postais.all() if e.ativa]
-        regras.append({
-            "zona": zona,
-            "faixas": faixas,
-            "excecoes": excecoes,
-        })
-    return regras
-
-
-def _resolver_zona_e_faixa_entrega(codigo_postal, regras_zona):
-    cp4, cp7 = _normalizar_cp7_num(codigo_postal)
-    if cp4 is None or cp7 is None:
-        return "", ""
-
-    for regra in regras_zona:
-        inclui_excecao = False
-        exclui_excecao = False
-        codigo_excecao_incluir = ""
-        for exc in regra["excecoes"]:
-            if exc.cp7_num == cp7:
-                if exc.tipo_excecao == "INCLUIR":
-                    inclui_excecao = True
-                    codigo_excecao_incluir = exc.codigo_postal
-                elif exc.tipo_excecao == "EXCLUIR":
-                    exclui_excecao = True
-        if inclui_excecao:
-            faixa_exc = f"EXC {codigo_excecao_incluir}"
-            return regra["zona"].descricao, faixa_exc
-        if exclui_excecao:
-            continue
-
-        for faixa in regra["faixas"]:
-            if faixa.tipo_intervalo == "CP4":
-                if faixa.cp4_inicial and faixa.cp4_final and int(faixa.cp4_inicial) <= cp4 <= int(faixa.cp4_final):
-                    faixa_desc = f"CP4 {faixa.codigo_postal_inicial}-{faixa.codigo_postal_final}"
-                    return regra["zona"].descricao, faixa_desc
-            else:
-                if faixa.cp7_inicial_num <= cp7 <= faixa.cp7_final_num:
-                    faixa_desc = f"CP7 {faixa.codigo_postal_inicial}-{faixa.codigo_postal_final}"
-                    return regra["zona"].descricao, faixa_desc
-    return "", ""
-
 @login_required
 @permission_required(PERMISSOES_ROTAS["acessar"], raise_exception=True)
 @csrf_protect
@@ -297,7 +237,7 @@ def relatorio_rotas_view(request):
         motoristas_choices = []
         if filial_ativa:
             motoristas_choices = [
-                {"value": m.id, "label": f"{m.codigo} - {m.nome}" if m.codigo else m.nome}
+                {"value": m.id, "label": m.nome}
                 for m in Motorista.objects.filter(is_deleted=False, filial=filial_ativa).order_by("nome")
             ]
         request.sisvar_extra = build_sisvar_payload(
@@ -365,7 +305,7 @@ def relatorio_rotas_view(request):
             dq = dq.filter(pedido__filial=filial_ativa)
         pedidos_com_devolucao = set(dq.values_list("pedido_id", flat=True).distinct())
 
-    regras_zona = _carregar_regras_zona_por_filial(filial_ativa)
+    regras_zona = carregar_regras_zona_por_filial(filial_ativa)
 
     grupos = []
     for grupo_key, items in groupby(movs, key=key_fn):
@@ -392,7 +332,7 @@ def relatorio_rotas_view(request):
                     peso_str = str(p.peso)
             segue_para_entrega = estado_segue_para_entrega(mov.estado)
             tem_tentativa_posterior = p.id in pedidos_com_tentativa_posterior
-            zona_entrega, faixa_entrega = _resolver_zona_e_faixa_entrega(p.codpost_dest, regras_zona)
+            zona_entrega, faixa_entrega = resolver_zona_e_faixa_entrega(p.codpost_dest, regras_zona)
             linhas.append({
                 "pedido": p.pedido or str(p.id_vonzu),
                 "id_vonzu": p.id_vonzu,

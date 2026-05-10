@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}SacBase — Logística por motorista{% endblock %}
+{% block page_title %}Relatório Logística (motorista × data){% endblock %}
+
+{% block estilo %}
+<style>
+.rlm-filtros { background: #f8f9fa; border-radius: .5rem; padding: 1rem; }
+.rlm-grupo-motorista { margin-bottom: .75rem; border: 1px solid #dee2e6; border-radius: .375rem; overflow: hidden; }
+.rlm-grupo-header {
+  background: #1a3a5c;
+  color: #fff;
+  padding: .4rem .75rem;
+  font-weight: 600;
+  font-size: .95rem;
+}
+.rlm-grupo-data-header {
+  background: #e9f0f7;
+  color: #1a3a5c;
+  padding: .35rem .75rem;
+  border-top: 1px solid #c8d8e8;
+  font-weight: 600;
+  font-size: .88rem;
+}
+.rlm-badge { background: rgba(255,255,255,.2); border-radius: .25rem; padding: .1rem .45rem; font-size: .78rem; margin-left: .35rem; }
+.rlm-grupo-data-header .rlm-badge { background: rgba(26,58,92,.12); color: #1a3a5c; }
+table.rlm-tabela { width: 100%; border-collapse: collapse; font-size: .85rem; }
+table.rlm-tabela th, table.rlm-tabela td { border: 1px solid #dee2e6; padding: .28rem .45rem; vertical-align: top; }
+table.rlm-tabela th { background: #f1f5f9; color: #334155; font-weight: 600; }
+#rlm-motoristas { min-height: 6rem; font-size: .875rem; width: 100%; max-width: 100%; }
+.rlm-select-actions { display: flex; gap: .25rem; margin-top: .25rem; }
+.rlm-select-actions button { font-size: .75rem; padding: .1rem .4rem; }
+#modFinan .mod-fin-ro { background: #f8f9fa; border-radius: .25rem; padding: .35rem .5rem; font-size: .9rem; }
+#rlm-print-meta { font-size: .9rem; color: #334155; line-height: 1.35; }
+@media print {
+  @page { size: A4 landscape; margin: 4mm 6mm; }
+  main > h1.mb-4 { margin-bottom: .35rem !important; font-size: 1rem !important; }
+  .rlm-filtros, .navbar, .sidebar, #navbase, #sidebarOffcanvas, .sidebar-wrapper, footer, .d-print-none, #container-mensagens, .no-print, .modal { display: none !important; }
+  body { background: #fff !important; }
+  main.py-4 { padding-top: .25rem !important; padding-bottom: .25rem !important; }
+  #rlm-root.container-xl { margin-top: 0 !important; margin-bottom: 0 !important; }
+  #rlm-print-area { margin-top: 0 !important; }
+  #rlm-resultado { margin-top: .25rem !important; }
+  #rlm-print-meta {
+    font-size: .72rem;
+    color: #000;
+    margin-bottom: .35rem !important;
+    padding-bottom: .25rem !important;
+    border-bottom: 1px solid #999 !important;
+    white-space: normal;
+  }
+  .rlm-grupo-motorista { margin-bottom: .45rem; break-inside: avoid-page; page-break-inside: avoid; }
+  .rlm-grupo-header, .rlm-grupo-data-header {
+    padding: .22rem .45rem !important;
+    font-size: .75rem !important;
+  }
+  .rlm-badge { font-size: .65rem !important; padding: .05rem .3rem !important; margin-left: .2rem !important; }
+  table.rlm-tabela { font-size: .68rem; }
+  table.rlm-tabela th, table.rlm-tabela td { padding: .15rem .3rem !important; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-xl my-3" id="rlm-root"
+     data-url-buscar="{% url 'relatorio_logistica_motorista' %}"
+     data-url-mod-finan="{% url 'relatorio_logistica_motorista_mod_finan' %}">
+
+  <div class="rlm-filtros mb-3 no-print">
+    <form id="rlm-form" class="row g-2 align-items-end">
+      <div class="col-6 col-md-3">
+        <label class="form-label mb-0" for="rlm-data-inicio">Data inicial</label>
+        <input type="date" id="rlm-data-inicio" class="form-control" required>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label mb-0" for="rlm-data-fim">Data final</label>
+        <input type="date" id="rlm-data-fim" class="form-control" required>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label mb-0" for="rlm-motoristas">Motoristas</label>
+        <select id="rlm-motoristas" class="form-select" multiple aria-label="Motoristas"></select>
+        <div class="rlm-select-actions d-print-none">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="rlm-btn-sel-todos">Todos</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="rlm-btn-des-todos">Nenhum</button>
+        </div>
+      </div>
+      <div class="col-12 col-md-2">
+        <label class="form-label mb-0 d-none d-md-block invisible" aria-hidden="true">&nbsp;</label>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="submit" class="btn btn-primary flex-grow-1 flex-md-grow-0" id="rlm-btn-buscar">
+            <i class="bi bi-search"></i> Buscar
+          </button>
+          <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" id="rlm-btn-imprimir" disabled>
+            <i class="bi bi-printer"></i> Imprimir
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div id="rlm-print-area">
+  <div id="rlm-print-meta" class="d-none d-print-block mb-2 pb-2 border-bottom"></div>
+  <div id="rlm-loader" class="text-center py-4 d-none no-print">
+    <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Carregando…</span></div>
+  </div>
+  <div id="rlm-vazio" class="alert alert-secondary d-none">Nenhuma tentativa encontrada para os filtros.</div>
+  <div id="rlm-resultado"></div>
+  </div>
+</div>
+
+<!-- Modal lançamento financeiro (atalho) -->
+<div class="modal fade" id="modFinan" tabindex="-1" aria-labelledby="modFinanLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modFinanLabel">Lançamento financeiro (diárias motorista)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <form id="modFinanForm">
+          <div class="row g-2 mb-2">
+            <div class="col-md-6"><div class="small text-muted">Matriz/Filial</div><div class="mod-fin-ro" id="mf-filial"></div></div>
+            <div class="col-md-3"><div class="small text-muted">Data emissão</div><div class="mod-fin-ro" id="mf-emissao"></div></div>
+            <div class="col-md-3"><div class="small text-muted">Data vencimento</div><div class="mod-fin-ro" id="mf-venc"></div></div>
+            <div class="col-md-3"><div class="small text-muted">Tipo</div><div class="mod-fin-ro">SAÍDA</div></div>
+            <div class="col-md-4"><div class="small text-muted">Tipo contraparte</div><div class="mod-fin-ro">Motorista</div></div>
+            <div class="col-md-5"><div class="small text-muted">Contraparte</div><div class="mod-fin-ro" id="mf-motorista"></div></div>
+            <div class="col-md-4"><div class="small text-muted">Plano (código)</div><div class="mod-fin-ro" id="mf-plano-codigo"></div></div>
+            <div class="col-md-4"><div class="small text-muted">Setor</div><div class="mod-fin-ro" id="mf-setor"></div></div>
+            <div class="col-md-4"><div class="small text-muted">Subsetor</div><div class="mod-fin-ro" id="mf-subsetor"></div></div>
+            <div class="col-md-4"><div class="small text-muted">Ativo</div><div class="mod-fin-ro" id="mf-ativo"></div></div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label mb-0" for="mf-valor">Valor *</label>
+            <input type="text" class="form-control smart-input" id="mf-valor" data-allow="0-9," required autocomplete="off">
+          </div>
+          <div class="mb-0">
+            <label class="form-label mb-0" for="mf-obs">Observação</label>
+            <input type="text" class="form-control" id="mf-obs" maxlength="1000" autocomplete="off">
+          </div>
+          <input type="hidden" id="mf-motorista-id" value="">
+          <input type="hidden" id="mf-data" value="">
+          <input type="hidden" id="mf-obs-padrao" value="">
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+        <button type="button" class="btn btn-primary" id="mf-btn-salvar"><i class="bi bi-save"></i> Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'pedidos/js/relatorio_logistica_motorista.js' %}"></script>
+{% endblock %}

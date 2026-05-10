@@ -20,6 +20,7 @@ from pages.financeiro.services.registro_manual import (
     listar_filiais_escrita,
     listar_planos_cascata,
     listar_planos_nivel4,
+    registro_eh_lancamento_manual_sem_referencia,
     salvar_registro_manual,
     serializar_registro,
 )
@@ -89,18 +90,33 @@ def registro_manual_view(request):
     }
     if request.method == "GET":
         filiais_escrita = listar_filiais_escrita(usuario)
+        filiais_ids_get = list(get_filiais_escrita_queryset(usuario).values_list("id", flat=True))
         filial_ativa = getattr(request, "filial_ativa", None)
         filial_ativa_id = str(filial_ativa.id) if filial_ativa else ""
         total_filiais_cadastradas = Filial.objects.filter(ativa=True).count()
         bloquear_filial_select = len(filiais_escrita) <= 1 or total_filiais_cadastradas <= 1
         campos_form = campos_iniciais_registro()
         campos_form["filial_id"] = filial_ativa_id
+        preload_registro_visualizar = False
+        visualizar_id = parse_int(request.GET.get("visualizar"), context="form")
+        estado_form_inicial = "novo" if acoes["incluir"] else "visualizar"
+        if visualizar_id:
+            registro = (
+                RegistroFinanceiro.objects.filter(id=visualizar_id, filial_id__in=filiais_ids_get)
+                .select_related("filial", "plano_contas")
+                .first()
+            )
+            if registro and registro_eh_lancamento_manual_sem_referencia(registro):
+                campos_form = serializar_registro(registro)
+                campos_form["filial_id"] = str(registro.filial_id)
+                estado_form_inicial = "visualizar"
+                preload_registro_visualizar = True
         contraparte = listar_contrapartes()
         request.sisvar_extra = build_sisvar_payload(
             schema=schema,
             forms={
                 nome_form: build_form_state(
-                    estado="novo" if acoes["incluir"] else "visualizar",
+                    estado=estado_form_inicial,
                     campos=campos_form,
                 ),
                 nome_form_cons: build_form_state(
@@ -130,6 +146,7 @@ def registro_manual_view(request):
                 "contrapartes_por_tipo": contraparte["por_tipo"],
                 "filial_ativa_id": filial_ativa_id,
                 "bloquear_filial_select": bloquear_filial_select,
+                "preload_registro_visualizar": preload_registro_visualizar,
             },
         )
         return render(request, "financeiro_registro_manual.html")

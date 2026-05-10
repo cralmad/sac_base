@@ -175,6 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
         registro.codigo || '',
         registro.nome,
         registro.telefone,
+        registro.categoria || '',
         registro.ativa ? 'Sim' : 'Não',
       ].forEach((valor) => {
         const td = document.createElement('td');

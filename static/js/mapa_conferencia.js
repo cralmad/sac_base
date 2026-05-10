@@ -33,6 +33,7 @@ const listaWrapper    = document.getElementById('mapa-lista-wrapper');
 const listaBadge      = document.getElementById('mapa-lista-badge');
 const listaTbody      = document.getElementById('mapa-lista-tbody');
 const listaFiltro     = document.getElementById('mapa-lista-filtro');
+const inputRaioFilialKm = document.getElementById('mapa-raio-filial-km');
 
 let mapaLeaflet   = null;
 let marcadores    = {};       // mov_id → marker
@@ -40,6 +41,7 @@ let rotasLayer    = null;     // LayerGroup de polylines
 let geojsonData   = null;     // última FeatureCollection carregada
 let depositoCoord = null;     // { lat, lng } da filial ativa, ou null
 let marcadorDeposito = null;  // Leaflet marker do depósito
+let circuloRaioFilial = null; // círculo opcional em torno da filial (Leaflet radius em metros)
 let carregamentoPontosEmCurso = false;
 let popupEventsInicializados = false;
 const featByMovId = new Map();
@@ -553,6 +555,9 @@ async function carregarPontos(data) {
     renderizarMarcadores(geojsonData);
     renderizarLegenda(geojsonData);
     renderizarDeposito();
+    definirInputRaioFilialDisponivel(
+      !!(depositoCoord && depositoCoord.lat != null && depositoCoord.lng != null),
+    );
     renderizarLista(geojsonData);
 
     // Ajusta o mapa aos marcadores (salta fitBounds se veio com mov_id específico)
@@ -618,16 +623,64 @@ function criarIconeDeposito() {
   return L.divIcon({ html: svg, iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -18], className: '' });
 }
 
+function _kmFilialParaMetros() {
+  if (!inputRaioFilialKm) return 0;
+  let v = parseFloat(String(inputRaioFilialKm.value).replace(',', '.'));
+  if (Number.isNaN(v) || v <= 0) return 0;
+  const maxKm = parseFloat(inputRaioFilialKm.getAttribute('max') || '2000');
+  if (!Number.isNaN(maxKm) && v > maxKm) v = maxKm;
+  return v * 1000;
+}
+
+function atualizarCirculoFilialOpcional() {
+  if (circuloRaioFilial) {
+    circuloRaioFilial.remove();
+    circuloRaioFilial = null;
+  }
+  if (!depositoCoord || !mapaLeaflet) return;
+  const metros = _kmFilialParaMetros();
+  if (metros <= 0) return;
+  const centro = [depositoCoord.lat, depositoCoord.lng];
+  const km = Math.round(metros / 1000);
+  circuloRaioFilial = L.circle(centro, {
+    radius: metros,
+    color: '#1a1a2e',
+    weight: 2,
+    opacity: 0.45,
+    fillColor: '#4363d8',
+    fillOpacity: 0.06,
+  });
+  circuloRaioFilial.bindPopup(
+    `<strong>Área de referência</strong><br>Raio aproximado de ${km} km em torno da filial.`,
+  );
+  circuloRaioFilial.addTo(mapaLeaflet);
+}
+
 function renderizarDeposito() {
   if (marcadorDeposito) { marcadorDeposito.remove(); marcadorDeposito = null; }
+  if (circuloRaioFilial) { circuloRaioFilial.remove(); circuloRaioFilial = null; }
   if (!depositoCoord || !mapaLeaflet) return;
-  marcadorDeposito = L.marker([depositoCoord.lat, depositoCoord.lng], {
+  const centro = [depositoCoord.lat, depositoCoord.lng];
+  marcadorDeposito = L.marker(centro, {
     icon: criarIconeDeposito(),
     title: 'Depósito',
     zIndexOffset: 1000,
   });
   marcadorDeposito.bindPopup('<strong>Depósito</strong><br>Ponto de partida/chegada das rotas.');
   marcadorDeposito.addTo(mapaLeaflet);
+  atualizarCirculoFilialOpcional();
+}
+
+function definirInputRaioFilialDisponivel(disponivel) {
+  if (!inputRaioFilialKm) return;
+  inputRaioFilialKm.disabled = !disponivel;
+  if (!disponivel) {
+    inputRaioFilialKm.value = '0';
+    if (circuloRaioFilial && mapaLeaflet) {
+      circuloRaioFilial.remove();
+      circuloRaioFilial = null;
+    }
+  }
 }
 
 // ─── Rotas por carro ─────────────────────────────────────────────────────────
@@ -763,6 +816,15 @@ btnMostrarRotas?.addEventListener('click', tracarRotas);
 btnLimparRotas?.addEventListener('click', () => {
   rotasLayer.clearLayers();
   btnLimparRotas.classList.add('d-none');
+});
+
+inputRaioFilialKm?.addEventListener('input', () => {
+  if (!depositoCoord || !mapaLeaflet) return;
+  atualizarCirculoFilialOpcional();
+});
+inputRaioFilialKm?.addEventListener('change', () => {
+  if (!depositoCoord || !mapaLeaflet) return;
+  atualizarCirculoFilialOpcional();
 });
 
 // Carrega automaticamente se veio com data da tela anterior

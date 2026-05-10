@@ -684,6 +684,14 @@ document.addEventListener('DOMContentLoaded', () => {
   renderizarContraparteTiposCons();
   renderizarContrapartesCons();
   hidratarFormulario(nomeForm);
+  if (getDataset('preload_registro_visualizar', false)) {
+    renderizarPlanoCascata();
+    renderizarContraparteTipos();
+    renderizarContrapartes();
+    hidratarFormulario(nomeForm);
+    setFormState(nomeForm, 'visualizar');
+    hidratarFormulario(nomeForm);
+  }
   aplicarPermissoes();
   AppLoader.hide();
 });
