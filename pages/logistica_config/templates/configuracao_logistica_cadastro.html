@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}SacBase - Configuração de Logística{% endblock %}
+
+{% block page_title %}Configuração de Logística{% endblock %}
+
+{% block content %}
+<div id="area-cadastro">
+  <ul class="nav nav-tabs" id="cfgLogTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="tab-geral-cfg" data-bs-toggle="tab" data-bs-target="#cfg-geral" type="button" role="tab">Geral</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-excecoes-cfg" data-bs-toggle="tab" data-bs-target="#cfg-excecoes" type="button" role="tab">Datas de exceção</button>
+    </li>
+  </ul>
+
+  <form id="cadConfigLogistica" data-form-lock="cadConfigLogistica" method="POST">
+    {% csrf_token %}
+    <div class="tab-content border border-top-0 p-2" id="cfgLogTabsContent">
+      <div class="tab-pane fade show active" id="cfg-geral" role="tabpanel">
+        <div class="container-xl my-3 mx-auto">
+          <input type="hidden" name="id" id="id" value="">
+          <div class="row g-3">
+            <div class="col-12 col-md-5">
+              <label class="form-label mb-0" for="filial_id">Matriz/Filial *</label>
+              <select name="filial_id" id="filial_id" class="form-select" required>
+                <option value="">Selecione</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0">País de Atuação</label>
+              <div id="pais_atuacao_info" class="form-control bg-light" aria-live="polite"></div>
+            </div>
+            <div class="col-12 col-md-4"></div>
+
+            <div class="col-12"><h6 class="text-secondary mb-0">Pesado</h6></div>
+            <div class="col-6 col-md-3">
+              <label class="form-label mb-0" for="pedidos_pesado">Pedidos pesado</label>
+              <input type="number" name="pedidos_pesado" id="pedidos_pesado" class="form-control" min="0" max="32767" step="1" required>
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label mb-0" for="pesado_reservado">Pesado reservado</label>
+              <input type="number" name="pesado_reservado" id="pesado_reservado" class="form-control" min="0" max="32767" step="1" required>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0" for="valor_unitario_pesado">Valor unitário pesado</label>
+              <input type="number" name="valor_unitario_pesado" id="valor_unitario_pesado" class="form-control" min="0" step="0.01" required>
+            </div>
+
+            <div class="col-12 mt-2"><h6 class="text-secondary mb-0">Ligeiro</h6></div>
+            <div class="col-6 col-md-3">
+              <label class="form-label mb-0" for="pedidos_ligeiro">Pedidos ligeiro</label>
+              <input type="number" name="pedidos_ligeiro" id="pedidos_ligeiro" class="form-control" min="0" max="32767" step="1" required>
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label mb-0" for="ligeiro_reservado">Ligeiro reservado</label>
+              <input type="number" name="ligeiro_reservado" id="ligeiro_reservado" class="form-control" min="0" max="32767" step="1" required>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0" for="valor_unitario_ligeiro">Valor unitário ligeiro</label>
+              <input type="number" name="valor_unitario_ligeiro" id="valor_unitario_ligeiro" class="form-control" min="0" step="0.01" required>
+            </div>
+
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0" for="valor_excedente">Valor excedente</label>
+              <input type="number" name="valor_excedente" id="valor_excedente" class="form-control" min="0" step="0.01" required>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-pane fade" id="cfg-excecoes" role="tabpanel">
+        <div class="container-xl my-3 mx-auto">
+          <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span>Datas de exceção (ligeiro / pesado reservado)</span>
+              <button type="button" id="btn-add-excecao-cfg" class="btn btn-sm btn-outline-primary">Adicionar data</button>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Data</th>
+                      <th>Pesado reservado</th>
+                      <th>Ligeiro reservado</th>
+                      <th class="text-center">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tabela-excecoes-cfg"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-actions container-xl">
+      <button id="btn-salvar" class="btn btn-primary d-none" data-show-on="novo,editar" type="submit">
+        <i class="bi bi-save"></i> Salvar
+      </button>
+      <button id="btn-editar" type="button" data-show-on="visualizar" class="btn btn-warning d-none">
+        <i class="bi bi-pencil"></i> Editar
+      </button>
+      <button id="btn-novo" type="button" data-show-on="visualizar" class="btn btn-success d-none">
+        <i class="bi bi-plus-circle"></i> Novo
+      </button>
+      <button id="btn-excluir" type="button" data-show-on="visualizar" class="btn btn-danger d-none">
+        <i class="bi bi-trash"></i> Excluir
+      </button>
+      <button id="btn-cancelar" type="button" data-show-on="novo,editar" class="btn btn-outline-secondary d-none">
+        <i class="bi bi-x-circle"></i> Cancelar
+      </button>
+      <button type="button" id="btn-abrir-pesquisa" class="btn btn-secondary d-none">
+        <i class="bi bi-search"></i> Pesquisar
+      </button>
+    </div>
+  </form>
+
+  <div id="div-pesquisa" class="container-xl d-none mt-3">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <span>Consultar configurações</span>
+        <button type="button" id="btn-fechar" class="btn-close btn-close-white"></button>
+      </div>
+      <div class="card-body">
+        <form id="consConfigLogistica" method="POST">
+          {% csrf_token %}
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0">Matriz/Filial</label>
+              <select name="filial_cons" id="filial_cons" class="form-select">
+                <option value="">Todas</option>
+              </select>
+            </div>
+            <div class="col-12 col-lg-3 d-grid gap-2 align-items-end">
+              <button type="submit" class="btn btn-success">Filtrar</button>
+              <button type="button" class="btn btn-outline-danger" id="btn-voltar">Voltar</button>
+            </div>
+          </div>
+        </form>
+        <div class="table-responsive mt-4">
+          <table class="table table-hover table-sm border">
+            <thead class="table-dark">
+              <tr>
+                <th>ID</th>
+                <th>Filial</th>
+                <th>Pedidos pesado</th>
+                <th>Pedidos ligeiro</th>
+                <th class="text-center">Ação</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-cfg-corpo"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'logistica_config/js/configuracao_logistica.js' %}"></script>
+{% endblock %}

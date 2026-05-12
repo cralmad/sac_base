@@ -274,6 +274,7 @@ class TentativaEntrega(models.Model):
             ("change_carro_tentativaentrega", "Pode alterar o campo Carro na conferência de volumes"),
             ("send_sms_tentativaentrega", "Pode enviar SMS de notificação de entrega"),
             ("view_relatorio_gerencial", "Pode acessar o Relatório Gerencial de Pedidos"),
+            ("view_relatorio_fechamento", "Pode acessar o Relatório de Fechamento (logística)"),
             ("view_relatorio_avaliacao", "Pode acessar o Relatório de Avaliações"),
             ("send_email_avaliacao", "Pode enviar e-mails de avaliação"),
             ("generate_email_queue_avaliacao", "Pode gerar fila de e-mails de avaliação"),

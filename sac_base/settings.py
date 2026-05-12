@@ -104,6 +104,7 @@ INSTALLED_APPS = [
     'pages.auditoria',
     'pages.filial',
     'pages.zona_entrega',
+    'pages.logistica_config',
     'pages.motorista',
     'pages.pedidos',
     'pages.financeiro',

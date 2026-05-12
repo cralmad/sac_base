@@ -173,6 +173,24 @@ class CadClientePermissaoViewTests(TestCase):
 		self.assertEqual(data['form']['cadCliente']['estado'], 'visualizar')
 		self.assertTrue(AuditEvent.objects.filter(action='create').exists())
 
+	def test_post_novo_regiao_cidade_string_vazia_grava_null_e_auditoria(self):
+		"""SisVar pode enviar '' em FK opcionais; não pode persistir '' nem falhar no snapshot."""
+		usuario = self.criar_usuario('comadd', [self.perm_view, self.perm_add])
+		payload = self.payload_cliente(estado='novo')
+		payload['form']['cadCliente']['campos']['regiao'] = ''
+		payload['form']['cadCliente']['campos']['cidade'] = ''
+		request = self.build_post_request('/app/cad/cliente/', payload, usuario)
+
+		response = cad_cliente_view(request)
+		data = json.loads(response.content)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertTrue(data['success'])
+		cliente = Cliente.objects.get()
+		self.assertIsNone(cliente.regiao_id)
+		self.assertIsNone(cliente.cidade_id)
+		self.assertTrue(AuditEvent.objects.filter(action='create').exists())
+
 	def test_post_editar_exige_permissao_change(self):
 		usuario = self.criar_usuario('semchange', [self.perm_view])
 		cliente = self.criar_cliente()

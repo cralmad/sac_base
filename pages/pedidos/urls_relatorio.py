@@ -10,6 +10,7 @@ from .views_relatorio import (
     relatorio_gerencial_view,
     relatorio_devolucao_view,
     relatorio_devolucao_gsheets_view,
+    relatorio_fechamento_view,
 )
 from .views_relatorio_motorista import (
     relatorio_logistica_motorista_mod_finan_view,
@@ -35,4 +36,5 @@ urlpatterns = [
     path('relatorio_gerencial/', relatorio_gerencial_view, name='relatorio_gerencial'),
     path('relatorio_devolucao/', relatorio_devolucao_view, name='relatorio_devolucao'),
     path('relatorio_devolucao/gsheets', relatorio_devolucao_gsheets_view, name='relatorio_devolucao_gsheets'),
+    path('relatorio_fechamento/', relatorio_fechamento_view, name='relatorio_fechamento'),
 ]

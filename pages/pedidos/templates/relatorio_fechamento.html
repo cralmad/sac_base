@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Relatório de Fechamento{% endblock %}
+
+{% block estilo %}
+<style>
+.rf-filtros { background: #f8f9fa; border-radius: .5rem; padding: 1rem; }
+.rf-tabela-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.rf-tabela { width: 100%; border-collapse: collapse; font-size: .82rem; min-width: 960px; }
+table.rf-tabela th {
+  background: #e9f0f7;
+  color: #1a3a5c;
+  border: 1px solid #c8d8e8;
+  padding: .35rem .45rem;
+  white-space: nowrap;
+  font-weight: 600;
+  vertical-align: bottom;
+}
+table.rf-tabela th small { font-weight: 400; display: block; color: #555; }
+table.rf-tabela td {
+  border: 1px solid #dee2e6;
+  padding: .28rem .45rem;
+  vertical-align: top;
+}
+.rf-sub { font-size: .78rem; color: #444; }
+.rf-cel-mista { white-space: normal; word-break: break-word; max-width: 28rem; }
+table.rf-tabela tfoot td {
+  background: #f0f4f8;
+  font-weight: 600;
+  border: 1px solid #c8d8e8;
+}
+table.rf-tabela tfoot .rf-sub { font-weight: 600; }
+
+@media print {
+  @page { size: A4 landscape; margin: 6mm 8mm; }
+  body, .container-xl { padding: 0 !important; margin: 0 !important; }
+  .rf-no-print, .navbar, .sidebar, footer, #container-mensagens,
+  [data-bs-toggle] { display: none !important; }
+  .rf-tabela-scroll { overflow: visible; }
+  table.rf-tabela { font-size: 7.5pt; min-width: 0; }
+  table.rf-tabela th {
+    background: #dce6f1 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    padding: .1rem .25rem;
+  }
+  table.rf-tabela td { padding: .08rem .25rem; }
+  table.rf-tabela tfoot td {
+    background: #e8eef5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  h1 { font-size: .85rem !important; margin-bottom: .15rem !important; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-xl my-3" id="rf-root"
+     data-url-buscar="{% url 'relatorio_fechamento' %}">
+
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="h4 mb-0"><i class="bi bi-calendar2-check me-2"></i>Relatório de Fechamento</h1>
+  </div>
+
+  <div id="container-mensagens"></div>
+
+  <div class="rf-filtros mb-3 rf-no-print" id="rf-toolbar">
+    <form id="rf-form" class="row g-2 align-items-end">
+      {% csrf_token %}
+      <div class="col-6 col-md-3">
+        <label class="form-label mb-0" for="rf-data-ini">Data inicial *</label>
+        <input type="date" id="rf-data-ini" class="form-control" required>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label mb-0" for="rf-data-fim">Data final *</label>
+        <input type="date" id="rf-data-fim" class="form-control" required>
+      </div>
+      <div class="col-12 col-md-5 d-flex flex-wrap gap-2 align-items-end">
+        <button type="submit" class="btn btn-primary" id="rf-btn-buscar">
+          <i class="bi bi-search me-1"></i>Buscar
+        </button>
+        <button type="button" class="btn btn-outline-secondary d-none" id="rf-btn-imprimir" title="Imprimir relatório">
+          <i class="bi bi-printer me-1"></i>Imprimir
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div id="rf-resultado">
+    <div class="rf-tabela-scroll d-none" id="rf-tabela-wrapper">
+      <table class="rf-tabela table-bordered mb-0">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Pedidos</th>
+            <th>Ligeiro <small>Qtd. / Valor</small></th>
+            <th>Pesado <small>Qtd. / Valor</small></th>
+            <th>Reservados</th>
+            <th>Excedentes </th>
+            <th>Expresso <small>Obs. / Valor</small></th>
+          </tr>
+        </thead>
+        <tbody id="rf-corpo"></tbody>
+        <tfoot id="rf-tfoot" class="d-none"></tfoot>
+      </table>
+    </div>
+    <p id="rf-vazio" class="text-muted d-none mb-0">Nenhuma linha para o período.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'pedidos/js/relatorio_fechamento.js' %}"></script>
+{% endblock %}

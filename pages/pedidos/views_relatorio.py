@@ -34,6 +34,7 @@ from pages.pedidos.services.sms_relatorio import (
     sigla_pais_operacao_filial,
 )
 from pages.pedidos.services.importador_csv import parse_csv_artigos_sem_persistir
+from pages.pedidos.services.relatorio_fechamento import montar_relatorio_fechamento, validar_periodo
 from sac_base.permissions_utils import build_action_permissions
 from sac_base.sisvar_builders import build_sisvar_payload
 from sac_base.sms_service import montar_mensagem
@@ -894,4 +895,53 @@ def relatorio_devolucao_gsheets_view(request):
         "ids_enviados": ids_enviados,
         "mensagem": f"{len(ids_enviados)} devolução(ões) enviada(s) com sucesso.",
     })
+
+
+# ─── Relatório de Fechamento (logística) ─────────────────────────────────────
+
+PERMISSOES_FECHAMENTO = {
+    "acessar": "pedidos.view_relatorio_fechamento",
+}
+
+
+@login_required
+@permission_required(PERMISSOES_FECHAMENTO["acessar"], raise_exception=True)
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def relatorio_fechamento_view(request):
+    if request.method == "GET":
+        request.sisvar_extra = build_sisvar_payload(
+            permissions={"fechamento": build_action_permissions(request.user, PERMISSOES_FECHAMENTO)},
+        )
+        return render(request, "relatorio_fechamento.html")
+
+    data = request.sisvar_front or {}
+    filtros = data.get("filtros", {})
+    data_inicial = (filtros.get("data_inicial") or "").strip()
+    data_final = (filtros.get("data_final") or "").strip()
+
+    if not data_inicial:
+        return JsonResponse({"success": False, "mensagem": "A data inicial é obrigatória."}, status=400)
+    if not data_final:
+        return JsonResponse({"success": False, "mensagem": "A data final é obrigatória."}, status=400)
+
+    try:
+        dt_ini = datetime.strptime(data_inicial, "%Y-%m-%d").date()
+        dt_fim = datetime.strptime(data_final, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"success": False, "mensagem": "Data inválida."}, status=400)
+
+    err_periodo = validar_periodo(dt_ini, dt_fim)
+    if err_periodo:
+        return JsonResponse({"success": False, "mensagem": err_periodo}, status=400)
+
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse({"success": False, "mensagem": "Filial ativa não encontrada na sessão."}, status=403)
+
+    payload, err_msg = montar_relatorio_fechamento(filial_ativa, dt_ini, dt_fim)
+    if err_msg:
+        return JsonResponse({"success": False, "mensagem": err_msg}, status=400)
+
+    return JsonResponse({"success": True, **payload})
 

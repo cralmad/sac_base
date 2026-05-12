@@ -12,6 +12,7 @@ urlpatterns = [
     path('app/', include('pages.usuario.urls')),
     path('app/', include('pages.filial.urls')),
     path('app/', include('pages.zona_entrega.urls')),
+    path('app/', include('pages.logistica_config.urls')),
     path('app/', include('pages.motorista.urls')),
     path('app/', include('pages.pedidos.urls')),
     path('app/', include('pages.financeiro.urls')),

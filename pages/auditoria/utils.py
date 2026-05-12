@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.contenttypes.models import ContentType
+from django.db.models.fields.related import ForeignKey
 
 from .models import AuditEvent
 
@@ -24,10 +25,13 @@ def snapshot_instance(instance, exclude_fields=None):
         if field.name in exclude:
             continue
 
+        if isinstance(field, ForeignKey):
+            raw_id = getattr(instance, field.attname)
+            data[field.name] = None if raw_id in (None, "") else raw_id
+            continue
+
         value = getattr(instance, field.name)
-        if hasattr(field, "target_field"):
-            data[field.name] = value.pk if value is not None else None
-        elif isinstance(value, Decimal):
+        if isinstance(value, Decimal):
             data[field.name] = str(value)
         else:
             data[field.name] = value.isoformat() if hasattr(value, "isoformat") and value is not None else value

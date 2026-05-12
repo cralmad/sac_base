@@ -45,6 +45,12 @@ export const PERMISSOES_SCHEMA = {
     { codename: "pedidos.change_carro_tentativaentrega",  label: "Alterar Carro no Mapa / Conferência" },
     // --- Relatório Gerencial de Pedidos ---
     { codename: "pedidos.view_relatorio_gerencial", label: "Acessar Relatório Gerencial de Pedidos" },
+    { codename: "pedidos.view_relatorio_fechamento", label: "Acessar Relatório de Fechamento (logística)" },
+    // --- Configuração de Logística ---
+    { codename: "logistica_config.view_configuracaologistica", label: "Visualizar Configuração de Logística" },
+    { codename: "logistica_config.add_configuracaologistica", label: "Incluir Configuração de Logística" },
+    { codename: "logistica_config.change_configuracaologistica", label: "Editar Configuração de Logística" },
+    { codename: "logistica_config.delete_configuracaologistica", label: "Excluir Configuração de Logística" },
     // --- Relatório de Devoluções ---
     { codename: "pedidos.view_relatorio_devolucao", label: "Acessar Relatório de Devoluções" },
     // --- Relatório de Avaliação ---
@@ -108,6 +114,11 @@ export const PERMISSOES_SCHEMA = {
     { codename: "pedidos.change_carro_tentativaentrega",  label: "Alterar Carro no Mapa / Conferência" },
     // --- Relatório Gerencial de Pedidos ---
     { codename: "pedidos.view_relatorio_gerencial", label: "Acessar Relatório Gerencial de Pedidos" },
+    { codename: "pedidos.view_relatorio_fechamento", label: "Acessar Relatório de Fechamento (logística)" },
+    { codename: "logistica_config.view_configuracaologistica", label: "Visualizar Configuração de Logística" },
+    { codename: "logistica_config.add_configuracaologistica", label: "Incluir Configuração de Logística" },
+    { codename: "logistica_config.change_configuracaologistica", label: "Editar Configuração de Logística" },
+    { codename: "logistica_config.delete_configuracaologistica", label: "Excluir Configuração de Logística" },
     // --- Relatório de Avaliação ---
     { codename: "pedidos.view_relatorio_avaliacao", label: "Acessar Relatório de Avaliação" },
     // --- SMS e E-mail ---

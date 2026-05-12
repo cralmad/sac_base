@@ -140,8 +140,8 @@ def cad_cliente_view(request):
     complemento   = campos.get("complemento", "")
     bairro        = campos.get("bairro", "")
     pais_id       = campos.get("pais")
-    regiao_id     = campos.get("regiao")
-    cidade_id     = campos.get("cidade")
+    regiao_id     = campos.get("regiao") or None
+    cidade_id     = campos.get("cidade") or None
     codpostal     = campos.get("codpostal", "")
     identificador = campos.get("identificador", "")
     observacao    = campos.get("observacao", "")
