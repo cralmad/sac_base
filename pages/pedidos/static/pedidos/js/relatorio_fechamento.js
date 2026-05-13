@@ -16,6 +16,8 @@ const tfoot = document.getElementById('rf-tfoot');
 const wrap = document.getElementById('rf-tabela-wrapper');
 const vazio = document.getElementById('rf-vazio');
 const btnImprimir = document.getElementById('rf-btn-imprimir');
+const linhaResumo = document.getElementById('rf-linha-resumo');
+const celulaResumo = document.getElementById('rf-celula-resumo');
 
 /** Separador entre quantidade e valor (Ligeiro/Pesado) e entre lançamentos (Expresso). */
 const RF_SEP = ' | ';
@@ -52,6 +54,19 @@ function renderCelulaExpresso(lista) {
   }
   cell.textContent = juntarListaExpresso(lista);
   return cell;
+}
+
+function atualizarResumoPeriodo(meta) {
+  if (!linhaResumo || !celulaResumo) return;
+  const p = meta?.periodo_texto;
+  const v = meta?.valor_total_consolidado;
+  if (p && v != null && String(v).length) {
+    linhaResumo.classList.remove('d-none');
+    celulaResumo.textContent = `Período: ${p} — ${v}`;
+    return;
+  }
+  linhaResumo.classList.add('d-none');
+  celulaResumo.textContent = '';
 }
 
 function renderLinha(linha) {
@@ -133,13 +148,21 @@ function renderRodape(totais) {
   tfoot.appendChild(tr);
 }
 
-function renderTabela(linhas, totais) {
+function renderTabela(linhas, totais, meta) {
   corpo.replaceChildren();
+  atualizarResumoPeriodo(meta);
   if (!linhas || !linhas.length) {
-    wrap.classList.add('d-none');
-    vazio.classList.remove('d-none');
-    renderRodape(null);
-    btnImprimir?.classList.add('d-none');
+    vazio.classList.add('d-none');
+    wrap.classList.remove('d-none');
+    const trV = document.createElement('tr');
+    const tdV = document.createElement('td');
+    tdV.colSpan = 7;
+    tdV.className = 'text-muted text-center py-3';
+    tdV.textContent = 'Nenhuma linha para o período.';
+    trV.appendChild(tdV);
+    corpo.appendChild(trV);
+    renderRodape(totais || null);
+    btnImprimir?.classList.remove('d-none');
     return;
   }
   vazio.classList.add('d-none');
@@ -180,13 +203,18 @@ form?.addEventListener('submit', async (e) => {
       definirMensagem('erro', data.mensagem || 'Erro ao buscar.', false);
       wrap.classList.add('d-none');
       vazio.classList.add('d-none');
+      atualizarResumoPeriodo(null);
       renderRodape(null);
       btnImprimir?.classList.add('d-none');
       return;
     }
-    renderTabela(data.linhas, data.totais);
+    renderTabela(data.linhas, data.totais, {
+      periodo_texto: data.periodo_texto,
+      valor_total_consolidado: data.valor_total_consolidado,
+    });
   } catch {
     definirMensagem('erro', 'Falha de rede ao buscar o relatório.', false);
+    atualizarResumoPeriodo(null);
     renderRodape(null);
     btnImprimir?.classList.add('d-none');
   } finally {

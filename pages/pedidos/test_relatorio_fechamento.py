@@ -110,6 +110,8 @@ class RelatorioFechamentoServiceTests(TestCase):
         self.assertEqual(t["pedidos_excedentes"], "0")
         self.assertEqual(t["pedidos_excedentes_valor"], "0,00")
         self.assertEqual(t["expresso_valor"], "0,00")
+        self.assertEqual(payload["periodo_texto"], "10/06/2026 a 10/06/2026")
+        self.assertEqual(payload["valor_total_consolidado"], "34,00")
 
     def test_excecao_substitui_reservados(self):
         DataExcecaoConfigLogistica.objects.create(
@@ -139,6 +141,8 @@ class RelatorioFechamentoServiceTests(TestCase):
         self.assertEqual(t["pedidos_excedentes"], "0")
         self.assertEqual(t["pedidos_excedentes_valor"], "0,00")
         self.assertEqual(t["expresso_valor"], "0,00")
+        self.assertEqual(payload["periodo_texto"], "10/06/2026 a 10/06/2026")
+        self.assertEqual(payload["valor_total_consolidado"], "118,00")
 
     def test_expresso_rf_entrada_por_data(self):
         p = self._pedido(50020)
@@ -167,6 +171,8 @@ class RelatorioFechamentoServiceTests(TestCase):
         self.assertEqual(t["ligeiro_valor"], "4,00")
         self.assertEqual(t["pesado_valor"], "30,00")
         self.assertEqual(t["pedidos_excedentes_valor"], "0,00")
+        self.assertEqual(payload["periodo_texto"], "10/06/2026 a 10/06/2026")
+        self.assertEqual(payload["valor_total_consolidado"], "134,00")
 
     def test_total_pedidos_excedentes_valor_multiplica_config(self):
         """Total excedente vezes ConfiguracaoLogistica.valor_excedente no rodape."""
@@ -182,3 +188,5 @@ class RelatorioFechamentoServiceTests(TestCase):
         t = payload["totais"]
         self.assertEqual(t["pedidos_excedentes"], "3")
         self.assertEqual(t["pedidos_excedentes_valor"], "6,00")
+        self.assertEqual(payload["periodo_texto"], "10/06/2026 a 10/06/2026")
+        self.assertEqual(payload["valor_total_consolidado"], "40,00")

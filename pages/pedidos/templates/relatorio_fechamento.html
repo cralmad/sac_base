@@ -25,6 +25,15 @@ table.rf-tabela td {
 }
 .rf-sub { font-size: .78rem; color: #444; }
 .rf-cel-mista { white-space: normal; word-break: break-word; max-width: 28rem; }
+table.rf-tabela thead .rf-th-resumo {
+  background: #f4f7fb;
+  color: #1a3a5c;
+  font-weight: 600;
+  text-align: left;
+  border: 1px solid #c8d8e8;
+  padding: .45rem .55rem;
+  white-space: normal;
+}
 table.rf-tabela tfoot td {
   background: #f0f4f8;
   font-weight: 600;
@@ -44,6 +53,11 @@ table.rf-tabela tfoot .rf-sub { font-weight: 600; }
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     padding: .1rem .25rem;
+  }
+  table.rf-tabela thead .rf-th-resumo {
+    background: #e8eef5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   table.rf-tabela td { padding: .08rem .25rem; }
   table.rf-tabela tfoot td {
@@ -92,6 +106,9 @@ table.rf-tabela tfoot .rf-sub { font-weight: 600; }
     <div class="rf-tabela-scroll d-none" id="rf-tabela-wrapper">
       <table class="rf-tabela table-bordered mb-0">
         <thead>
+          <tr id="rf-linha-resumo" class="d-none">
+            <th colspan="7" id="rf-celula-resumo" class="rf-th-resumo" scope="colgroup"></th>
+          </tr>
           <tr>
             <th>Data</th>
             <th>Pedidos</th>

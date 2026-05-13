@@ -173,6 +173,9 @@ def montar_relatorio_fechamento(filial, data_ini: date, data_fim: date) -> tuple
 
     tot_exc_valor = (Decimal(tot_exc) * cfg.valor_excedente).quantize(Decimal("0.01"))
 
+    valor_total_consolidado = (tot_l_v + tot_p_v + tot_exc_valor + tot_expresso_v).quantize(Decimal("0.01"))
+    periodo_texto = f"{data_ini.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}"
+
     totais = {
         "qtd_pedidos": formatar_inteiro_pt_br(tot_qtd),
         "ligeiro_quantidade": formatar_inteiro_pt_br(tot_l_q),
@@ -185,4 +188,10 @@ def montar_relatorio_fechamento(filial, data_ini: date, data_fim: date) -> tuple
         "expresso_valor": formatar_decimal_pt_br(tot_expresso_v),
     }
 
-    return {"linhas": linhas, "totais": totais, "periodo_maximo_dias": PERIODO_MAXIMO_DIAS}, None
+    return {
+        "linhas": linhas,
+        "totais": totais,
+        "periodo_texto": periodo_texto,
+        "valor_total_consolidado": formatar_decimal_pt_br(valor_total_consolidado),
+        "periodo_maximo_dias": PERIODO_MAXIMO_DIAS,
+    }, None
