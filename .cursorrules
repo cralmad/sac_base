@@ -151,6 +151,30 @@ Uma **única execução** do comando: várias **rondas** releem pendentes com te
 
 ---
 
+## Relatório de respostas à avaliação (logística)
+
+| Peça | Ficheiro |
+|------|----------|
+| Rota | `pages/pedidos/urls_relatorio.py` — `relatorio_avaliacao_respostas` |
+| View | `pages/pedidos/views_relatorio.py` — `relatorio_avaliacao_respostas_view` |
+| Serviço | `pages/pedidos/services/relatorio_avaliacao_respostas.py` — `montar_relatorio_avaliacao_respostas`, `validar_e_montar_relatorio_avaliacao_respostas`, `montar_sisvar_relatorio_avaliacao_respostas_get` |
+| Front | `pages/pedidos/templates/relatorio_avaliacao_respostas.html`, `pages/pedidos/static/pedidos/js/relatorio_avaliacao_respostas.js` |
+
+**Regras (relatório tabular):** apenas `AvaliacaoPedido` com `respondido_em` preenchido; filtro de **período** em `Pedido.prev_entrega`; motorista da `TentativaEntrega` com `data_tentativa = pedido.prev_entrega` (primeira tentativa por `id` se houver várias). **Tenant:** `pedido__filial = filial_ativa`. **Permissão:** `pedidos.view_relatorio_avaliacao`. Validação de intervalo: `validar_periodo` (máx. 90 dias) como no fechamento.
+
+### Dashboard de avaliações (logística)
+
+| Peça | Ficheiro |
+|------|----------|
+| Rota | `pages/pedidos/urls_relatorio.py` — `relatorio_avaliacao_dashboard` |
+| View | `pages/pedidos/views_relatorio.py` — `relatorio_avaliacao_dashboard_view` |
+| Serviço | `pages/pedidos/services/dashboard_avaliacao_respostas.py` — `montar_dashboard_avaliacao_respostas`, `validar_e_montar_dashboard_avaliacao_respostas`, `montar_sisvar_relatorio_avaliacao_dashboard_get` |
+| Front | `pages/pedidos/templates/relatorio_avaliacao_dashboard.html`, `pages/pedidos/static/pedidos/js/relatorio_avaliacao_dashboard.js` (Chart.js via jsDelivr, alinhado ao CSP) |
+
+**Regras (dashboard):** queryset base `qs_avaliacoes_periodo_anotada_motorista` em `relatorio_avaliacao_respostas.py` (período `prev_entrega`, motorista da tentativa); funil com `email_enviado` e `respondido_em`; agregados de perguntas só em respondidas. **Permissão:** `pedidos.view_relatorio_avaliacao`.
+
+---
+
 ## Change discipline
 
 - Touch only files and lines needed for the task; no drive-by refactors or unrelated formatting.

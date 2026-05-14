@@ -34,6 +34,14 @@ from pages.pedidos.services.sms_relatorio import (
     sigla_pais_operacao_filial,
 )
 from pages.pedidos.services.importador_csv import parse_csv_artigos_sem_persistir
+from pages.pedidos.services.dashboard_avaliacao_respostas import (
+    montar_sisvar_relatorio_avaliacao_dashboard_get,
+    validar_e_montar_dashboard_avaliacao_respostas,
+)
+from pages.pedidos.services.relatorio_avaliacao_respostas import (
+    montar_sisvar_relatorio_avaliacao_respostas_get,
+    validar_e_montar_relatorio_avaliacao_respostas,
+)
 from pages.pedidos.services.relatorio_fechamento import montar_relatorio_fechamento, validar_periodo
 from sac_base.permissions_utils import build_action_permissions
 from sac_base.sisvar_builders import build_sisvar_payload
@@ -943,5 +951,59 @@ def relatorio_fechamento_view(request):
     if err_msg:
         return JsonResponse({"success": False, "mensagem": err_msg}, status=400)
 
+    return JsonResponse({"success": True, **payload})
+
+
+# ─── Relatório de respostas à pesquisa de satisfação (logística) ─────────────
+
+PERMISSOES_AVALIACAO_RESPOSTAS = {
+    "acessar": "pedidos.view_relatorio_avaliacao",
+}
+
+
+@login_required
+@permission_required(PERMISSOES_AVALIACAO_RESPOSTAS["acessar"], raise_exception=True)
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def relatorio_avaliacao_respostas_view(request):
+    if request.method == "GET":
+        request.sisvar_extra = montar_sisvar_relatorio_avaliacao_respostas_get(
+            request=request,
+            acoes=build_action_permissions(request.user, PERMISSOES_AVALIACAO_RESPOSTAS),
+        )
+        return render(request, "relatorio_avaliacao_respostas.html")
+    filial_ativa = getattr(request, "filial_ativa", None)
+    payload, err = validar_e_montar_relatorio_avaliacao_respostas(
+        filial_ativa, (request.sisvar_front or {}).get("filtros") or {}
+    )
+    if err:
+        status = 403 if "Filial ativa" in err else 400
+        return JsonResponse({"success": False, "mensagem": err}, status=status)
+    return JsonResponse({"success": True, **payload})
+
+
+PERMISSOES_AVALIACAO_DASHBOARD = {
+    "acessar": "pedidos.view_relatorio_avaliacao",
+}
+
+
+@login_required
+@permission_required(PERMISSOES_AVALIACAO_DASHBOARD["acessar"], raise_exception=True)
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def relatorio_avaliacao_dashboard_view(request):
+    if request.method == "GET":
+        request.sisvar_extra = montar_sisvar_relatorio_avaliacao_dashboard_get(
+            request=request,
+            acoes=build_action_permissions(request.user, PERMISSOES_AVALIACAO_DASHBOARD),
+        )
+        return render(request, "relatorio_avaliacao_dashboard.html")
+    filial_ativa = getattr(request, "filial_ativa", None)
+    payload, err = validar_e_montar_dashboard_avaliacao_respostas(
+        filial_ativa, (request.sisvar_front or {}).get("filtros") or {}
+    )
+    if err:
+        status = 403 if "Filial ativa" in err else 400
+        return JsonResponse({"success": False, "mensagem": err}, status=status)
     return JsonResponse({"success": True, **payload})
 

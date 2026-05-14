@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Dashboard de avaliações{% endblock %}
+
+{% block estilo %}
+<style>
+.dash-filtros { background: #f8f9fa; border-radius: .5rem; padding: 1rem; }
+.dash-kpi .card { border: 1px solid #dee2e6; }
+.dash-kpi .card-body { padding: .75rem 1rem; }
+.dash-kpi .display-6 { font-size: 1.75rem; font-weight: 700; color: #1a3a5c; }
+.dash-chart-wrap { position: relative; height: 220px; max-width: 100%; }
+.dash-chart-wrap.tall { height: 260px; }
+.dash-pergunta-card .card-header { font-size: .88rem; font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-xl my-3" id="dash-root"
+     data-url-buscar="{% url 'relatorio_avaliacao_dashboard' %}">
+
+  <h1 class="h4 mb-3"><i class="bi bi-speedometer2 me-2"></i>Dashboard de avaliações</h1>
+  <div id="container-mensagens"></div>
+
+  <div class="dash-filtros mb-3">
+    <form id="dash-form" class="row g-2 align-items-end">
+      {% csrf_token %}
+      <div class="col-6 col-md-3">
+        <label class="form-label mb-0" for="dash-data-ini">Data inicial *</label>
+        <input type="date" id="dash-data-ini" class="form-control" required>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label mb-0" for="dash-data-fim">Data final *</label>
+        <input type="date" id="dash-data-fim" class="form-control" required>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label mb-0" for="dash-motorista">Motorista</label>
+        <select id="dash-motorista" class="form-select">
+          <option value="">Todos (visão geral)</option>
+          {% for m in sisVar.meta.options.motoristas %}
+          <option value="{{ m.value }}">{{ m.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-2">
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-search me-1"></i>Atualizar
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <p id="dash-resumo" class="text-muted small d-none mb-3"></p>
+
+  <div id="dash-conteudo" class="d-none">
+    <div class="row row-cols-2 row-cols-md-4 g-2 mb-3 dash-kpi" id="dash-kpi-funil"></div>
+    <div class="row row-cols-2 row-cols-md-3 g-2 mb-3 dash-kpi" id="dash-kpi-extra"></div>
+
+    <div class="row mb-4">
+      <div class="col-lg-6 mb-3">
+        <div class="card">
+          <div class="card-header">Funil: respondidos vs pendentes (sobre e-mails enviados)</div>
+          <div class="card-body">
+            <div class="dash-chart-wrap mx-auto" style="max-width:320px">
+              <canvas id="chart-funil" aria-label="Gráfico funil"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6 mb-3">
+        <div class="card">
+          <div class="card-header">Média por pergunta (escala 1–5)</div>
+          <div class="card-body">
+            <div class="dash-chart-wrap tall">
+              <canvas id="chart-likert-compare" aria-label="Gráfico médias Likert"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="h6 text-secondary mb-2">Detalhe por pergunta</h2>
+    <div class="row g-3" id="dash-perguntas"></div>
+  </div>
+
+  <p id="dash-vazio" class="text-muted d-none">Sem dados para o período e filtros selecionados.</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script type="module" src="{% static 'pedidos/js/relatorio_avaliacao_dashboard.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Respostas à pesquisa de satisfação{% endblock %}
+
+{% block estilo %}
+<style>
+.rar-filtros { background: #f8f9fa; border-radius: .5rem; padding: 1rem; }
+.rar-tabela-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.rar-tabela { width: 100%; border-collapse: collapse; font-size: .78rem; min-width: 1100px; }
+table.rar-tabela th {
+  background: #e9f0f7;
+  color: #1a3a5c;
+  border: 1px solid #c8d8e8;
+  padding: .3rem .35rem;
+  white-space: nowrap;
+  font-weight: 600;
+  vertical-align: bottom;
+}
+table.rar-tabela th small { font-weight: 500; display: block; color: #495057; font-size: .72rem; }
+table.rar-tabela td {
+  border: 1px solid #dee2e6;
+  padding: .25rem .35rem;
+  vertical-align: middle;
+}
+.rar-grupo { margin-bottom: 1rem; border: 1px solid #dee2e6; border-radius: .375rem; overflow: hidden; }
+.rar-grupo-header {
+  background: #1a3a5c;
+  color: #fff;
+  padding: .4rem .75rem;
+  font-weight: 600;
+  font-size: .9rem;
+}
+.rar-detail td { background: #f8fafc; font-size: .82rem; white-space: pre-wrap; word-break: break-word; }
+.rar-cmt-btn { padding: .1rem .35rem; line-height: 1; }
+@media print {
+  .rar-filtros, .navbar, .sidebar, #container-mensagens { display: none !important; }
+  table.rar-tabela { font-size: 7pt; min-width: 0; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-xl my-3" id="rar-root"
+     data-url-buscar="{% url 'relatorio_avaliacao_respostas' %}">
+
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="h4 mb-0"><i class="bi bi-clipboard-data me-2"></i>Respostas à pesquisa de satisfação</h1>
+  </div>
+
+  <div id="container-mensagens"></div>
+
+  <div class="rar-filtros mb-3">
+    <form id="rar-form" class="row g-2 align-items-end">
+      {% csrf_token %}
+      <div class="col-6 col-md-3">
+        <label class="form-label mb-0" for="rar-data-ini">Data inicial *</label>
+        <input type="date" id="rar-data-ini" class="form-control" required>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label mb-0" for="rar-data-fim">Data final *</label>
+        <input type="date" id="rar-data-fim" class="form-control" required>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label mb-0" for="rar-motorista">Motorista</label>
+        <select id="rar-motorista" class="form-select">
+          <option value="">Todos os motoristas</option>
+          {% for m in sisVar.meta.options.motoristas %}
+          <option value="{{ m.value }}">{{ m.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-2">
+        <div class="form-check mt-3 mt-md-4">
+          <input class="form-check-input" type="checkbox" id="rar-agrupar" name="agrupar_motorista">
+          <label class="form-check-label" for="rar-agrupar">Agrupar por motorista</label>
+        </div>
+      </div>
+      <div class="col-12 col-md-2">
+        <button type="submit" class="btn btn-primary" id="rar-btn-buscar">
+          <i class="bi bi-search me-1"></i>Buscar
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <p id="rar-resumo-periodo" class="text-muted small d-none mb-2"></p>
+
+  <div id="rar-resultado">
+    <div class="rar-tabela-scroll d-none" id="rar-wrap-flat">
+      <table class="rar-tabela table-bordered mb-0">
+        <thead>
+          <tr>
+            <th scope="col" title="Número do pedido">Pedido</th>
+            <th scope="col" title="Data de entrega prevista do pedido">Prev. entrega</th>
+            <th scope="col" title="Motorista na tentativa cuja data coincide com a data de entrega prevista">Motorista</th>
+            <th scope="col" title="Data e hora em que o cliente respondeu à pesquisa">Respondido</th>
+            {% for p in sisVar.meta.datasets.perguntas_meta %}
+            <th scope="col" title="{{ p.descricao }}">{{ p.sigla }}<small>{{ p.titulo_curto }}</small></th>
+            {% endfor %}
+            <th scope="col" title="Comentário opcional do cliente">Obs.</th>
+          </tr>
+        </thead>
+        <tbody id="rar-corpo-flat"></tbody>
+      </table>
+    </div>
+
+    <div id="rar-wrap-grupos" class="d-none"></div>
+    <p id="rar-vazio" class="text-muted d-none mb-0">Nenhuma avaliação respondida no período.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'pedidos/js/relatorio_avaliacao_respostas.js' %}"></script>
+{% endblock %}
