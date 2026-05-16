@@ -109,6 +109,44 @@ class DashboardAvaliacaoRespostasTests(TestCase):
         )
         self.assertEqual(out_b["total_respondidas"], 1)
 
+    def test_p8_exclui_na_da_analise(self):
+        p = self._pedido(701, self.d0)
+        TentativaEntrega.objects.create(
+            pedido=p, data_tentativa=self.d0, estado="completed", motorista=self.mot_a
+        )
+        AvaliacaoPedido.objects.create(
+            pedido=p,
+            respondido_em=timezone.now(),
+            p8_esclareceu_duvidas="Sim",
+        )
+        p2 = self._pedido(702, self.d0)
+        TentativaEntrega.objects.create(
+            pedido=p2, data_tentativa=self.d0, estado="completed", motorista=self.mot_a
+        )
+        AvaliacaoPedido.objects.create(
+            pedido=p2,
+            respondido_em=timezone.now(),
+            p8_esclareceu_duvidas="N/A",
+        )
+        p3 = self._pedido(703, self.d0)
+        TentativaEntrega.objects.create(
+            pedido=p3, data_tentativa=self.d0, estado="completed", motorista=self.mot_a
+        )
+        AvaliacaoPedido.objects.create(
+            pedido=p3,
+            respondido_em=timezone.now(),
+            p8_esclareceu_duvidas="Nao",
+        )
+
+        out = montar_dashboard_avaliacao_respostas(self.filial, self.d0, self.d1)
+        p8 = next(x for x in out["perguntas_resumo"] if x["campo"] == "p8")
+        self.assertEqual(p8["n"], 2)
+        self.assertEqual(p8["distribuicao_abs"].get("Sim"), 1)
+        self.assertEqual(p8["distribuicao_abs"].get("Nao"), 1)
+        self.assertNotIn("N/A", p8["distribuicao_abs"])
+        self.assertEqual(p8["na_informativo"]["quantidade"], 1)
+        self.assertEqual(p8["na_informativo"]["pct_sobre_total_pergunta"], 33.3)
+
     def test_validar_sem_filial(self):
         payload, err = validar_e_montar_dashboard_avaliacao_respostas(
             None, {"data_inicial": "2026-07-01", "data_final": "2026-07-01"}

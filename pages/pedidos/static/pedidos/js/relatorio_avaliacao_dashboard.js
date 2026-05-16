@@ -11,6 +11,10 @@ import { AppLoader } from '/static/js/loader.js';
 
 const Chart = window.Chart;
 
+if (window.ChartDataLabels && Chart?.register) {
+  Chart.register(window.ChartDataLabels);
+}
+
 const root = document.getElementById('dash-root');
 const URL_BUSCAR = root?.dataset?.urlBuscar ?? '';
 
@@ -48,7 +52,57 @@ function metaSigla(perguntasMeta, campo) {
   return m?.sigla || campo.toUpperCase();
 }
 
-function appendKpi(container, titulo, valor, subtitulo) {
+const LIKERT_GLOBAL_CAMPOS = ['p3', 'p4', 'p6', 'p9'];
+
+function pctTexto(valor, total) {
+  if (!total || total <= 0 || !valor) return '0%';
+  return `${((Number(valor) / Number(total)) * 100).toFixed(1)}%`;
+}
+
+/** Rótulos visíveis em donut: contagem + percentual. */
+function pluginDatalabelsDonut() {
+  return {
+    font: { weight: '600', size: 11 },
+    textAlign: 'center',
+    color(ctx) {
+      const bg = ctx.dataset.backgroundColor?.[ctx.dataIndex];
+      return bg === '#ffc107' ? '#212529' : '#fff';
+    },
+    formatter(value, ctx) {
+      const sum = ctx.dataset.data.reduce((a, b) => a + Number(b), 0);
+      if (!value) return '';
+      return `${value}\n(${pctTexto(value, sum)})`;
+    },
+  };
+}
+
+/** Rótulos em barras verticais: contagem + % do total informado. */
+function pluginDatalabelsBarCount(total) {
+  return {
+    anchor: 'end',
+    align: 'top',
+    color: '#212529',
+    font: { size: 10, weight: '600' },
+    formatter(value) {
+      if (!value) return '';
+      return `${value}\n(${pctTexto(value, total)})`;
+    },
+  };
+}
+
+function textoAjudaMediaGlobalLikert(perguntasMeta) {
+  const linhas = [
+    'Média ponderada pelas respostas das perguntas:',
+    ...LIKERT_GLOBAL_CAMPOS.map((c) => {
+      const sigla = metaSigla(perguntasMeta, c);
+      const desc = metaDescricao(perguntasMeta, c);
+      return `${sigla} — ${desc}`;
+    }),
+  ];
+  return linhas.join('\n');
+}
+
+function appendKpi(container, titulo, valor, subtitulo, { tituloHelp } = {}) {
   const col = document.createElement('div');
   col.className = 'col';
   const card = document.createElement('div');
@@ -56,8 +110,21 @@ function appendKpi(container, titulo, valor, subtitulo) {
   const body = document.createElement('div');
   body.className = 'card-body py-2';
   const t = document.createElement('div');
-  t.className = 'small text-muted text-uppercase';
-  t.textContent = titulo;
+  t.className = 'small text-muted text-uppercase d-flex align-items-center justify-content-center gap-1 flex-wrap';
+  t.appendChild(document.createTextNode(titulo));
+  if (tituloHelp) {
+    const hint = document.createElement('span');
+    hint.className = 'dash-kpi-hint text-primary';
+    hint.setAttribute('tabindex', '0');
+    hint.setAttribute('role', 'img');
+    hint.setAttribute('title', tituloHelp);
+    hint.setAttribute('aria-label', tituloHelp);
+    const icon = document.createElement('i');
+    icon.className = 'bi bi-exclamation-circle-fill';
+    icon.setAttribute('aria-hidden', 'true');
+    hint.appendChild(icon);
+    t.appendChild(hint);
+  }
   const v = document.createElement('div');
   v.className = 'display-6';
   v.textContent = valor;
@@ -80,12 +147,21 @@ function renderFunilDonut(funil) {
   const nEmail = funil?.n_email_enviado ?? 0;
   const nOk = funil?.n_respondido_e_enviado ?? 0;
   const pend = Math.max(0, nEmail - nOk);
+  const legendaComTotais = (nome, n) => {
+    const pct = pctTexto(n, nEmail);
+    return nEmail > 0 ? `${nome}: ${n} (${pct})` : `${nome}: ${n}`;
+  };
   if (nEmail <= 0) {
     chartInstances.push(
       new Chart(canvas, {
         type: 'doughnut',
         data: { labels: ['Sem envios no período'], datasets: [{ data: [1], backgroundColor: ['#dee2e6'] }] },
-        options: { plugins: { legend: { position: 'bottom' } } },
+        options: {
+          plugins: {
+            legend: { position: 'bottom' },
+            datalabels: { display: false },
+          },
+        },
       }),
     );
     return;
@@ -94,7 +170,7 @@ function renderFunilDonut(funil) {
     new Chart(canvas, {
       type: 'doughnut',
       data: {
-        labels: ['Respondidos (após envio)', 'Pendentes'],
+        labels: [legendaComTotais('Respondidos', nOk), legendaComTotais('Pendentes', pend)],
         datasets: [
           {
             data: [nOk, pend],
@@ -108,63 +184,80 @@ function renderFunilDonut(funil) {
         maintainAspectRatio: false,
         plugins: {
           legend: { position: 'bottom' },
-          tooltip: {
-            callbacks: {
-              label(ctx) {
-                const t = ctx.dataset.data.reduce((a, b) => a + b, 0);
-                const n = ctx.raw;
-                const p = t ? ((n / t) * 100).toFixed(1) : '0';
-                return `${ctx.label}: ${n} (${p}%)`;
-              },
-            },
-          },
+          datalabels: pluginDatalabelsDonut(),
+          tooltip: { enabled: true },
         },
       },
     }),
   );
 }
 
+/** Barras HTML (descrição completa à esquerda; Chart.js corta rótulos longos no eixo Y). */
 function renderLikertCompare(likertComparativo, perguntasMeta) {
-  const canvas = document.getElementById('chart-likert-compare');
-  if (!canvas || !Chart) return;
+  const root = document.getElementById('dash-likert-compare');
+  if (!root) return;
+  root.replaceChildren();
   const list = likertComparativo || [];
-  const labels = list.map((x) => `${metaSigla(perguntasMeta, x.campo)} (${x.campo})`);
-  const data = list.map((x) => (x.media != null ? Number(x.media) : 0));
   if (!list.length) {
-    chartInstances.push(
-      new Chart(canvas, {
-        type: 'bar',
-        data: { labels: ['—'], datasets: [{ data: [0], backgroundColor: ['#dee2e6'] }] },
-        options: { indexAxis: 'y', plugins: { legend: { display: false } } },
-      }),
-    );
+    const vazio = document.createElement('p');
+    vazio.className = 'text-muted small mb-0';
+    vazio.textContent = 'Sem dados Likert no período.';
+    root.appendChild(vazio);
     return;
   }
-  chartInstances.push(
-    new Chart(canvas, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          {
-            label: 'Média (1–5)',
-            data,
-            backgroundColor: '#0d6efd',
-            borderRadius: 4,
-          },
-        ],
-      },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          x: { min: 0, max: 5, ticks: { stepSize: 1 } },
-        },
-        plugins: { legend: { display: false } },
-      },
-    }),
-  );
+
+  list.forEach((item) => {
+    const row = document.createElement('div');
+    row.className = 'dash-likert-row';
+
+    const label = document.createElement('div');
+    label.className = 'dash-likert-label';
+    const siglaEl = document.createElement('span');
+    siglaEl.className = 'dash-likert-sigla';
+    siglaEl.textContent = `${metaSigla(perguntasMeta, item.campo)} — `;
+    label.appendChild(siglaEl);
+    label.appendChild(document.createTextNode(metaDescricao(perguntasMeta, item.campo)));
+
+    const barCol = document.createElement('div');
+    barCol.className = 'dash-likert-bar-col';
+
+    const track = document.createElement('div');
+    track.className = 'dash-likert-track';
+    const media = item.media != null ? Number(item.media) : 0;
+    const pct = Math.min(100, Math.max(0, (media / 5) * 100));
+    const bar = document.createElement('div');
+    bar.className = 'dash-likert-bar';
+    bar.style.width = `${pct}%`;
+    track.appendChild(bar);
+
+    const metaEl = document.createElement('span');
+    metaEl.className = 'dash-likert-meta';
+    const mediaTxt = item.media != null ? Number(item.media).toFixed(2) : '—';
+    const n = item.n != null ? item.n : '—';
+    metaEl.textContent = `${mediaTxt} (n=${n})`;
+
+    barCol.appendChild(track);
+    barCol.appendChild(metaEl);
+    row.appendChild(label);
+    row.appendChild(barCol);
+    root.appendChild(row);
+  });
+
+  const scaleRow = document.createElement('div');
+  scaleRow.className = 'dash-likert-row dash-likert-scale-row';
+  scaleRow.appendChild(document.createElement('div'));
+  const scaleWrap = document.createElement('div');
+  scaleWrap.className = 'dash-likert-bar-col';
+  const scale = document.createElement('div');
+  scale.className = 'dash-likert-scale';
+  [0, 1, 2, 3, 4, 5].forEach((n) => {
+    const tick = document.createElement('span');
+    tick.textContent = String(n);
+    scale.appendChild(tick);
+  });
+  scaleWrap.appendChild(scale);
+  scaleRow.appendChild(scaleWrap);
+  root.appendChild(scaleRow);
 }
 
 function renderPerguntaCard(item, perguntasMeta) {
@@ -194,6 +287,7 @@ function renderPerguntaCard(item, perguntasMeta) {
     const abs = item.distribuicao_abs || {};
     const labels = ['1', '2', '3', '4', '5'];
     const vals = labels.map((k) => abs[Number(k)] || 0);
+    const totalN = item.n || vals.reduce((a, b) => a + b, 0);
     chartInstances.push(
       new Chart(canvas, {
         type: 'bar',
@@ -204,42 +298,92 @@ function renderPerguntaCard(item, perguntasMeta) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          layout: { padding: { top: 24 } },
           plugins: {
             title: {
               display: true,
               text: item.media != null ? `Média: ${item.media} (n=${item.n})` : `n=${item.n}`,
             },
             legend: { display: false },
+            datalabels: pluginDatalabelsBarCount(totalN),
+            tooltip: { enabled: true },
           },
-          scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+          scales: {
+            x: { title: { display: true, text: 'Nota' } },
+            y: { beginAtZero: true, ticks: { precision: 0 } },
+          },
         },
       }),
     );
     return;
   }
 
+  renderDonutCategorico(item, canvas, body);
+}
+
+function renderDonutCategorico(item, canvas, body) {
   const abs = item.distribuicao_abs || {};
+  const totalN = item.n || Object.values(abs).reduce((a, b) => a + Number(b), 0);
   const labels = Object.keys(abs);
   const vals = labels.map((k) => abs[k]);
-  const colors = ['#198754', '#dc3545', '#6c757d', '#fd7e14', '#0dcaf0', '#6f42c1'];
-  const bg = labels.map((_, i) => colors[i % colors.length]);
-  chartInstances.push(
-    new Chart(canvas, {
-      type: 'doughnut',
-      data: {
-        labels,
-        datasets: [{ data: vals, backgroundColor: bg, borderWidth: 1 }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          title: { display: true, text: `n=${item.n}` },
-          legend: { position: 'bottom' },
+  const legendaCateg = labels.map((nome, i) => `${nome}: ${vals[i]} (${pctTexto(vals[i], totalN)})`);
+  const coresSimNao = { Sim: '#198754', Nao: '#dc3545', Não: '#dc3545' };
+  const coresPadrao = ['#198754', '#dc3545', '#6c757d', '#fd7e14', '#0dcaf0', '#6f42c1'];
+  const bg = labels.map((nome, i) => coresSimNao[nome] || coresPadrao[i % coresPadrao.length]);
+
+  const tituloGrafico =
+    item.tipo === 'sim_nao_na'
+      ? `Análise Sim/Não (n=${totalN}; N/A excluído)`
+      : `n=${totalN}`;
+
+  if (!labels.length) {
+    chartInstances.push(
+      new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+          labels: ['Sem respostas Sim/Não'],
+          datasets: [{ data: [1], backgroundColor: ['#dee2e6'] }],
         },
-      },
-    }),
-  );
+        options: {
+          plugins: {
+            legend: { position: 'bottom' },
+            title: { display: true, text: tituloGrafico },
+            datalabels: { display: false },
+          },
+        },
+      }),
+    );
+  } else {
+    chartInstances.push(
+      new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+          labels: legendaCateg,
+          datasets: [{ data: vals, backgroundColor: bg, borderWidth: 1 }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: { display: true, text: tituloGrafico },
+            legend: { position: 'bottom' },
+            datalabels: pluginDatalabelsDonut(),
+            tooltip: { enabled: true },
+          },
+        },
+      }),
+    );
+  }
+
+  if (item.tipo === 'sim_nao_na' && item.na_informativo) {
+    const info = document.createElement('p');
+    info.className = 'small text-muted text-center mb-0 mt-2 px-1';
+    const q = Number(item.na_informativo.quantidade ?? 0);
+    const pct = item.na_informativo.pct_sobre_total_pergunta;
+    const pctTxt = pct != null ? ` — ${pct}% das respostas à pergunta` : '';
+    info.textContent = `N/A (informativo, fora da análise): ${q}${pctTxt}`;
+    body.appendChild(info);
+  }
 }
 
 function renderDashboard(data) {
@@ -249,8 +393,9 @@ function renderDashboard(data) {
   wrapPerguntas.replaceChildren();
 
   const f = data.funil || {};
-  appendKpi(kpiFunil, 'E-mails enviados', String(f.n_email_enviado ?? 0), 'No período (prev. entrega)');
-  appendKpi(kpiFunil, 'Respondidos (após envio)', String(f.n_respondido_e_enviado ?? 0), '');
+  const meta = data.perguntas_meta || [];
+
+  appendKpi(kpiFunil, 'E-mails enviados', String(f.n_email_enviado ?? 0), '');
   appendKpi(
     kpiFunil,
     'Taxa resposta',
@@ -264,22 +409,20 @@ function renderDashboard(data) {
     'Pareto (cauda)',
   );
 
-  appendKpi(kpiExtra, 'Total respostas', String(data.total_respondidas ?? 0), 'Com respondido_em');
+  appendKpi(kpiExtra, 'Total respostas', String(data.total_respondidas ?? 0), '');
   appendKpi(
     kpiExtra,
     'Com comentário',
     String(data.com_comentario ?? 0),
     data.pct_comentario != null ? `${data.pct_comentario}%` : '',
   );
-  appendKpi(kpiExtra, 'Sem motorista (tentativa)', String(data.n_sem_motorista ?? 0), 'Na data prevista');
   appendKpi(
     kpiExtra,
     'Média global Likert',
     data.media_global_likert != null ? String(data.media_global_likert) : '—',
-    'P3,P4,P6,P9 ponderada',
+    'Nível de Qualidade Percebida',
+    { tituloHelp: textoAjudaMediaGlobalLikert(meta) },
   );
-
-  const meta = data.perguntas_meta || [];
   renderFunilDonut(f);
   renderLikertCompare(data.likert_comparativo, meta);
 

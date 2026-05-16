@@ -48,6 +48,28 @@ def _dist_pct(dist: dict[str, int], n: int) -> dict[str, float]:
     return {k: round(100.0 * float(v) / float(n), 1) for k, v in sorted(dist.items(), key=lambda x: (-x[1], x[0]))}
 
 
+def _resposta_eh_na(valor: str | None) -> bool:
+    return (valor or "").strip().upper() == "N/A"
+
+
+def _agregar_sim_nao_com_na_informativo(qs, campo_modelo: str) -> dict:
+    """P8: Sim/Não entram na análise; N/A só em bloco informativo (fora dos % do gráfico)."""
+    dist_total, n_total_pergunta = _agregar_categorica(qs, campo_modelo)
+    n_na = sum(v for k, v in dist_total.items() if _resposta_eh_na(k))
+    dist_analise = {k: v for k, v in dist_total.items() if not _resposta_eh_na(k)}
+    n_analise = sum(dist_analise.values())
+    return {
+        "n": n_analise,
+        "n_total_respostas_pergunta": n_total_pergunta,
+        "distribuicao_abs": dist_analise,
+        "distribuicao_pct": _dist_pct(dist_analise, n_analise),
+        "na_informativo": {
+            "quantidade": n_na,
+            "pct_sobre_total_pergunta": _pct(n_na, n_total_pergunta),
+        },
+    }
+
+
 def _agregar_likert(qs, campo_modelo: str) -> dict:
     agg = qs.aggregate(
         avg=Avg(campo_modelo),
@@ -121,14 +143,11 @@ def montar_dashboard_avaliacao_respostas(
                 }
             )
         elif chave in _SIM_NAO_NA:
-            dist, n = _agregar_categorica(qs_resp, campo_m)
             perguntas_resumo.append(
                 {
                     "campo": chave,
                     "tipo": "sim_nao_na",
-                    "n": n,
-                    "distribuicao_abs": dist,
-                    "distribuicao_pct": _dist_pct(dist, n),
+                    **_agregar_sim_nao_com_na_informativo(qs_resp, campo_m),
                 }
             )
         elif chave in _LIKERT:

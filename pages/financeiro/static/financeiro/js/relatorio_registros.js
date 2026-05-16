@@ -98,6 +98,35 @@ function totalValorGrupo(node) {
   return t;
 }
 
+/** Totais de entrada e saída separados (cabeçalho de filial). */
+function totaisEntradaSaidaGrupo(node) {
+  const out = { entrada: 0, saida: 0 };
+  if (node.linhas && node.linhas.length) {
+    node.linhas.forEach((row) => {
+      const v = Number(row.valor_numero);
+      if (!Number.isFinite(v)) return;
+      if (row.tipo === 'ENTRADA') out.entrada += v;
+      else if (row.tipo === 'SAIDA') out.saida += v;
+    });
+  }
+  if (node.filhos && node.filhos.length) {
+    node.filhos.forEach((ch) => {
+      const sub = totaisEntradaSaidaGrupo(ch);
+      out.entrada += sub.entrada;
+      out.saida += sub.saida;
+    });
+  }
+  return out;
+}
+
+function appendBadgeTotal(header, texto, titulo) {
+  const badge = document.createElement('span');
+  badge.className = 'rfin-badge';
+  badge.textContent = texto;
+  if (titulo) badge.title = titulo;
+  header.appendChild(badge);
+}
+
 function rotuloStatus(st) {
   const map = {
     aberto: 'Aberto',
@@ -275,12 +304,26 @@ function renderGrupo(node, depth) {
     header.appendChild(b);
   }
 
-  const totalGrupo = totalValorGrupo(node);
-  const badgeTotal = document.createElement('span');
-  badgeTotal.className = 'rfin-badge';
-  badgeTotal.textContent = `Total: ${formatarValorBr(totalGrupo)}`;
-  badgeTotal.title = 'Soma dos valores dos títulos neste grupo';
-  header.appendChild(badgeTotal);
+  if (node.nivel === 'filial') {
+    const { entrada, saida } = totaisEntradaSaidaGrupo(node);
+    appendBadgeTotal(
+      header,
+      `Entrada: ${formatarValorBr(entrada)}`,
+      'Soma dos valores de títulos de entrada nesta filial',
+    );
+    appendBadgeTotal(
+      header,
+      `Saída: ${formatarValorBr(saida)}`,
+      'Soma dos valores de títulos de saída nesta filial',
+    );
+  } else {
+    const totalGrupo = totalValorGrupo(node);
+    appendBadgeTotal(
+      header,
+      `Total: ${formatarValorBr(totalGrupo)}`,
+      'Soma dos valores dos títulos neste grupo',
+    );
+  }
 
   wrap.appendChild(header);
 

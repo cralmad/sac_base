@@ -10,8 +10,56 @@
 .dash-kpi .card-body { padding: .75rem 1rem; }
 .dash-kpi .display-6 { font-size: 1.75rem; font-weight: 700; color: #1a3a5c; }
 .dash-chart-wrap { position: relative; height: 220px; max-width: 100%; }
-.dash-chart-wrap.tall { height: 260px; }
+.dash-likert-compare { display: flex; flex-direction: column; gap: .875rem; }
+.dash-likert-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(10rem, 48%);
+  gap: .65rem 1rem;
+  align-items: center;
+}
+@media (max-width: 575.98px) {
+  .dash-likert-row { grid-template-columns: 1fr; }
+}
+.dash-likert-label {
+  font-size: .875rem;
+  line-height: 1.4;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+.dash-likert-sigla { font-weight: 600; color: #1a3a5c; }
+.dash-likert-bar-col { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.dash-likert-track {
+  flex: 1;
+  height: 1.35rem;
+  background: #e9ecef;
+  border-radius: .25rem;
+  overflow: hidden;
+}
+.dash-likert-bar {
+  height: 100%;
+  background: #0d6efd;
+  border-radius: .25rem;
+}
+.dash-likert-meta {
+  font-size: .8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 4.75rem;
+  text-align: right;
+  color: #212529;
+}
+.dash-likert-scale-row { margin-top: -.25rem; }
+.dash-likert-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: .7rem;
+  color: #6c757d;
+  flex: 1;
+  padding-right: 5.25rem;
+}
 .dash-pergunta-card .card-header { font-size: .88rem; font-weight: 600; }
+.dash-kpi-hint { cursor: help; line-height: 1; font-size: .95rem; }
 </style>
 {% endblock %}
 
@@ -53,13 +101,13 @@
   <p id="dash-resumo" class="text-muted small d-none mb-3"></p>
 
   <div id="dash-conteudo" class="d-none">
-    <div class="row row-cols-2 row-cols-md-4 g-2 mb-3 dash-kpi" id="dash-kpi-funil"></div>
+    <div class="row row-cols-2 row-cols-md-3 g-2 mb-3 dash-kpi" id="dash-kpi-funil"></div>
     <div class="row row-cols-2 row-cols-md-3 g-2 mb-3 dash-kpi" id="dash-kpi-extra"></div>
 
-    <div class="row mb-4">
-      <div class="col-lg-6 mb-3">
-        <div class="card">
-          <div class="card-header">Funil: respondidos vs pendentes (sobre e-mails enviados)</div>
+    <div class="row mb-4 g-3">
+      <div class="col-md-4 col-lg-3">
+        <div class="card h-100">
+          <div class="card-header">Respondidos vs Pendentes</div>
           <div class="card-body">
             <div class="dash-chart-wrap mx-auto" style="max-width:320px">
               <canvas id="chart-funil" aria-label="Gráfico funil"></canvas>
@@ -67,13 +115,12 @@
           </div>
         </div>
       </div>
-      <div class="col-lg-6 mb-3">
-        <div class="card">
+      <div class="col-md-8 col-lg-9">
+        <div class="card h-100">
           <div class="card-header">Média por pergunta (escala 1–5)</div>
-          <div class="card-body">
-            <div class="dash-chart-wrap tall">
-              <canvas id="chart-likert-compare" aria-label="Gráfico médias Likert"></canvas>
-            </div>
+          <div class="card-body py-3">
+            <div id="dash-likert-compare" class="dash-likert-compare"
+                 aria-label="Médias Likert por pergunta, escala 1 a 5"></div>
           </div>
         </div>
       </div>
@@ -89,5 +136,6 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script type="module" src="{% static 'pedidos/js/relatorio_avaliacao_dashboard.js' %}"></script>
 {% endblock %}
