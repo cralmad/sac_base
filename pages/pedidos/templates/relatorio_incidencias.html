@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Relatório de Incidências{% endblock %}
+
+{% block estilo %}
+<style>
+.ri-filtros { background: #f8f9fa; border-radius: .5rem; padding: 1rem; }
+.ri-tabela-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.ri-tabela { width: 100%; border-collapse: collapse; font-size: 9pt; min-width: 960px; }
+table.ri-tabela th {
+  background: #e9f0f7;
+  color: #1a3a5c;
+  border: 1px solid #c8d8e8;
+  padding: .3rem .5rem;
+  white-space: nowrap;
+}
+table.ri-tabela td {
+  border: 1px solid #dee2e6;
+  padding: .28rem .5rem;
+  vertical-align: top;
+}
+.ri-obs { color: #555; font-size: .78rem; font-style: italic; max-width: 220px; white-space: pre-wrap; word-break: break-word; }
+.ri-total-bar {
+  background: #e9f0f7;
+  border: 1px solid #c8d8e8;
+  border-radius: .375rem;
+  padding: .4rem .75rem;
+  font-size: .85rem;
+  color: #1a3a5c;
+  font-weight: 600;
+}
+.ri-grupo {
+  margin-bottom: 1rem;
+  border: 1px solid #dee2e6;
+  border-radius: .375rem;
+  overflow: hidden;
+}
+.ri-grupo-header {
+  background: #1a3a5c;
+  color: #fff;
+  padding: .45rem .75rem;
+  font-weight: 600;
+  font-size: .9rem;
+}
+.ri-grupo-header .ri-badge {
+  display: inline;
+  background: rgba(255, 255, 255, .25);
+  color: #fff;
+  border-radius: .25rem;
+  padding: .12rem .5rem;
+  font-size: .85rem;
+  font-weight: 700;
+  margin-left: .35rem;
+}
+.ri-subgrupo-header {
+  background: #e9f0f7;
+  color: #1a3a5c;
+  padding: .35rem .75rem;
+  font-weight: 600;
+  font-size: .82rem;
+  border-bottom: 1px solid #c8d8e8;
+}
+#rim-fotos-grid img {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  cursor: pointer;
+}
+@media print {
+  @page { size: A4 landscape; margin: 6mm 8mm; }
+  body, .container-xl { padding: 0 !important; margin: 0 !important; }
+  .ri-filtros, #ri-toolbar, .navbar, .sidebar, footer,
+  [data-bs-toggle], .btn, #container-mensagens { display: none !important; }
+  .ri-tabela-scroll { overflow: visible; }
+  table.ri-tabela { font-size: 7.5pt; min-width: 0; }
+  table.ri-tabela th { background: #dce6f1 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .ri-grupo { break-inside: avoid-page; page-break-inside: avoid; margin-bottom: .35rem; }
+  .ri-grupo-header {
+    background: #1a3a5c !important;
+    color: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-size: 8pt !important;
+    padding: .15rem .45rem !important;
+  }
+  .ri-subgrupo-header {
+    background: #dce6f1 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-size: 7.5pt !important;
+  }
+  .ri-total-bar { border: none; background: none !important; padding: 0; font-size: 7.5pt; }
+  h1 { font-size: .85rem !important; margin-bottom: .15rem !important; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-xl my-3" id="ri-root"
+     data-url-buscar="{% url 'relatorio_incidencias' %}"
+     data-url-foto-add="/app/logistica/pedidos/inc/foto/add"
+     data-url-foto-del="/app/logistica/pedidos/inc/foto/del">
+
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="h4 mb-0 me-2"><i class="bi bi-exclamation-triangle me-2"></i>Relatório de Incidências</h1>
+    <span id="ri-titulo-periodo" class="text-muted small text-end"></span>
+  </div>
+
+  <div class="ri-filtros mb-3" id="ri-toolbar">
+    <form id="ri-form" class="row g-2 align-items-end">
+      <div class="col-6 col-sm-6 col-md-2">
+        <label class="form-label mb-0" for="ri-data-ini">Data inicial *</label>
+        <input type="date" id="ri-data-ini" class="form-control" required>
+      </div>
+      <div class="col-6 col-sm-6 col-md-2">
+        <label class="form-label mb-0" for="ri-data-fim">Data final *</label>
+        <input type="date" id="ri-data-fim" class="form-control" required>
+      </div>
+      <div class="col-6 col-sm-6 col-md-2">
+        <label class="form-label mb-0" for="ri-origem">Origem</label>
+        <select id="ri-origem" class="form-select">
+          {% for o in sisVar.meta.options.origens %}
+          <option value="{{ o.value }}">{{ o.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-sm-6 col-md-2">
+        <label class="form-label mb-0" for="ri-motorista">Motorista</label>
+        <select id="ri-motorista" class="form-select">
+          <option value="">Todos</option>
+          {% for m in sisVar.meta.options.motoristas %}
+          <option value="{{ m.value }}">{{ m.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-2">
+        <div class="form-check mt-3 mt-md-4">
+          <input class="form-check-input" type="checkbox" id="ri-agrupar-motorista" name="agrupar_motorista">
+          <label class="form-check-label" for="ri-agrupar-motorista">Agrupar por motorista</label>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-md-2 d-flex gap-2">
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-search"></i><span class="d-none d-md-inline"> Buscar</span>
+        </button>
+        <button type="button" id="ri-btn-imprimir" class="btn btn-outline-secondary" disabled title="Imprimir">
+          <i class="bi bi-printer"></i>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div id="ri-total-bar" class="ri-total-bar mb-2 d-none"></div>
+
+  <div id="ri-wrap-grupos" class="d-none"></div>
+
+  <div id="ri-loader" class="text-center my-4 d-none">
+    <div class="spinner-border" role="status">
+      <span class="visually-hidden">Carregando…</span>
+    </div>
+  </div>
+
+  <div id="ri-vazio" class="text-center text-muted d-none">Nenhuma incidência encontrada para os filtros informados.</div>
+</div>
+
+<div class="modal fade" id="ri-modal-fotos" tabindex="-1" aria-labelledby="ri-modal-fotos-label" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="ri-modal-fotos-label">
+          <i class="bi bi-images me-2"></i>Fotos da Incidência
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3 p-2 bg-light rounded border">
+          <div class="row g-1 small">
+            <div class="col-6"><span class="text-muted">Pedido:</span> <strong id="rim-pedido"></strong></div>
+            <div class="col-3"><span class="text-muted">Data:</span> <strong id="rim-data"></strong></div>
+            <div class="col-3"><span class="text-muted">Tipo:</span> <strong id="rim-tipo"></strong></div>
+          </div>
+        </div>
+        <div id="rim-upload-area" class="mb-3 d-none">
+          <div class="d-flex gap-2 flex-wrap">
+            <label for="rim-fotos-input" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-upload me-1"></i>Adicionar fotos
+            </label>
+            <label for="rim-camera-input" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-camera me-1"></i>Câmera
+            </label>
+          </div>
+          <input type="file" id="rim-fotos-input" accept="image/*" multiple class="d-none">
+          <input type="file" id="rim-camera-input" accept="image/*" capture="environment" class="d-none">
+        </div>
+        <div id="rim-progresso" class="mb-3 d-none">
+          <div class="progress mb-1" style="height:6px">
+            <div id="rim-barra" class="progress-bar" style="width:0%"></div>
+          </div>
+          <small id="rim-status" class="text-muted"></small>
+        </div>
+        <div class="row g-2" id="rim-fotos-grid"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'pedidos/js/relatorio_incidencias.js' %}"></script>
+{% endblock %}

@@ -53,6 +53,7 @@ export const PERMISSOES_SCHEMA = {
     { codename: "logistica_config.delete_configuracaologistica", label: "Excluir Configuração de Logística" },
     // --- Relatório de Devoluções ---
     { codename: "pedidos.view_relatorio_devolucao", label: "Acessar Relatório de Devoluções" },
+    { codename: "pedidos.view_relatorio_incidencia", label: "Acessar Relatório de Incidências" },
     // --- Relatório de Avaliação ---
     { codename: "pedidos.view_relatorio_avaliacao", label: "Acessar Relatório de Avaliação" },
     // --- SMS e E-mail ---

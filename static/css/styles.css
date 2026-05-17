@@ -254,6 +254,16 @@ button[id^="btn-"]:disabled {
     }
 }
 
+/* Coluna de conteúdo: min-width 0 evita que tabelas largas alarguem a linha além do viewport/navbar */
+.container-fluid > .row.flex-nowrap > .col.flex-grow-1 {
+    min-width: 0;
+    max-width: 100%;
+}
+.container-fluid > .row.flex-nowrap > .col.flex-grow-1 > main {
+    min-width: 0;
+    max-width: 100%;
+}
+
 /* Rótulos de grupo (COMERCIAL, FINANCEIRO…) */
 .sidebar-group-label {
     font-size: 0.68rem;

@@ -125,6 +125,7 @@ class RelatorioAvaliacaoRespostasTests(TestCase):
         self.assertTrue(out["agrupar_motorista"])
         self.assertIn("grupos", out)
         self.assertEqual(len(out["grupos"]), 1)
+        self.assertEqual(out["grupos"][0]["total"], 2)
         self.assertEqual(len(out["grupos"][0]["linhas"]), 2)
 
     def test_validar_sem_filial(self):

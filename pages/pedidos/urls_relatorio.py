@@ -13,6 +13,7 @@ from .views_relatorio import (
     relatorio_fechamento_view,
     relatorio_avaliacao_respostas_view,
     relatorio_avaliacao_dashboard_view,
+    relatorio_incidencias_view,
 )
 from .views_relatorio_motorista import (
     relatorio_logistica_motorista_mod_finan_view,
@@ -49,4 +50,5 @@ urlpatterns = [
         relatorio_avaliacao_dashboard_view,
         name='relatorio_avaliacao_dashboard',
     ),
+    path('relatorio_incidencias/', relatorio_incidencias_view, name='relatorio_incidencias'),
 ]

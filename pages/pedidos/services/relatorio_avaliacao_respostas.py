@@ -224,6 +224,7 @@ def montar_relatorio_avaliacao_respostas(
             {
                 "motorista_id": mid0,
                 "motorista_nome": nome_key,
+                "total": len(grupo_list),
                 "linhas": grupo_list,
             }
         )

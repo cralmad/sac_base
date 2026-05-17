@@ -345,6 +345,9 @@ class Incidencia(models.Model):
 
     class Meta:
         db_table = "incidencia"
+        permissions = [
+            ("view_relatorio_incidencia", "Pode acessar o Relatório de Incidências"),
+        ]
         indexes = [
             models.Index(fields=["pedido"]),
             models.Index(fields=["data"]),

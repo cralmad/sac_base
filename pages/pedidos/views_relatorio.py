@@ -42,6 +42,10 @@ from pages.pedidos.services.relatorio_avaliacao_respostas import (
     montar_sisvar_relatorio_avaliacao_respostas_get,
     validar_e_montar_relatorio_avaliacao_respostas,
 )
+from pages.pedidos.services.relatorio_incidencias import (
+    montar_sisvar_relatorio_incidencias_get,
+    validar_e_montar_relatorio_incidencias,
+)
 from pages.pedidos.services.relatorio_fechamento import montar_relatorio_fechamento, validar_periodo
 from sac_base.permissions_utils import build_action_permissions
 from sac_base.sisvar_builders import build_sisvar_payload
@@ -1000,6 +1004,35 @@ def relatorio_avaliacao_dashboard_view(request):
         return render(request, "relatorio_avaliacao_dashboard.html")
     filial_ativa = getattr(request, "filial_ativa", None)
     payload, err = validar_e_montar_dashboard_avaliacao_respostas(
+        filial_ativa, (request.sisvar_front or {}).get("filtros") or {}
+    )
+    if err:
+        status = 403 if "Filial ativa" in err else 400
+        return JsonResponse({"success": False, "mensagem": err}, status=status)
+    return JsonResponse({"success": True, **payload})
+
+
+# ─── Relatório de Incidências (logística) ─────────────────────────────────────
+
+PERMISSOES_INCIDENCIAS = {
+    "acessar": "pedidos.view_relatorio_incidencia",
+    "editar": "pedidos.change_pedido",
+}
+
+
+@login_required
+@permission_required(PERMISSOES_INCIDENCIAS["acessar"], raise_exception=True)
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def relatorio_incidencias_view(request):
+    if request.method == "GET":
+        request.sisvar_extra = montar_sisvar_relatorio_incidencias_get(
+            request=request,
+            acoes=build_action_permissions(request.user, PERMISSOES_INCIDENCIAS),
+        )
+        return render(request, "relatorio_incidencias.html")
+    filial_ativa = getattr(request, "filial_ativa", None)
+    payload, err = validar_e_montar_relatorio_incidencias(
         filial_ativa, (request.sisvar_front or {}).get("filtros") or {}
     )
     if err:

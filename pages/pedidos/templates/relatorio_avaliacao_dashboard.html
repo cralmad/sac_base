@@ -9,7 +9,13 @@
 .dash-kpi .card { border: 1px solid #dee2e6; }
 .dash-kpi .card-body { padding: .75rem 1rem; }
 .dash-kpi .display-6 { font-size: 1.75rem; font-weight: 700; color: #1a3a5c; }
-.dash-chart-wrap { position: relative; height: 220px; max-width: 100%; }
+.dash-chart-wrap {
+  position: relative;
+  width: 100%;
+  height: 240px;
+  min-height: 240px;
+  max-width: 100%;
+}
 .dash-likert-compare { display: flex; flex-direction: column; gap: .875rem; }
 .dash-likert-row {
   display: grid;
@@ -59,7 +65,135 @@
   padding-right: 5.25rem;
 }
 .dash-pergunta-card .card-header { font-size: .88rem; font-weight: 600; }
+.dash-perguntas-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+@media (min-width: 768px) {
+  .dash-perguntas-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1200px) {
+  .dash-perguntas-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.dash-pergunta-col {
+  min-width: 0;
+  width: 100%;
+}
+.dash-pergunta-card {
+  width: 100%;
+}
+.dash-pergunta-card .dash-chart-wrap {
+  height: 240px;
+  min-height: 240px;
+}
+.dash-pergunta-card .dash-chart-wrap canvas {
+  display: block;
+  max-width: 100% !important;
+  max-height: 100% !important;
+}
 .dash-kpi-hint { cursor: help; line-height: 1; font-size: .95rem; }
+#dash-print-meta { font-size: .85rem; color: #334155; line-height: 1.35; }
+
+@media print {
+  @page { size: A4 portrait; margin: 8mm 10mm; }
+  body { background: #fff !important; }
+  main.py-4 { padding-top: .2rem !important; padding-bottom: 0 !important; }
+  #dash-root.container-xl { margin: 0 !important; max-width: 100% !important; }
+  .dash-no-print,
+  .navbar, #navbase, #sidebarOffcanvas, .sidebar-wrapper,
+  footer, #container-mensagens, #global-loader, .modal {
+    display: none !important;
+  }
+  #dash-print-meta {
+    display: block !important;
+    font-size: 7.5pt;
+    color: #000;
+    margin-bottom: .2rem !important;
+    padding-bottom: .15rem !important;
+    border-bottom: 1px solid #999;
+  }
+  #dash-root > h1.h4 {
+    font-size: 10pt !important;
+    margin-bottom: .15rem !important;
+  }
+  #dash-resumo { font-size: 7pt !important; margin-bottom: .15rem !important; }
+  #dash-conteudo { margin: 0 !important; }
+  .dash-kpi { margin-bottom: .2rem !important; --bs-gutter-x: .25rem; --bs-gutter-y: .25rem; }
+  .dash-kpi .card-body { padding: .15rem .35rem !important; }
+  .dash-kpi .display-6 { font-size: .95rem !important; }
+  .dash-kpi .small { font-size: 6pt !important; }
+  .dash-kpi-hint { display: none !important; }
+  .dash-kpi .row { flex-wrap: nowrap !important; }
+  #dash-kpi-funil, #dash-kpi-extra { display: flex !important; flex-wrap: nowrap !important; }
+  #dash-kpi-funil > .col, #dash-kpi-extra > .col { flex: 1 1 0 !important; min-width: 0 !important; }
+  .dash-charts-row {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: .35rem !important;
+    margin-bottom: .35rem !important;
+  }
+  .dash-charts-row > [class*="col"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 auto !important;
+    padding: 0 !important;
+  }
+  .dash-charts-row .dash-chart-wrap { height: 140px !important; min-height: 140px !important; }
+  .card { margin-bottom: 0 !important; border-width: 1px !important; }
+  .card-header { padding: .12rem .35rem !important; font-size: 7pt !important; }
+  .card-body { padding: .2rem !important; }
+  .dash-chart-wrap { max-width: 100% !important; }
+  .dash-likert-compare { gap: .25rem !important; }
+  .dash-likert-row { gap: .2rem .35rem !important; grid-template-columns: minmax(0, 1fr) minmax(5rem, 38%) !important; }
+  .dash-likert-label { font-size: 6.5pt !important; line-height: 1.2 !important; }
+  .dash-likert-track { height: .65rem !important; }
+  .dash-likert-meta { font-size: 6.5pt !important; min-width: 2.5rem !important; }
+  .dash-likert-scale { font-size: 6pt !important; padding-right: 2.5rem !important; }
+  .dash-likert-compare .rar-badge { font-size: 6.5pt !important; }
+  #dash-perguntas-title { font-size: 7.5pt !important; margin-bottom: .1rem !important; }
+  .dash-perguntas-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr);
+    align-items: start !important;
+    gap: .5rem !important;
+    margin: 0 !important;
+  }
+  .dash-pergunta-col {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .dash-pergunta-card {
+    height: auto !important;
+  }
+  .dash-pergunta-card .card-header {
+    font-size: 5.5pt !important;
+    line-height: 1.15 !important;
+    padding: .1rem .2rem !important;
+  }
+  .dash-pergunta-card .card-body { padding: .1rem !important; }
+  .dash-pergunta-card .dash-chart-wrap {
+    height: 165px !important;
+    min-height: 165px !important;
+  }
+  .dash-pergunta-card .small { font-size: 5.5pt !important; margin-top: .1rem !important; }
+  canvas {
+    max-width: 100% !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  main > h1.mb-4:empty { display: none !important; }
+}
 </style>
 {% endblock %}
 
@@ -70,7 +204,7 @@
   <h1 class="h4 mb-3"><i class="bi bi-speedometer2 me-2"></i>Dashboard de avaliações</h1>
   <div id="container-mensagens"></div>
 
-  <div class="dash-filtros mb-3">
+  <div class="dash-filtros mb-3 dash-no-print">
     <form id="dash-form" class="row g-2 align-items-end">
       {% csrf_token %}
       <div class="col-6 col-md-3">
@@ -90,21 +224,29 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-12 col-md-2">
+      <div class="col-6 col-md-2">
         <button type="submit" class="btn btn-primary w-100">
           <i class="bi bi-search me-1"></i>Atualizar
+        </button>
+      </div>
+      <div class="col-6 col-md-2">
+        <button type="button" class="btn btn-outline-secondary w-100 d-none" id="dash-btn-imprimir"
+                title="Imprimir dashboard (A4 retrato)">
+          <i class="bi bi-printer me-1"></i>Imprimir
         </button>
       </div>
     </form>
   </div>
 
+  <div id="dash-print-area">
+  <div id="dash-print-meta" class="d-none"></div>
   <p id="dash-resumo" class="text-muted small d-none mb-3"></p>
 
   <div id="dash-conteudo" class="d-none">
     <div class="row row-cols-2 row-cols-md-3 g-2 mb-3 dash-kpi" id="dash-kpi-funil"></div>
     <div class="row row-cols-2 row-cols-md-3 g-2 mb-3 dash-kpi" id="dash-kpi-extra"></div>
 
-    <div class="row mb-4 g-3">
+    <div class="row mb-4 g-3 dash-charts-row">
       <div class="col-md-4 col-lg-3">
         <div class="card h-100">
           <div class="card-header">Respondidos vs Pendentes</div>
@@ -126,11 +268,12 @@
       </div>
     </div>
 
-    <h2 class="h6 text-secondary mb-2">Detalhe por pergunta</h2>
-    <div class="row g-3" id="dash-perguntas"></div>
+    <h2 class="h6 text-secondary mb-2" id="dash-perguntas-title">Detalhe por pergunta</h2>
+    <div class="dash-perguntas-grid" id="dash-perguntas"></div>
+  </div>
   </div>
 
-  <p id="dash-vazio" class="text-muted d-none">Sem dados para o período e filtros selecionados.</p>
+  <p id="dash-vazio" class="text-muted d-none dash-no-print">Sem dados para o período e filtros selecionados.</p>
 </div>
 {% endblock %}
 

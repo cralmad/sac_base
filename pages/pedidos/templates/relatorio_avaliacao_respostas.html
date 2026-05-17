@@ -5,8 +5,32 @@
 
 {% block estilo %}
 <style>
+/* Alinha com a área útil do main (navbar = container-fluid; conteúdo = px do main, sem container-xl extra) */
+main > h1.mb-4:empty { display: none; margin: 0 !important; }
+#rar-root {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+#rar-print-area,
+#rar-resultado {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
 .rar-filtros { background: #f8f9fa; border-radius: .5rem; padding: 1rem; }
-.rar-tabela-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.rar-tabela-scroll {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
 table.rar-tabela { width: 100%; border-collapse: collapse; font-size: .78rem; min-width: 1100px; }
 table.rar-tabela th {
   background: #e9f0f7;
@@ -23,25 +47,133 @@ table.rar-tabela td {
   padding: .25rem .35rem;
   vertical-align: middle;
 }
-.rar-grupo { margin-bottom: 1rem; border: 1px solid #dee2e6; border-radius: .375rem; overflow: hidden; }
+#rar-wrap-grupos {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.rar-grupo {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.rar-grupo {
+  margin-bottom: 1rem;
+  border: 1px solid #dee2e6;
+  border-radius: .375rem;
+}
 .rar-grupo-header {
   background: #1a3a5c;
   color: #fff;
-  padding: .4rem .75rem;
+  padding: .45rem .75rem;
   font-weight: 600;
   font-size: .9rem;
+  line-height: 1.35;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  border-radius: .375rem .375rem 0 0;
+}
+.rar-grupo-header .rar-badge {
+  display: inline;
+  background: rgba(255, 255, 255, .25);
+  color: #fff;
+  border-radius: .25rem;
+  padding: .12rem .5rem;
+  font-size: .85rem;
+  font-weight: 700;
+  white-space: nowrap;
+  margin-left: .4rem;
+}
+.rar-grupo .rar-tabela-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: 0 0 .375rem .375rem;
+}
+.rar-grupo .rar-tabela tfoot td {
+  background: #f1f3f5;
+  font-weight: 600;
+  color: #1a3a5c;
+  border: 1px solid #dee2e6;
+  padding: .35rem .5rem;
 }
 .rar-detail td { background: #f8fafc; font-size: .82rem; white-space: pre-wrap; word-break: break-word; }
 .rar-cmt-btn { padding: .1rem .35rem; line-height: 1; }
+#rar-print-meta { font-size: .85rem; color: #334155; line-height: 1.35; }
+
 @media print {
-  .rar-filtros, .navbar, .sidebar, #container-mensagens { display: none !important; }
-  table.rar-tabela { font-size: 7pt; min-width: 0; }
+  @page { size: A4 landscape; margin: 6mm 8mm; }
+  body { padding: 0 !important; margin: 0 !important; }
+  main.py-4 { padding: 0 !important; }
+  #rar-root { margin: 0 !important; max-width: 100% !important; }
+  .rar-no-print,
+  .rar-filtros, .navbar, #navbase, #sidebarOffcanvas, .sidebar-wrapper,
+  footer, #container-mensagens, #global-loader, .modal,
+  .rar-cmt-btn, .btn, [data-bs-toggle] { display: none !important; }
+  #rar-print-meta {
+    display: block !important;
+    font-size: 8pt;
+    color: #000;
+    margin-bottom: .25rem !important;
+    padding-bottom: .15rem !important;
+    border-bottom: 1px solid #999;
+  }
+  #rar-root > .d-flex h1,
+  #rar-root > h1 { font-size: 10pt !important; margin-bottom: .15rem !important; }
+  #rar-resumo-periodo { font-size: 7.5pt !important; margin-bottom: .2rem !important; }
+  .rar-tabela-scroll { overflow: visible !important; }
+  table.rar-tabela {
+    font-size: 7.5pt;
+    min-width: 0;
+    width: 100%;
+  }
+  table.rar-tabela th {
+    background: #dce6f1 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    padding: .1rem .25rem;
+  }
+  table.rar-tabela td { padding: .08rem .25rem; vertical-align: middle; }
+  table.rar-tabela tfoot td {
+    background: #e8eef5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-weight: 600;
+  }
+  .rar-grupo {
+    margin-bottom: .35rem;
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+  .rar-grupo-header {
+    background: #1a3a5c !important;
+    color: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    padding: .15rem .45rem !important;
+    font-size: 8pt !important;
+  }
+  .rar-grupo-header .rar-badge {
+    background: rgba(255, 255, 255, .25) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  tr.rar-detail { display: table-row !important; }
+  tr.rar-detail td {
+    background: #f8fafc !important;
+    font-size: 7pt;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  main > h1.mb-4:empty { display: none !important; }
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-xl my-3" id="rar-root"
+<div class="my-3" id="rar-root"
      data-url-buscar="{% url 'relatorio_avaliacao_respostas' %}">
 
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
@@ -50,7 +182,7 @@ table.rar-tabela td {
 
   <div id="container-mensagens"></div>
 
-  <div class="rar-filtros mb-3">
+  <div class="rar-filtros mb-3 rar-no-print">
     <form id="rar-form" class="row g-2 align-items-end">
       {% csrf_token %}
       <div class="col-6 col-md-3">
@@ -76,14 +208,22 @@ table.rar-tabela td {
           <label class="form-check-label" for="rar-agrupar">Agrupar por motorista</label>
         </div>
       </div>
-      <div class="col-12 col-md-2">
-        <button type="submit" class="btn btn-primary" id="rar-btn-buscar">
+      <div class="col-6 col-md-2">
+        <button type="submit" class="btn btn-primary w-100" id="rar-btn-buscar">
           <i class="bi bi-search me-1"></i>Buscar
+        </button>
+      </div>
+      <div class="col-6 col-md-2">
+        <button type="button" class="btn btn-outline-secondary w-100 d-none" id="rar-btn-imprimir"
+                title="Imprimir relatório (A4 paisagem)">
+          <i class="bi bi-printer me-1"></i>Imprimir
         </button>
       </div>
     </form>
   </div>
 
+  <div id="rar-print-area">
+  <div id="rar-print-meta" class="d-none"></div>
   <p id="rar-resumo-periodo" class="text-muted small d-none mb-2"></p>
 
   <div id="rar-resultado">
@@ -106,7 +246,8 @@ table.rar-tabela td {
     </div>
 
     <div id="rar-wrap-grupos" class="d-none"></div>
-    <p id="rar-vazio" class="text-muted d-none mb-0">Nenhuma avaliação respondida no período.</p>
+    <p id="rar-vazio" class="text-muted d-none mb-0 rar-no-print">Nenhuma avaliação respondida no período.</p>
+  </div>
   </div>
 </div>
 {% endblock %}

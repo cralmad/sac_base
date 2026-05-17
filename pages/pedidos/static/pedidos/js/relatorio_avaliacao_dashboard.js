@@ -28,6 +28,8 @@ const vazio = document.getElementById('dash-vazio');
 const kpiFunil = document.getElementById('dash-kpi-funil');
 const kpiExtra = document.getElementById('dash-kpi-extra');
 const wrapPerguntas = document.getElementById('dash-perguntas');
+const btnImprimir = document.getElementById('dash-btn-imprimir');
+const printMeta = document.getElementById('dash-print-meta');
 
 const chartInstances = [];
 
@@ -260,11 +262,36 @@ function renderLikertCompare(likertComparativo, perguntasMeta) {
   root.appendChild(scaleRow);
 }
 
+function atualizarPrintMeta(periodoTexto) {
+  if (!printMeta) return;
+  const mot = selMot?.selectedOptions?.[0]?.text?.trim() || 'Todos (visão geral)';
+  const periodo = (periodoTexto || resumo?.textContent || '').replace(
+    /^Período \(prev\. entrega\):\s*/i,
+    '',
+  );
+  printMeta.textContent = `Dashboard de avaliações — Período (prev. entrega): ${periodo} — Motorista: ${mot}`;
+}
+
+function prepararImpressao() {
+  chartInstances.forEach((c) => {
+    try {
+      c.resize();
+    } catch {
+      /* ignore */
+    }
+  });
+}
+
+function setBtnImprimirVisivel(visivel) {
+  if (!btnImprimir) return;
+  btnImprimir.classList.toggle('d-none', !visivel);
+}
+
 function renderPerguntaCard(item, perguntasMeta) {
   const col = document.createElement('div');
-  col.className = 'col-12 col-md-6 col-xl-4';
+  col.className = 'dash-pergunta-col';
   const card = document.createElement('div');
-  card.className = 'card h-100 dash-pergunta-card';
+  card.className = 'card dash-pergunta-card';
   const head = document.createElement('div');
   head.className = 'card-header';
   head.textContent = `${metaSigla(perguntasMeta, item.campo)} — ${metaDescricao(perguntasMeta, item.campo)}`;
@@ -298,7 +325,7 @@ function renderPerguntaCard(item, perguntasMeta) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          layout: { padding: { top: 24 } },
+          layout: { padding: { top: 8, bottom: 4 } },
           plugins: {
             title: {
               display: true,
@@ -345,9 +372,11 @@ function renderDonutCategorico(item, canvas, body) {
           datasets: [{ data: [1], backgroundColor: ['#dee2e6'] }],
         },
         options: {
+          responsive: true,
+          maintainAspectRatio: false,
           plugins: {
-            legend: { position: 'bottom' },
-            title: { display: true, text: tituloGrafico },
+            legend: { display: false },
+            title: { display: true, text: tituloGrafico, font: { size: 11 } },
             datalabels: { display: false },
           },
         },
@@ -364,9 +393,10 @@ function renderDonutCategorico(item, canvas, body) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          layout: { padding: { top: 4, bottom: 4 } },
           plugins: {
-            title: { display: true, text: tituloGrafico },
-            legend: { position: 'bottom' },
+            title: { display: true, text: tituloGrafico, font: { size: 11 } },
+            legend: { display: false },
             datalabels: pluginDatalabelsDonut(),
             tooltip: { enabled: true },
           },
@@ -429,7 +459,20 @@ function renderDashboard(data) {
   (data.perguntas_resumo || []).forEach((item) => {
     renderPerguntaCard(item, meta);
   });
+  requestAnimationFrame(() => {
+    prepararImpressao();
+  });
+  atualizarPrintMeta(data.periodo_texto);
+  setBtnImprimirVisivel(true);
 }
+
+btnImprimir?.addEventListener('click', () => {
+  if (conteudo?.classList.contains('d-none')) return;
+  prepararImpressao();
+  window.print();
+});
+
+window.addEventListener('beforeprint', prepararImpressao);
 
 form?.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -463,6 +506,7 @@ form?.addEventListener('submit', async (e) => {
       conteudo.classList.add('d-none');
       vazio.classList.add('d-none');
       destroyCharts();
+      setBtnImprimirVisivel(false);
       return;
     }
     const tem =
@@ -475,6 +519,7 @@ form?.addEventListener('submit', async (e) => {
       resumo.textContent = data.periodo_texto || '';
       resumo.classList.remove('d-none');
       destroyCharts();
+      setBtnImprimirVisivel(false);
       return;
     }
     vazio.classList.add('d-none');
@@ -485,6 +530,7 @@ form?.addEventListener('submit', async (e) => {
   } catch {
     definirMensagem('erro', 'Falha de rede.', false);
     destroyCharts();
+    setBtnImprimirVisivel(false);
   } finally {
     AppLoader.hide();
   }
