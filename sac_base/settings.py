@@ -107,6 +107,7 @@ INSTALLED_APPS = [
     'pages.logistica_config',
     'pages.motorista',
     'pages.pedidos',
+    'pages.agenda',
     'pages.financeiro',
 ]
 

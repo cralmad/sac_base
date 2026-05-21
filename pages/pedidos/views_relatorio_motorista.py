@@ -15,6 +15,9 @@ from pages.pedidos.services.relatorio_logistica_motorista import (
     montar_relatorio_logistica_motorista,
     montar_sisvar_relatorio_logistica_motorista_get,
 )
+from pages.pedidos.services.relatorio_logistica_motorista_gsheets import (
+    executar_envio_gsheets_logistica_motorista,
+)
 from sac_base.coercion import parse_date, parse_int
 from sac_base.form_validador import SchemaValidator
 from sac_base.permissions_utils import build_action_permissions, permission_denied_response
@@ -125,3 +128,50 @@ def relatorio_logistica_motorista_mod_finan_view(request):
         return JsonResponse({"success": False, "mensagem": "Falha ao salvar registro financeiro."}, status=500)
 
     return JsonResponse({"success": True, "mensagem": "Registro financeiro salvo com sucesso!"})
+
+
+@login_required
+@permission_required(PERMISSOES_REL_LOG_MOTORISTA["acessar"], raise_exception=True)
+@csrf_protect
+@require_POST
+def relatorio_logistica_motorista_gsheets_view(request):
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse({"success": False, "mensagem": "Selecione uma filial ativa."}, status=403)
+
+    data = request.sisvar_front or {}
+    filtros = data.get("filtros", {})
+    data_inicio = parse_date(filtros.get("data_inicio"))
+    data_fim = parse_date(filtros.get("data_fim"))
+    raw_mot = filtros.get("motoristas", [])
+    motorista_ids = []
+    if isinstance(raw_mot, list):
+        motorista_ids = [int(x) for x in raw_mot if str(x).isdigit()]
+
+    if not data_inicio or not data_fim:
+        return JsonResponse(
+            {"success": False, "mensagem": "Informe data inicial e data final."},
+            status=400,
+        )
+
+    try:
+        resultado = executar_envio_gsheets_logistica_motorista(
+            filial_ativa,
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            motorista_ids=motorista_ids or None,
+        )
+    except ValidationError as exc:
+        msgs = list(exc.messages) if hasattr(exc, "messages") else [str(exc)]
+        return JsonResponse(
+            {"success": False, "mensagem": msgs[0] if msgs else "Validação falhou."},
+            status=400,
+        )
+    except Exception as exc:
+        logger.error(exc, exc_info=True)
+        return JsonResponse(
+            {"success": False, "mensagem": "Falha ao enviar dados ao Google Sheets."},
+            status=500,
+        )
+
+    return JsonResponse({"success": True, **resultado})

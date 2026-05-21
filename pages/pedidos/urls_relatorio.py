@@ -16,6 +16,7 @@ from .views_relatorio import (
     relatorio_incidencias_view,
 )
 from .views_relatorio_motorista import (
+    relatorio_logistica_motorista_gsheets_view,
     relatorio_logistica_motorista_mod_finan_view,
     relatorio_logistica_motorista_view,
 )
@@ -30,6 +31,11 @@ urlpatterns = [
         'relatorio_logistica_motorista/mod-finan/salvar',
         relatorio_logistica_motorista_mod_finan_view,
         name='relatorio_logistica_motorista_mod_finan',
+    ),
+    path(
+        'relatorio_logistica_motorista/gsheets',
+        relatorio_logistica_motorista_gsheets_view,
+        name='relatorio_logistica_motorista_gsheets',
     ),
     path('relatorio_rotas/', relatorio_rotas_view, name='relatorio_rotas'),
     path('relatorio_rotas/importar-artigos/', relatorio_rotas_importar_artigos_view, name='relatorio_rotas_importar_artigos'),

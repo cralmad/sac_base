@@ -244,7 +244,14 @@ def _resolver_contraparte(campos: dict, filial_id: int):
 
 
 @transaction.atomic
-def salvar_registro_manual(*, usuario, campos: dict, estado: str, filiais_escrita_ids: list[int]) -> RegistroFinanceiro:
+def salvar_registro_manual(
+    *,
+    usuario,
+    campos: dict,
+    estado: str,
+    filiais_escrita_ids: list[int],
+    permitir_valor_flutuante: bool = False,
+) -> RegistroFinanceiro:
     filial = obter_filial_escrita(campos.get("filial_id"), usuario)
     if not filial:
         raise ValidationError("Filial inválida ou sem permissão de escrita.")
@@ -266,7 +273,12 @@ def salvar_registro_manual(*, usuario, campos: dict, estado: str, filiais_escrit
     _validar_tipo_plano(tipo, plano)
 
     valor = parse_decimal(campos.get("valor"), context="form")
-    if valor is None or valor <= Decimal("0"):
+    if permitir_valor_flutuante:
+        if valor is None:
+            valor = Decimal("0")
+        elif valor < Decimal("0"):
+            raise ValidationError("Valor não pode ser negativo.")
+    elif valor is None or valor <= Decimal("0"):
         raise ValidationError("Informe um valor maior que zero.")
     data_emissao = parse_date(campos.get("data_emissao"))
     data_vencimento = parse_date(campos.get("data_vencimento"))

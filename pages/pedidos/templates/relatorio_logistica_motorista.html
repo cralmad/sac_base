@@ -65,7 +65,8 @@ table.rlm-tabela th { background: #f1f5f9; color: #334155; font-weight: 600; }
 {% block content %}
 <div class="container-xl my-3" id="rlm-root"
      data-url-buscar="{% url 'relatorio_logistica_motorista' %}"
-     data-url-mod-finan="{% url 'relatorio_logistica_motorista_mod_finan' %}">
+     data-url-mod-finan="{% url 'relatorio_logistica_motorista_mod_finan' %}"
+     data-url-gsheets="{% url 'relatorio_logistica_motorista_gsheets' %}">
 
   <div class="rlm-filtros mb-3 no-print">
     <form id="rlm-form" class="row g-2 align-items-end">
@@ -93,6 +94,10 @@ table.rlm-tabela th { background: #f1f5f9; color: #334155; font-weight: 600; }
           </button>
           <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" id="rlm-btn-imprimir" disabled>
             <i class="bi bi-printer"></i> Imprimir
+          </button>
+          <button type="button" class="btn btn-outline-success btn-sm flex-shrink-0 d-print-none" id="rlm-btn-gsheets" disabled
+                  title="Enviar tentativas do relatório (exceto Concluído e interno) ao Google Sheets — outra tabela">
+            <i class="bi bi-cloud-upload"></i> Google Sheets
           </button>
         </div>
       </div>

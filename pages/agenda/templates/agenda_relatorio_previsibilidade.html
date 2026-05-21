@@ -1,0 +1,51 @@
+﻿{% extends "base.html" %}
+{% load static %}
+
+{% block title %}SacBase — Agenda e previsibilidade{% endblock %}
+{% block page_title %}Relatório — Agenda e previsibilidade{% endblock %}
+
+{% block estilo %}
+<style>
+.ag-prev-filtros { background: #f8f9fa; border-radius: .5rem; padding: 1rem; }
+.ag-prev-dia { margin-bottom: 1.5rem; border-left: 3px solid #1a3a5c; padding-left: .75rem; }
+.ag-prev-dia h3 { font-size: 1.05rem; margin: 0 0 .75rem; color: #1a3a5c; }
+.ag-prev-categoria { margin-bottom: 1rem; padding-left: .5rem; border-left: 2px solid #6c757d; }
+.ag-prev-categoria h4 { font-size: .95rem; margin: 0 0 .5rem; color: #495057; }
+.ag-prev-subgrupo { margin-bottom: .75rem; }
+.ag-prev-subgrupo h5 { font-size: .875rem; margin: 0 0 .35rem; color: #6c757d; }
+.ag-prev-totais { font-weight: normal; color: #6c757d; font-size: .85em; }
+.ag-prev-tabela { font-size: .875rem; }
+.ag-prev-tabela td { vertical-align: middle; }
+.badge-tipo-flutuante { background: #6c757d; }
+.badge-tipo-concreto { background: #0d6efd; }
+.badge-status-pendente { background: #ffc107; color: #000; }
+.badge-status-concluido { background: #198754; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="ag-prev-root" class="container-xl">
+  <form id="ag-prev-form" class="ag-prev-filtros mb-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label for="ag-prev-ini" class="form-label">Data início</label>
+        <input type="date" class="form-control" id="ag-prev-ini" name="data_inicio" required>
+      </div>
+      <div class="col-md-3">
+        <label for="ag-prev-fim" class="form-label">Data fim</label>
+        <input type="date" class="form-control" id="ag-prev-fim" name="data_fim" required>
+      </div>
+      <div class="col-md-3">
+        <button type="submit" class="btn btn-primary w-100">Gerar timeline</button>
+      </div>
+    </div>
+  </form>
+  <div id="ag-prev-resumo" class="mb-2 small text-muted d-none"></div>
+  <div id="ag-prev-timeline"></div>
+  <p id="ag-prev-vazio" class="text-muted d-none">Nenhum evento no período.</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'agenda/js/relatorio_previsibilidade.js' %}"></script>
+{% endblock %}

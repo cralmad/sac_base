@@ -251,9 +251,13 @@
               <input type="text" id="email_nome_remetente" name="email_nome_remetente" class="form-control" maxlength="120">
             </div>
 
+            <div class="col-12">
+              <h6 class="text-muted mb-0">Google Sheets — Devoluções</h6>
+            </div>
+
             <div class="col-12 col-md-8">
               <label class="form-label mb-0 d-flex align-items-center gap-1" for="gsheets_spreadsheet_id">
-                <span>ID da Planilha Google Sheets</span>
+                <span>ID da Planilha (Devoluções)</span>
                 <span
                   class="text-primary"
                   role="button"
@@ -271,7 +275,7 @@
 
             <div class="col-12 col-md-4">
               <label class="form-label mb-0 d-flex align-items-center gap-1" for="gsheets_sheet_name">
-                <span>Nome da Aba</span>
+                <span>Nome da Aba (Devoluções)</span>
                 <span
                   class="text-primary"
                   role="button"
@@ -285,6 +289,46 @@
               <input type="text" id="gsheets_sheet_name" name="gsheets_sheet_name"
                      class="form-control" maxlength="100"
                      placeholder="Ex: Devoluções">
+            </div>
+
+            <div class="col-12">
+              <h6 class="text-muted mb-0">Google Sheets (Incidências)</h6>
+            </div>
+
+            <div class="col-12 col-md-8">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="gsheets_spreadsheet_id_2">
+                <span>ID da Planilha (Incidências)</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="Segunda planilha Google Sheets (ID na URL). Pode ser a mesma planilha com aba diferente ou outro documento.">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <input type="text" id="gsheets_spreadsheet_id_2" name="gsheets_spreadsheet_id_2"
+                     class="form-control font-monospace" maxlength="200"
+                     placeholder="Ex: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms">
+            </div>
+
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="gsheets_sheet_name_2">
+                <span>Nome da Aba (Incidências)</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="Nome exato da aba onde os dados da segunda integração serão registados.">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <input type="text" id="gsheets_sheet_name_2" name="gsheets_sheet_name_2"
+                     class="form-control" maxlength="100"
+                     placeholder="Ex: Dados">
             </div>
 
           </div>

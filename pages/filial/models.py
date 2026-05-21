@@ -119,6 +119,8 @@ class FilialConfig(models.Model):
     email_nome_remetente = models.CharField(max_length=120, null=True, blank=True)
     gsheets_spreadsheet_id = models.CharField(max_length=200, null=True, blank=True)
     gsheets_sheet_name = models.CharField(max_length=100, null=True, blank=True)
+    gsheets_spreadsheet_id_2 = models.CharField(max_length=200, null=True, blank=True)
+    gsheets_sheet_name_2 = models.CharField(max_length=100, null=True, blank=True)
 
     class Meta:
         db_table = "filial_config"

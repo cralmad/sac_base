@@ -15,6 +15,8 @@ const nomeFormCons = 'consRegistroFinanceiro';
 const form = document.getElementById(nomeForm);
 const form2 = document.getElementById(nomeFormCons);
 let reconstruindoPlano = false;
+/** Referência mutável: listeners em conditional_select leem planoConta no momento do change. */
+let planoCascataHierarchies = null;
 
 getDataBackEnd();
 
@@ -262,12 +264,54 @@ function rehidratarPlanoSelecionado() {
   if (n4) s4.value = n4;
 }
 
-function renderizarPlanoCascata() {
+function classificacaoPlanoPorId(planoId) {
+  const p = getPlanos().find((x) => String(x.id) === String(planoId));
+  return p ? p.tipo_classificacao : null;
+}
+
+function repopularPlanoRoot(hierarchy) {
+  const s2 = document.getElementById('plano_n2_id');
+  if (!s2) return;
+  s2.innerHTML = '';
+  const def = document.createElement('option');
+  def.value = '';
+  def.textContent = 'Selecione';
+  s2.appendChild(def);
+  Object.entries(hierarchy).forEach(([value, node]) => {
+    const op = document.createElement('option');
+    op.value = value;
+    op.textContent = node.label;
+    s2.appendChild(op);
+  });
+  s2.disabled = false;
+  s2.value = '';
+  s2.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function limparCamposPlanoForm() {
+  updateFormField(nomeForm, 'plano_n2_id', '');
+  updateFormField(nomeForm, 'plano_n3_id', '');
+  updateFormField(nomeForm, 'plano_n4_id', '');
+  updateFormField(nomeForm, 'plano_contas_id', '');
+}
+
+function renderizarPlanoCascata(limparSelecao = false) {
   reconstruindoPlano = true;
   const tipo = String(getForm(nomeForm)?.campos?.tipo ?? '');
+  if (limparSelecao) {
+    limparCamposPlanoForm();
+  }
   const hierarchy = buildPlanHierarchy(tipo);
-  initHierarchicalSelects(form, { planoConta: hierarchy });
-  rehidratarPlanoSelecionado();
+  if (!planoCascataHierarchies) {
+    planoCascataHierarchies = { planoConta: hierarchy };
+    initHierarchicalSelects(form, planoCascataHierarchies);
+  } else {
+    planoCascataHierarchies.planoConta = hierarchy;
+    repopularPlanoRoot(hierarchy);
+  }
+  if (!limparSelecao) {
+    rehidratarPlanoSelecionado();
+  }
   sincronizarCamposPlanoSelecionados();
   reconstruindoPlano = false;
 }
@@ -341,11 +385,22 @@ function validarAtivoSelecionado() {
     definirMensagem('erro', 'Selecione o Ativo (nível final do plano de contas).', false);
     return false;
   }
+  const tipo = String(campos.tipo ?? '');
+  const classeEsperada = classTipoParaPlano(tipo);
+  const classeAtivo = classificacaoPlanoPorId(ativoId);
+  if (classeEsperada && classeAtivo && classeAtivo !== classeEsperada) {
+    const msg = tipo === 'ENTRADA'
+      ? 'Entrada exige plano classificado como receita. Selecione novamente o Ativo.'
+      : 'Saída exige plano classificado como despesa. Selecione novamente o Ativo.';
+    definirMensagem('erro', msg, false);
+    return false;
+  }
   return true;
 }
 
 function aplicarDefaultsNovo() {
   const hoje = new Date().toISOString().slice(0, 10);
+  updateFormField(nomeForm, 'id', null);
   updateFormField(nomeForm, 'tipo', 'ENTRADA');
   updateFormField(nomeForm, 'filial_id', getFilialAtivaId());
   updateFormField(nomeForm, 'contraparte_tipo', '');
@@ -362,6 +417,8 @@ function aplicarDefaultsNovo() {
   updateFormField(nomeForm, 'permite_excluir_permanente', false);
   updateFormField(nomeForm, 'valor', '');
   updateFormField(nomeForm, 'observacao', '');
+  renderizarPlanoCascata(true);
+  renderizarContrapartes();
   hidratarFormulario(nomeForm);
 }
 
@@ -643,10 +700,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('tipo').addEventListener('change', () => {
     if (reconstruindoPlano) return;
-    updateFormField(nomeForm, 'plano_n2_id', '');
-    updateFormField(nomeForm, 'plano_n3_id', '');
-    updateFormField(nomeForm, 'plano_n4_id', '');
-    renderizarPlanoCascata();
+    renderizarPlanoCascata(true);
   });
   document.getElementById('plano_n2_id').addEventListener('change', () => {
     if (reconstruindoPlano) return;

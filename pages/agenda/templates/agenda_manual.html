@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}SacBase — Agenda manual{% endblock %}
+{% block page_title %}Cadastro — Agenda manual{% endblock %}
+
+{% block content %}
+  <form id="cadAgendaManual" data-form-lock="cadAgendaManual" method="POST">
+    {% csrf_token %}
+    <div class="container-xl my-3 mx-auto">
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <a href="/app/agenda/relatorio/previsibilidade/" class="btn btn-outline-primary btn-sm">Relatório previsibilidade</a>
+      </div>
+      <div class="row g-3">
+        <input type="hidden" name="id" id="id">
+        <input type="hidden" name="filial_id" id="filial_id">
+        <div class="col-12 col-md-8">
+          <label class="form-label mb-0" for="titulo">Título</label>
+          <input type="text" name="titulo" id="titulo" class="form-control" maxlength="200" required>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label mb-0" for="categoria">Categoria</label>
+          <select name="categoria" id="categoria" class="form-select" required></select>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label mb-0" for="modo_evento">Modo</label>
+          <select name="modo_evento" id="modo_evento" class="form-select" required></select>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label mb-0" for="recorrencia">Recorrência</label>
+          <select name="recorrencia" id="recorrencia" class="form-select" required></select>
+        </div>
+        <div class="col-12 col-md-2">
+          <label class="form-label mb-0" for="intervalo">Intervalo</label>
+          <input type="number" name="intervalo" id="intervalo" class="form-control" min="1" value="1" required>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label mb-0" for="data_ancora">Data âncora</label>
+          <input type="date" name="data_ancora" id="data_ancora" class="form-control" required>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label mb-0" for="data_fim_serie">Data fim série <span class="text-muted small">(vazio = aberta)</span></label>
+          <input type="date" name="data_fim_serie" id="data_fim_serie" class="form-control">
+        </div>
+        <div class="col-12 col-md-3 d-none" id="wrap-dia-semana">
+          <label class="form-label mb-0" for="dia_semana">Dia da semana</label>
+          <select name="dia_semana" id="dia_semana" class="form-select">
+            <option value="">—</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-3 d-none" id="wrap-dia-mes">
+          <label class="form-label mb-0" for="dia_mes_fixo">Dia do mês</label>
+          <input type="number" name="dia_mes_fixo" id="dia_mes_fixo" class="form-control" min="1" max="31">
+        </div>
+        <div class="col-12 col-md-4 d-none align-self-end" id="wrap-antecipar">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="antecipar_fim_semana" id="antecipar_fim_semana">
+            <label class="form-check-label" for="antecipar_fim_semana">Antecipar sáb/dom para sexta</label>
+          </div>
+        </div>
+        <div class="col-12 d-none" id="wrap-materializacao">
+          <label class="form-label mb-0" for="tipo_materializacao">Tipo de lançamento vinculado</label>
+          <select name="tipo_materializacao" id="tipo_materializacao" class="form-select">
+            <option value="">—</option>
+          </select>
+          <div id="payload-subform" class="mt-2 border rounded p-2 bg-light"></div>
+        </div>
+        <div class="col-12">
+          <label class="form-label mb-0" for="descricao">Descrição</label>
+          <textarea name="descricao" id="descricao" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="col-12">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="ativa" id="ativa" checked>
+            <label class="form-check-label" for="ativa">Ativa</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-actions">
+      <button id="btn-salvar" class="btn btn-primary d-none" data-show-on="novo,editar" type="submit">
+        <i class="bi bi-save"></i> Salvar
+      </button>
+      <button id="btn-editar" type="button" data-show-on="visualizar" class="btn btn-warning d-none">
+        <i class="bi bi-pencil"></i> Editar
+      </button>
+      <button id="btn-novo" type="button" data-show-on="visualizar" class="btn btn-success d-none">
+        <i class="bi bi-plus-circle"></i> Novo
+      </button>
+      <button id="btn-cancelar" type="button" data-show-on="novo,editar" class="btn btn-outline-secondary d-none">
+        <i class="bi bi-x-circle"></i> Cancelar
+      </button>
+      <button type="button" id="btn-abrir-pesquisa" class="btn btn-secondary d-none">
+        <i class="bi bi-search"></i> Pesquisar
+      </button>
+    </div>
+  </form>
+
+  <div id="div-pesquisa" class="container-xl d-none mt-3">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <span>Consultar regras de agenda</span>
+        <button type="button" id="btn-fechar" class="btn-close btn-close-white" aria-label="Fechar"></button>
+      </div>
+      <div class="card-body">
+        <form id="consAgendaManual" method="POST">
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
+              <label class="form-label mb-0" for="titulo_cons">Título</label>
+              <input type="text" name="titulo_cons" id="titulo_cons" class="form-control" maxlength="200" placeholder="Contém…">
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0" for="categoria_cons">Categoria</label>
+              <select name="categoria_cons" id="categoria_cons" class="form-select">
+                <option value="">Todas</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label mb-0" for="modo_evento_cons">Modo</label>
+              <select name="modo_evento_cons" id="modo_evento_cons" class="form-select">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-2">
+              <label class="form-label mb-0" for="ativa_cons">Ativa</label>
+              <select name="ativa_cons" id="ativa_cons" class="form-select">
+                <option value="">Todas</option>
+                <option value="true">Sim</option>
+                <option value="false">Não</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-3 d-grid gap-2 d-md-flex align-items-end">
+              <button type="submit" class="btn btn-success">Filtrar</button>
+              <button type="button" class="btn btn-outline-danger" id="btn-voltar">Voltar</button>
+            </div>
+          </div>
+        </form>
+
+        <div class="table-responsive mt-4">
+          <table class="table table-hover table-sm border">
+            <thead class="table-dark">
+              <tr>
+                <th>ID</th>
+                <th>Título</th>
+                <th>Categoria</th>
+                <th>Modo</th>
+                <th>Recorrência</th>
+                <th>Âncora</th>
+                <th>Ativa</th>
+                <th class="text-center">Ação</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-agenda-manual-corpo"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'agenda/js/agenda_manual.js' %}"></script>
+{% endblock %}

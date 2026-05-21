@@ -32,8 +32,14 @@ export function initHierarchicalSelects(root, hierarchies) {
                 const source = root.querySelector(`[name="${depName}"]`);
                 if (!source) return;
 
+                const boundKey = `hierarchyBound_${target.name}_${depName}`;
+                if (source.dataset[boundKey]) return;
+                source.dataset[boundKey] = '1';
+
                 source.addEventListener('change', () => {
-                    updateSelect(root, target, deps, hierarchy);
+                    const hierarchyAtEvent = hierarchies[hierarchyKey];
+                    if (!hierarchyAtEvent) return;
+                    updateSelect(root, target, deps, hierarchyAtEvent);
                 });
             });
         });

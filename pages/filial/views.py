@@ -56,6 +56,8 @@ def build_filial_campos_iniciais():
         "email_nome_remetente": "",
         "gsheets_spreadsheet_id": "",
         "gsheets_sheet_name": "",
+        "gsheets_spreadsheet_id_2": "",
+        "gsheets_sheet_name_2": "",
     }
 
 
@@ -82,6 +84,8 @@ def serializar_form_filial(filial):
         email_nome_remetente = config.email_nome_remetente or ""
         gsheets_spreadsheet_id = config.gsheets_spreadsheet_id or ""
         gsheets_sheet_name = config.gsheets_sheet_name or ""
+        gsheets_spreadsheet_id_2 = config.gsheets_spreadsheet_id_2 or ""
+        gsheets_sheet_name_2 = config.gsheets_sheet_name_2 or ""
     except FilialConfig.DoesNotExist:
         sms_padrao_1 = ""
         sms_padrao_2 = ""
@@ -92,6 +96,8 @@ def serializar_form_filial(filial):
         email_nome_remetente = ""
         gsheets_spreadsheet_id = ""
         gsheets_sheet_name = ""
+        gsheets_spreadsheet_id_2 = ""
+        gsheets_sheet_name_2 = ""
     return {
         "id": filial.id,
         "codigo": filial.codigo,
@@ -113,6 +119,8 @@ def serializar_form_filial(filial):
         "email_nome_remetente": email_nome_remetente,
         "gsheets_spreadsheet_id": gsheets_spreadsheet_id,
         "gsheets_sheet_name": gsheets_sheet_name,
+        "gsheets_spreadsheet_id_2": gsheets_spreadsheet_id_2,
+        "gsheets_sheet_name_2": gsheets_sheet_name_2,
     }
 
 
@@ -145,6 +153,8 @@ def cadastro_filial_view(request):
             "email_nome_remetente": {"type": "string", "maxlength": 120, "required": False, "value": ""},
             "gsheets_spreadsheet_id": {"type": "string", "maxlength": 200, "required": False, "value": ""},
             "gsheets_sheet_name": {"type": "string", "maxlength": 100, "required": False, "value": ""},
+            "gsheets_spreadsheet_id_2": {"type": "string", "maxlength": 200, "required": False, "value": ""},
+            "gsheets_sheet_name_2": {"type": "string", "maxlength": 100, "required": False, "value": ""},
         },
         nome_form_cons: {
             "codigo_cons": {"type": "string", "maxlength": 20, "required": False, "value": ""},
@@ -329,6 +339,8 @@ def cadastro_filial_view(request):
     email_nome_remetente = (campos.get("email_nome_remetente") or "").strip() or None
     gsheets_spreadsheet_id = (campos.get("gsheets_spreadsheet_id") or "").strip() or None
     gsheets_sheet_name = (campos.get("gsheets_sheet_name") or "").strip() or None
+    gsheets_spreadsheet_id_2 = (campos.get("gsheets_spreadsheet_id_2") or "").strip() or None
+    gsheets_sheet_name_2 = (campos.get("gsheets_sheet_name_2") or "").strip() or None
     FilialConfig.objects.update_or_create(
         filial=filial,
         defaults={
@@ -341,6 +353,8 @@ def cadastro_filial_view(request):
             "email_nome_remetente": email_nome_remetente,
             "gsheets_spreadsheet_id": gsheets_spreadsheet_id,
             "gsheets_sheet_name": gsheets_sheet_name,
+            "gsheets_spreadsheet_id_2": gsheets_spreadsheet_id_2,
+            "gsheets_sheet_name_2": gsheets_sheet_name_2,
         },
     )
 

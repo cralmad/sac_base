@@ -1,10 +1,12 @@
-import { getCsrfToken, clearMessages, definirMensagem, getOptions, getDataset, getScreenPermissions } from '/static/js/sisVar.js';
+import { getCsrfToken, clearMessages, definirMensagem, confirmar, getOptions, getDataset, getScreenPermissions } from '/static/js/sisVar.js';
+import { AppLoader } from '/static/js/loader.js';
 import { getMultiSelectValues } from '/static/js/smart_filter.js';
 import { initSmartInputs } from '/static/js/input_rules.js';
 
 const root = document.getElementById('rlm-root');
 const URL_BUSCAR = root?.dataset?.urlBuscar ?? '';
 const URL_MOD_FINAN = root?.dataset?.urlModFinan ?? '';
+const URL_GSHEETS = root?.dataset?.urlGsheets ?? '';
 
 const form = document.getElementById('rlm-form');
 const inpInicio = document.getElementById('rlm-data-inicio');
@@ -16,6 +18,7 @@ const loader = document.getElementById('rlm-loader');
 const vazio = document.getElementById('rlm-vazio');
 const resultado = document.getElementById('rlm-resultado');
 const btnImprimir = document.getElementById('rlm-btn-imprimir');
+const btnGSheets = document.getElementById('rlm-btn-gsheets');
 
 const modalEl = document.getElementById('modFinan');
 const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
@@ -298,12 +301,70 @@ function renderizar(payload) {
     vazio.classList.remove('d-none');
     atualizarCabecalhoImpressao(false);
     btnImprimir.disabled = true;
+    if (btnGSheets) btnGSheets.disabled = true;
     return;
   }
   vazio.classList.add('d-none');
   renderResultados(motoristas);
   atualizarCabecalhoImpressao(true);
   btnImprimir.disabled = false;
+  if (btnGSheets) btnGSheets.disabled = false;
+}
+
+async function enviarAoGSheets() {
+  const di = inpInicio.value;
+  const df = inpFim.value;
+  if (!di || !df) {
+    definirMensagem('erro', 'Informe o período antes de enviar.', false);
+    return;
+  }
+  confirmar({
+    titulo: 'Enviar ao Google Sheets',
+    mensagem: 'Deseja enviar ao Google Sheets as tentativas do relatório (exceto Concluído e interno)?',
+    onConfirmar: async () => {
+      clearMessages();
+      if (btnGSheets) btnGSheets.disabled = true;
+      AppLoader.show();
+      try {
+        const payload = {
+          filtros: {
+            data_inicio: di,
+            data_fim: df,
+            motoristas: getMultiSelectValues(selMotoristas),
+          },
+        };
+        const resp = await fetch(URL_GSHEETS, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+          body: JSON.stringify(payload),
+        });
+        const json = await resp.json();
+        if (!json.success) {
+          definirMensagem('erro', json.mensagem || 'Erro ao enviar.', false);
+          return;
+        }
+        let msgOk = json.mensagem || 'Enviado com sucesso.';
+        const ignorados = json.ignorados || [];
+        if (ignorados.length) {
+          const linhas = ignorados.map((r) => {
+            const ref = String(r.referencia ?? '');
+            const dt = String(r.data_tentativa ?? '');
+            const est = String(r.estado_label || r.estado || '');
+            return `${ref} (${dt}${est ? ` — ${est}` : ''})`;
+          });
+          msgOk += ` Ignorados (interno): ${linhas.join('; ')}.`;
+        }
+        definirMensagem('sucesso', msgOk, false);
+      } catch {
+        definirMensagem('erro', 'Erro de comunicação com o servidor.', false);
+      } finally {
+        AppLoader.hide();
+        if (btnGSheets && vazio.classList.contains('d-none')) {
+          btnGSheets.disabled = false;
+        }
+      }
+    },
+  });
 }
 
 async function buscar() {
@@ -315,6 +376,7 @@ async function buscar() {
     return;
   }
   btnImprimir.disabled = true;
+  if (btnGSheets) btnGSheets.disabled = true;
   atualizarCabecalhoImpressao(false);
   loader.classList.remove('d-none');
   resultado.replaceChildren();
@@ -360,6 +422,7 @@ btnDesTodos?.addEventListener('click', () => {
   Array.from(selMotoristas.options).forEach(o => { o.selected = false; });
 });
 btnImprimir?.addEventListener('click', () => window.print());
+btnGSheets?.addEventListener('click', enviarAoGSheets);
 mfBtnSalvar?.addEventListener('click', salvarModFinan);
 
 preencherMotoristas();

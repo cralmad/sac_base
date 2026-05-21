@@ -87,6 +87,13 @@ export const PERMISSOES_SCHEMA = {
     { codename: "financeiro.add_registrofinanceiro",    label: "Incluir Registro Financeiro" },
     { codename: "financeiro.change_registrofinanceiro", label: "Editar Registro Financeiro" },
     { codename: "financeiro.delete_registrofinanceiro", label: "Excluir Registro Financeiro" },
+    // --- Agenda / previsibilidade (menu Financeiro > Relatório) ---
+    { codename: "agenda.view_relatorio_previsibilidade", label: "Relatório Agenda e previsibilidade" },
+    { codename: "agenda.view_agendamanual", label: "Visualizar regras de agenda manual" },
+    { codename: "agenda.add_agendamanual", label: "Incluir regra de agenda manual" },
+    { codename: "agenda.change_agendamanual", label: "Editar regra de agenda manual" },
+    { codename: "agenda.confirmar_ocorrencia_agendamanual", label: "Confirmar ocorrência na agenda" },
+    { codename: "agenda.materializar_agendamanual", label: "Materializar ocorrência na agenda" },
     // --- Cadastro de Clientes ---
     { codename: "cad_cliente.view_cliente",   label: "Visualizar Cliente" },
     { codename: "cad_cliente.add_cliente",    label: "Incluir Cliente" },

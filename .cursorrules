@@ -175,6 +175,39 @@ Uma **única execução** do comando: várias **rondas** releem pendentes com te
 
 ---
 
+## Estrutura Agenda / Previsibilidade
+
+App Django **`pages.agenda`**. Objetivo: timeline de eventos **flutuantes** (projeção de `AgendaManual`) + **concretos** (`PeriodAlertProvider` por módulo), com desduplicação via `AgendaMaterializacao`.
+
+### Modos `AgendaManual.modo_evento`
+
+| Modo | Materializar | Confirmar | Status |
+|------|--------------|-----------|--------|
+| `aviso` | Não | Não | Derivado da data (`< hoje` concluído) |
+| `aviso_confirmavel` | Não | Sim → `AgendaMaterializacao(concluido_confirmado)` | Pendente até confirmar |
+| `materializavel` | Sim (`AgendaMaterializationProvider`) | Não | Flutuente suprimido após `materializado` + GFK |
+
+### Peças principais
+
+| Peça | Ficheiro |
+|------|----------|
+| Modelos | `pages/agenda/models.py` — `AgendaManual`, `AgendaMaterializacao` |
+| Projeção | `pages/agenda/services/recorrencia.py` — `projetar_datas_ocorrencia`; `dia_semana` 1=seg … 7=dom; mensal + `antecipar_fim_semana` |
+| Flutuantes | `pages/agenda/services/coletar_flutuantes.py` |
+| Concretos | `pages/agenda/registry_providers.py` + providers por app (ex. `pages/financeiro/providers/agenda_periodo.py`) |
+| Materialização | `pages/agenda/registry_materializacao.py` + `pages/financeiro/agenda_materialization/registro_financeiro.py` |
+| Relatório | `pages/agenda/views_relatorio.py`, `services/relatorio_previsibilidade.py`, template/JS `relatorio_previsibilidade` |
+| CRUD | `pages/agenda/views_agenda_manual.py`, `services/agenda_manual.py` |
+
+### MUST ao alterar
+
+1. **Tenant:** `filial_id` / `request.filial_ativa` em queries e POST.
+2. **Não** duplicar critério de elegibilidade de providers fora do registry.
+3. **`data_fim_serie` null:** série sempre recorrente até `data_fim` do relatório; `AgendaManual` não importa models de domínio (payload opaco + providers).
+4. Período máximo relatório: **366 dias** (`PERIODO_MAXIMO_AGENDA_DIAS`).
+
+---
+
 ## Change discipline
 
 - Touch only files and lines needed for the task; no drive-by refactors or unrelated formatting.
