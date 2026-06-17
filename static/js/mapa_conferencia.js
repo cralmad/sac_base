@@ -1,5 +1,12 @@
 import { getCsrfToken, hasScreenPermission, confirmar } from '/static/js/sisVar.js';
 import { AppLoader } from '/static/js/loader.js';
+import {
+  chamarRota,
+  desenharPolyline,
+  initReordenacaoLista,
+  montarWaypoints,
+  renderizarPainelResumo,
+} from '/static/js/mapa_rotas_core.js';
 
 // ─── Constantes e estado ─────────────────────────────────────────────────────
 
@@ -34,6 +41,7 @@ const listaBadge      = document.getElementById('mapa-lista-badge');
 const listaTbody      = document.getElementById('mapa-lista-tbody');
 const listaFiltro     = document.getElementById('mapa-lista-filtro');
 const inputRaioFilialKm = document.getElementById('mapa-raio-filial-km');
+const resumoRotasWrapper = document.getElementById('mapa-rotas-resumo-wrapper');
 
 let mapaLeaflet   = null;
 let marcadores    = {};       // mov_id → marker
@@ -45,6 +53,10 @@ let circuloRaioFilial = null; // círculo opcional em torno da filial (Leaflet r
 let carregamentoPontosEmCurso = false;
 let popupEventsInicializados = false;
 const featByMovId = new Map();
+let carroSelecionado = null; // number|null
+const ordemParadasPorCarro = new Map(); // carroKey -> [mov_id]
+let reordenacaoHandle = null;
+let avisoOrdemPendente = false;
 
 // ─── Inicialização do mapa ───────────────────────────────────────────────────
 
@@ -56,6 +68,16 @@ function inicializarMapa() {
     maxZoom: 19,
   }).addTo(mapaLeaflet);
   rotasLayer = L.layerGroup().addTo(mapaLeaflet);
+}
+
+function _carroKey(carro) {
+  return carro == null ? '__sem_carro__' : String(carro);
+}
+
+function _parseCarro(x) {
+  if (x == null) return null;
+  const n = typeof x === 'number' ? x : parseInt(String(x), 10);
+  return Number.isFinite(n) ? n : null;
 }
 
 // ─── Ícone de pin colorido ────────────────────────────────────────────────────
@@ -387,6 +409,19 @@ function renderizarLista(geojson) {
     const tr = document.createElement('tr');
     tr.dataset.movId = p.mov_id;
     tr.dataset.ref   = String(p.referencia).toLowerCase();
+    tr.dataset.carro = p.carro != null ? String(p.carro) : '';
+    tr.dataset.segue = p.segue_para_entrega === false ? '0' : '1';
+    if (p.segue_para_entrega === false) tr.classList.add('mapa-linha-nao-segue');
+
+    // Handle de reordenação (mostra só quando carro selecionado)
+    const tdOrd = document.createElement('td');
+    tdOrd.className = 'mapa-ordem-td';
+    const handle = document.createElement('span');
+    handle.className = 'mapa-ordem-handle';
+    handle.title = 'Arraste para reordenar as paradas da rota';
+    handle.textContent = '⋮⋮';
+    tdOrd.appendChild(handle);
+    tr.appendChild(tdOrd);
 
     // Referência (botão que foca o pin)
     const tdRef = document.createElement('td');
@@ -403,6 +438,13 @@ function renderizarLista(geojson) {
       badgeDev.textContent = 'Devolucao';
       badgeDev.title = 'Pedido com devolucao associada';
       tdRef.appendChild(badgeDev);
+    }
+    if (p.segue_para_entrega === false) {
+      const badgeNao = document.createElement('span');
+      badgeNao.className = 'badge text-bg-danger ms-2';
+      badgeNao.textContent = 'Nao segue';
+      badgeNao.title = 'Pedido não segue para entrega (não entra na rota).';
+      tdRef.appendChild(badgeNao);
     }
     tr.appendChild(tdRef);
 
@@ -442,16 +484,33 @@ function renderizarLista(geojson) {
   }
 
   listaWrapper.classList.toggle('d-none', total === 0);
+  aplicarFiltroLista();
+  inicializarReordenacaoLista();
 }
 
 function filtrarLista(termo) {
   const t = termo.trim().toLowerCase();
-  listaTbody.querySelectorAll('tr').forEach(tr => {
-    tr.classList.toggle('d-none', t !== '' && !tr.dataset.ref.includes(t));
-  });
+  listaFiltro.value = termo;
+  aplicarFiltroLista();
 }
 
 listaFiltro?.addEventListener('input', () => filtrarLista(listaFiltro.value));
+
+function aplicarFiltroLista() {
+  const t = (listaFiltro?.value || '').trim().toLowerCase();
+  let visiveis = 0;
+  listaTbody.querySelectorAll('tr').forEach(tr => {
+    const matchRef = t === '' || (tr.dataset.ref || '').includes(t);
+    const matchCarro = carroSelecionado == null
+      ? true
+      : (tr.dataset.carro || '') === String(carroSelecionado);
+    const hide = !(matchRef && matchCarro);
+    tr.classList.toggle('d-none', hide);
+    if (!hide) visiveis += 1;
+  });
+  if (listaBadge) listaBadge.textContent = String(visiveis);
+  if (reordenacaoHandle) reordenacaoHandle.refresh?.();
+}
 
 // ─── Focar marcador por mov_id ──────────────────────────────────────────────
 
@@ -495,31 +554,112 @@ function renderizarLegenda(geojson) {
     item.appendChild(txt);
     // Clique na legenda → filtra/destaca marcadores desse carro
     item.style.cursor = 'pointer';
-    item.addEventListener('click', () => filtrarPorCarro(carro === '—' ? null : parseInt(carro, 10)));
+    item.dataset.carro = carro === '—' ? '' : String(parseInt(carro, 10));
+    item.addEventListener('click', () => selecionarCarro(carro === '—' ? null : parseInt(carro, 10), item));
     legendaItens.appendChild(item);
   }
   legendaWrapper.classList.remove('d-none');
 }
 
-// Destaca/oculta pins por carro
-let filtroCarroAtivo = null;
-function filtrarPorCarro(carro) {
-  if (filtroCarroAtivo === carro) {
-    // Desfaz o filtro
-    filtroCarroAtivo = null;
-    for (const [id, m] of Object.entries(marcadores)) {
-      m.setOpacity(1);
-    }
-    return;
+function selecionarCarro(carro, itemEl = null) {
+  const novo = _parseCarro(carro);
+  const mesmo = carroSelecionado === novo;
+  carroSelecionado = mesmo ? null : novo;
+  avisoOrdemPendente = false;
+  rotasLayer?.clearLayers();
+  btnLimparRotas?.classList.add('d-none');
+  if (resumoRotasWrapper) resumoRotasWrapper.classList.add('d-none');
+
+  // Atualiza classe ativa na legenda
+  legendaItens?.querySelectorAll('.mapa-legenda-item').forEach(el => el.classList.remove('mapa-legenda-item--ativo'));
+  if (carroSelecionado != null) {
+    const el = itemEl || legendaItens?.querySelector(`.mapa-legenda-item[data-carro="${carroSelecionado}"]`);
+    el?.classList.add('mapa-legenda-item--ativo');
   }
-  filtroCarroAtivo = carro;
-  for (const feat of geojsonData.features) {
-    const m = marcadores[feat.properties.mov_id];
-    if (!m) continue;
-    const match = carro === null
-      ? feat.properties.carro == null
-      : feat.properties.carro === carro;
-    m.setOpacity(match ? 1 : 0.15);
+
+  // Botão rota habilita só com carro selecionado
+  if (btnMostrarRotas) btnMostrarRotas.disabled = carroSelecionado == null;
+
+  // Opacidade dos pins
+  if (geojsonData) {
+    for (const feat of geojsonData.features) {
+      const m = marcadores[feat.properties.mov_id];
+      if (!m) continue;
+      const match = carroSelecionado == null ? true : feat.properties.carro === carroSelecionado;
+      m.setOpacity(match ? 1 : 0.15);
+    }
+  }
+
+  aplicarFiltroLista();
+  _inicializarOrdemCarroSelecionado();
+  inicializarReordenacaoLista();
+}
+
+function _inicializarOrdemCarroSelecionado() {
+  if (carroSelecionado == null || !listaTbody) return;
+  const ids = [...listaTbody.querySelectorAll('tr:not(.d-none)')]
+    .filter(tr => (tr.dataset.carro || '') === String(carroSelecionado))
+    .filter(tr => (tr.dataset.segue || '1') === '1')
+    .map(tr => parseInt(tr.dataset.movId, 10))
+    .filter(n => Number.isFinite(n));
+  ordemParadasPorCarro.set(_carroKey(carroSelecionado), ids);
+}
+
+function _featuresCarroSelecionado() {
+  if (!geojsonData || carroSelecionado == null) return [];
+  return geojsonData.features.filter(f => f.properties?.carro === carroSelecionado);
+}
+
+async function gerarRotaCarroSelecionado() {
+  if (!geojsonData || carroSelecionado == null) return;
+  AppLoader.show();
+  try {
+    const feats = _featuresCarroSelecionado();
+    const ordem = ordemParadasPorCarro.get(_carroKey(carroSelecionado)) || null;
+    const pontos = montarWaypoints(feats, { deposito: depositoCoord, ordemMovIds: ordem, somenteSegueEntrega: true });
+    const pontosApi = pontos.map(p => ({ lat: p.lat, lng: p.lng }));
+
+    if (pontosApi.length < 2) {
+      renderizarPainelResumo(resumoRotasWrapper, {
+        carro: carroSelecionado,
+        distancia_metros: null,
+        duracao_segundos: null,
+        paradas: Math.max(0, pontosApi.length - (depositoCoord ? 1 : 0)),
+        fallback: false,
+        deposito: !!depositoCoord,
+        aviso: 'Sem paradas elegíveis para calcular rota.',
+      });
+      return;
+    }
+
+    const { ok, data } = await chamarRota(URL_ROTA, pontosApi, getCsrfToken(), carroSelecionado);
+    if (!ok || !data?.success) {
+      renderizarPainelResumo(resumoRotasWrapper, {
+        carro: carroSelecionado,
+        distancia_metros: null,
+        duracao_segundos: null,
+        paradas: Math.max(0, pontosApi.length - (depositoCoord ? 1 : 0)),
+        fallback: false,
+        deposito: !!depositoCoord,
+        aviso: data?.mensagem || 'Falha ao calcular rota.',
+      });
+      return;
+    }
+
+    desenharPolyline(rotasLayer, data.geometry, { color: feats[0]?.properties?.cor || '#198754', weight: 4, opacity: 0.85 });
+    btnLimparRotas.classList.remove('d-none');
+    renderizarPainelResumo(resumoRotasWrapper, {
+      carro: carroSelecionado,
+      distancia_metros: data.distancia_metros,
+      duracao_segundos: data.duracao_segundos,
+      paradas: Math.max(0, pontosApi.length - (depositoCoord ? 1 : 0)),
+      fallback: !!data.fallback,
+      deposito: !!depositoCoord,
+      aviso: avisoOrdemPendente ? 'Ordem alterada — gere a rota novamente.' : '',
+    });
+    avisoOrdemPendente = false;
+  } finally {
+    AppLoader.hide();
   }
 }
 
@@ -536,6 +676,10 @@ async function carregarPontos(data) {
   btnMostrarRotas.disabled = true;
   btnLimparRotas.classList.add('d-none');
   mapaInfo.classList.add('d-none');
+  if (resumoRotasWrapper) resumoRotasWrapper.classList.add('d-none');
+  carroSelecionado = null;
+  ordemParadasPorCarro.clear();
+  avisoOrdemPendente = false;
 
   try {
     const resp = await fetch(URL_PONTOS, {
@@ -683,59 +827,38 @@ function definirInputRaioFilialDisponivel(disponivel) {
   }
 }
 
-// ─── Rotas por carro ─────────────────────────────────────────────────────────
-
-async function tracarRotas() {
-  if (!geojsonData) return;
-  AppLoader.show();
-  rotasLayer.clearLayers();
-
-  // Agrupa features por carro
-  const grupos = new Map();
-  for (const f of geojsonData.features) {
-    const c = f.properties.carro ?? '__sem_carro__';
-    if (!grupos.has(c)) grupos.set(c, { pontos: [], cor: f.properties.cor });
-    grupos.get(c).pontos.push({ lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] });
+function inicializarReordenacaoLista() {
+  if (!listaTbody) return;
+  if (!reordenacaoHandle) {
+    reordenacaoHandle = initReordenacaoLista(listaTbody, {
+      selectorLinha: 'tr',
+      canDrag: (tr) => {
+        if (carroSelecionado == null) return false;
+        if (tr.classList.contains('d-none')) return false;
+        if ((tr.dataset.carro || '') !== String(carroSelecionado)) return false;
+        if ((tr.dataset.segue || '1') !== '1') return false;
+        return true;
+      },
+      onOrdemAlterada: (movIds) => {
+        if (carroSelecionado == null) return;
+        ordemParadasPorCarro.set(_carroKey(carroSelecionado), movIds);
+        avisoOrdemPendente = true;
+        if (!btnLimparRotas.classList.contains('d-none')) {
+          renderizarPainelResumo(resumoRotasWrapper, {
+            carro: carroSelecionado,
+            distancia_metros: null,
+            duracao_segundos: null,
+            paradas: movIds.length,
+            fallback: false,
+            deposito: !!depositoCoord,
+            aviso: 'Ordem alterada — clique em Gerar rota.',
+          });
+        }
+      },
+    });
+  } else {
+    reordenacaoHandle.refresh?.();
   }
-
-  // Inclui depósito como ponto de partida e chegada, se configurado
-  if (depositoCoord) {
-    for (const grupo of grupos.values()) {
-      grupo.pontos.unshift({ lat: depositoCoord.lat, lng: depositoCoord.lng });
-      grupo.pontos.push({ lat: depositoCoord.lat, lng: depositoCoord.lng });
-    }
-  }
-
-  const promessas = [];
-  for (const [carro, grupo] of grupos.entries()) {
-    if (grupo.pontos.length < 2) continue;
-    promessas.push(
-      fetch(URL_ROTA, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
-        body: JSON.stringify({ pontos: grupo.pontos, carro }),
-      })
-      .then(r => r.json())
-      .then(data => {
-        if (!data.success) return;
-        const latLngs = data.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
-        L.polyline(latLngs, {
-          color: grupo.cor,
-          weight: 4,
-          opacity: 0.8,
-        }).addTo(rotasLayer);
-      })
-      .catch(() => {
-        // Rota falhou para este carro — desenha linha direta entre os pontos
-        const latLngs = grupo.pontos.map(p => [p.lat, p.lng]);
-        L.polyline(latLngs, { color: grupo.cor, weight: 3, opacity: 0.5, dashArray: '6, 6' }).addTo(rotasLayer);
-      })
-    );
-  }
-
-  await Promise.all(promessas);
-  btnLimparRotas.classList.remove('d-none');
-  AppLoader.hide();
 }
 
 async function salvarCarroNoPopup(movId, novoCarro, popupInstance, statusEl) {
@@ -811,11 +934,12 @@ document.getElementById('form-filtro-mapa').addEventListener('submit', e => {
   if (data) carregarPontos(data);
 });
 
-btnMostrarRotas?.addEventListener('click', tracarRotas);
+btnMostrarRotas?.addEventListener('click', gerarRotaCarroSelecionado);
 
 btnLimparRotas?.addEventListener('click', () => {
   rotasLayer.clearLayers();
   btnLimparRotas.classList.add('d-none');
+  if (resumoRotasWrapper) resumoRotasWrapper.classList.add('d-none');
 });
 
 inputRaioFilialKm?.addEventListener('input', () => {

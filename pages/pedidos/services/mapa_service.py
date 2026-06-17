@@ -1,4 +1,5 @@
 import logging
+import math
 import time
 import unicodedata
 
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 NOMINATIM_HEADERS = {"User-Agent": "sac-base-mapa/1.0"}
+OSRM_ROUTE_URL = "https://router.project-osrm.org/route/v1/driving"
 NOMINATIM_MIN_INTERVAL_SECONDS = 1.1
 MAX_GEOCODE_POR_REQUISICAO = 12
 MAX_GEOCODE_SEGUNDOS = 20
@@ -553,3 +555,73 @@ def montar_payload_mapa(filial, data_tentativa):
         "pendentes_sem_coord": pendentes_sem_coord,
         "limite_atingido": limite_atingido,
     }
+
+
+def coordenadas_deposito_filial(filial):
+    """Retorna {'lat': ..., 'lng': ...} do depósito da filial, ou None se não configurado."""
+    if filial is None:
+        return None
+    lat = filial.lat_deposito
+    lng = filial.lng_deposito
+    if lat is None or lng is None:
+        return None
+    return {"lat": float(lat), "lng": float(lng)}
+
+
+def _haversine_metros(lat1, lng1, lat2, lng2):
+    raio_terra = 6_371_000
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lng2 - lng1)
+    a = (
+        math.sin(dphi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    )
+    return raio_terra * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def _distancia_haversine_waypoints(pontos):
+    total = 0.0
+    for i in range(1, len(pontos)):
+        p0, p1 = pontos[i - 1], pontos[i]
+        total += _haversine_metros(p0["lat"], p0["lng"], p1["lat"], p1["lng"])
+    return total
+
+
+def calcular_rota_osrm(pontos):
+    """
+    Calcula rota rodoviária via OSRM público.
+
+    pontos: lista de dicts {'lat': float, 'lng': float}
+    Retorna dict com geometry, distancia_metros, duracao_segundos, fallback.
+    """
+    if len(pontos) < 2:
+        raise ValueError("Mínimo 2 pontos para traçar rota.")
+
+    coordenadas = [[p["lng"], p["lat"]] for p in pontos]
+    coords_str = ";".join(f"{lng},{lat}" for lng, lat in coordenadas)
+    try:
+        resp = http_requests.get(
+            f"{OSRM_ROUTE_URL}/{coords_str}",
+            params={"overview": "full", "geometries": "geojson"},
+            headers=NOMINATIM_HEADERS,
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        rota = data["routes"][0]
+        return {
+            "geometry": rota["geometry"],
+            "distancia_metros": float(rota["distance"]),
+            "duracao_segundos": float(rota["duration"]),
+            "fallback": False,
+        }
+    except http_requests.RequestException as exc:
+        logger.warning("OSRM rota falhou: %s", exc)
+        return {
+            "geometry": {"type": "LineString", "coordinates": coordenadas},
+            "distancia_metros": _distancia_haversine_waypoints(pontos),
+            "duracao_segundos": None,
+            "fallback": True,
+        }

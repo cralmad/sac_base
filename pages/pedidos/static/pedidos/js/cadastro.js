@@ -1165,6 +1165,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setFormState(nomeForm, 'novo');
     form.reset();
     updateState({ form: { [nomeForm]: { estado: 'novo', campos: { ...getForm(nomeForm).campos, id: null, origem: 'MANUAL' } } } });
+    hidratarFormulario(nomeForm);
     carregarMovimentacoes();
     carregarDevolucoes();
     carregarIncidencias();

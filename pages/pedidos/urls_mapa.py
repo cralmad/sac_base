@@ -9,6 +9,7 @@ from .views_mapa import (
     mapa_publico_gerar_link_view,
     mapa_publico_view,
     mapa_publico_pontos_view,
+    mapa_publico_rota_view,
     mapa_publico_periodo_view,
 )
 
@@ -24,5 +25,6 @@ urlpatterns = [
     path("mapa_conferencia/link", mapa_publico_gerar_link_view, name="mapa_publico_gerar_link"),
     path("mapa/<str:token>/", mapa_publico_view, name="mapa_publico"),
     path("mapa/<str:token>/pontos", mapa_publico_pontos_view, name="mapa_publico_pontos"),
+    path("mapa/<str:token>/rota", mapa_publico_rota_view, name="mapa_publico_rota"),
     path("mapa/<str:token>/periodo", mapa_publico_periodo_view, name="mapa_publico_periodo"),
 ]

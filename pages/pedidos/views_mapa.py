@@ -2,7 +2,6 @@ import json
 import logging
 
 import jwt
-import requests as http_requests
 from django.conf import settings
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.cache import cache
@@ -14,9 +13,12 @@ from django.views.decorators.csrf import csrf_protect, csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
 from datetime import datetime, time as dt_time
 
+from pages.filial.models import Filial
 from pages.pedidos.models import Pedido, TentativaEntrega, estado_segue_para_entrega
 from pages.pedidos.services.mapa_service import (
     buscar_local_para_pedido,
+    calcular_rota_osrm,
+    coordenadas_deposito_filial,
     cor_carro,
     geocodificar,
     montar_payload_mapa,
@@ -35,6 +37,17 @@ PERMISSOES_MAPA = {
 NOMINATIM_HEADERS = {"User-Agent": "sac-base-mapa/1.0"}
 
 
+def _resposta_rota_json(resultado, carro=""):
+    return JsonResponse({
+        "success": True,
+        "geometry": resultado["geometry"],
+        "distancia_metros": resultado["distancia_metros"],
+        "duracao_segundos": resultado["duracao_segundos"],
+        "fallback": resultado["fallback"],
+        "carro": carro,
+    })
+
+
 @login_required
 @permission_required(PERMISSOES_MAPA["acessar"], raise_exception=True)
 @csrf_protect
@@ -45,18 +58,6 @@ def mapa_conferencia_view(request):
         permissions={"mapa": build_action_permissions(request.user, PERMISSOES_MAPA)}
     )
     return render(request, "mapa_conferencia.html", {"data_tentativa": data_tentativa})
-
-
-def _coordenadas_deposito(request):
-    """Retorna {'lat': ..., 'lng': ...} da filial ativa, ou None se não configurado."""
-    filial = getattr(request, "filial_ativa", None)
-    if filial is None:
-        return None
-    lat = filial.lat_deposito
-    lng = filial.lng_deposito
-    if lat is None or lng is None:
-        return None
-    return {"lat": float(lat), "lng": float(lng)}
 
 
 @login_required
@@ -99,7 +100,7 @@ def mapa_pontos_view(request):
             "sem_coord": payload["sem_coord"],
             "pendentes_sem_coord": payload.get("pendentes_sem_coord", 0),
             "limite_atingido": payload.get("limite_atingido", False),
-            "deposito": _coordenadas_deposito(request),
+            "deposito": coordenadas_deposito_filial(filial_ativa),
         })
     finally:
         cache.delete(lock_key)
@@ -220,45 +221,20 @@ def mapa_salvar_coord_view(request):
 @csrf_protect
 @require_POST
 def mapa_rota_view(request):
-    """
-    Recebe lista de pontos {lat, lng} e retorna geometria de rota
-    via OpenRouteService (free tier, sem chave necessária para tráfego básico).
-    Fallback: linha reta entre pontos (polyline simples).
-    """
+    """Recebe lista de pontos {lat, lng} e retorna geometria de rota via OSRM."""
     try:
         body = json.loads(request.body)
-        pontos = body["pontos"]  # [{lat, lng}, ...]
+        pontos = body["pontos"]
         carro = body.get("carro", "")
     except (KeyError, TypeError, ValueError, json.JSONDecodeError):
         return JsonResponse({"success": False, "mensagem": "Dados inválidos."}, status=400)
 
-    if len(pontos) < 2:
-        return JsonResponse({"success": False, "mensagem": "Mínimo 2 pontos para traçar rota."}, status=400)
-
-    coordenadas = [[p["lng"], p["lat"]] for p in pontos]
-    # OSRM público — gratuito, sem chave de API
-    # Formato: lng,lat;lng,lat;...
-    coords_str = ";".join(f"{lng},{lat}" for lng, lat in coordenadas)
     try:
-        resp = http_requests.get(
-            f"https://router.project-osrm.org/route/v1/driving/{coords_str}",
-            params={"overview": "full", "geometries": "geojson"},
-            headers=NOMINATIM_HEADERS,
-            timeout=15,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        geometry = data["routes"][0]["geometry"]
-        return JsonResponse({"success": True, "geometry": geometry, "carro": carro})
-    except http_requests.RequestException as exc:
-        logger.warning("OSRM rota falhou: %s", exc)
-        # Fallback: retorna polyline reta entre os pontos
-        return JsonResponse({
-            "success": True,
-            "geometry": {"type": "LineString", "coordinates": coordenadas},
-            "carro": carro,
-            "fallback": True,
-        })
+        resultado = calcular_rota_osrm(pontos)
+    except ValueError as exc:
+        return JsonResponse({"success": False, "mensagem": str(exc)}, status=400)
+
+    return _resposta_rota_json(resultado, carro)
 
 
 # ─── Mapa Público (link por carro, sem login) ────────────────────────────────
@@ -389,6 +365,10 @@ def mapa_publico_pontos_view(request, token):
             periodo_atual = mov.periodo
 
         fones = " / ".join(f for f in [pedido.fone_dest or "", pedido.fone_dest2 or ""] if f)
+        segue_para_entrega = (
+            estado_segue_para_entrega(mov.estado)
+            and (pedido.id not in pedidos_com_tentativa_posterior)
+        )
         linhas.append({
             "mov_id": mov.id,
             "referencia": str(pedido.pedido or pedido.id_vonzu),
@@ -402,6 +382,7 @@ def mapa_publico_pontos_view(request, token):
             "peso": pedido.peso,
             "obs_rota": pedido.obs_rota or "",
             "periodo": mov.periodo or "",
+            "segue_para_entrega": segue_para_entrega,
         })
 
         lat = float(pedido.lat) if pedido.lat is not None else None
@@ -432,6 +413,13 @@ def mapa_publico_pontos_view(request, token):
             },
         })
 
+    deposito = None
+    try:
+        filial = Filial.objects.get(pk=filial_id)
+        deposito = coordenadas_deposito_filial(filial)
+    except Filial.DoesNotExist:
+        pass
+
     return JsonResponse({
         "success": True,
         "geojson": {"type": "FeatureCollection", "features": features},
@@ -440,7 +428,32 @@ def mapa_publico_pontos_view(request, token):
         "total_mapa": len(features),
         "sem_coord": sem_coord,
         "periodo_atual": periodo_atual or "",
+        "deposito": deposito,
     })
+
+
+@csrf_exempt
+@require_POST
+def mapa_publico_rota_view(request, token):
+    """Calcula rota para o carro do token (sem login)."""
+    try:
+        _validar_token_carro(token)
+    except Exception:
+        return JsonResponse({"success": False, "mensagem": "Link inválido ou expirado."}, status=403)
+
+    try:
+        body = json.loads(request.body)
+        pontos = body["pontos"]
+        carro = body.get("carro", "")
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return JsonResponse({"success": False, "mensagem": "Dados inválidos."}, status=400)
+
+    try:
+        resultado = calcular_rota_osrm(pontos)
+    except ValueError as exc:
+        return JsonResponse({"success": False, "mensagem": str(exc)}, status=400)
+
+    return _resposta_rota_json(resultado, carro)
 
 
 @csrf_exempt

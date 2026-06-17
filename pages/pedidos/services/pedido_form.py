@@ -85,6 +85,13 @@ def persistir_pedido_cadastro(usuario, estado_form, campos, filial):
             if parsed["id_vonzu"] is None:
                 return fail("ID Vonzu é obrigatório e numérico.", 400)
 
+            existe_duplicado = Pedido.objects.filter(
+                filial_id=filial.id,
+                id_vonzu=parsed["id_vonzu"],
+            ).exclude(id=pedido.id).exists()
+            if existe_duplicado:
+                return fail("Já existe pedido com este ID Vonzu para a filial selecionada.", 400)
+
             for campo, valor in parsed.items():
                 setattr(pedido, campo, valor)
 
