@@ -9,7 +9,11 @@ from django.utils import timezone
 from pages.core.models import Pais
 from pages.filial.models import Filial
 from pages.financeiro.models import PlanoContas, RegistroFinanceiro, RegistroFinanceiroTipo
-from pages.logistica_config.models import ConfiguracaoLogistica, DataExcecaoConfigLogistica
+from pages.logistica_config.models import (
+    ConfiguracaoLogistica,
+    DataExcecaoConfigLogistica,
+    PeriodoExcecaoConfigLogistica,
+)
 from pages.pedidos.models import Pedido, TentativaEntrega
 from pages.pedidos.services.relatorio_fechamento import (
     formatar_decimal_pt_br,
@@ -143,6 +147,82 @@ class RelatorioFechamentoServiceTests(TestCase):
         self.assertEqual(t["expresso_valor"], "0,00")
         self.assertEqual(payload["periodo_texto"], "10/06/2026 a 10/06/2026")
         self.assertEqual(payload["valor_total_consolidado"], "118,00")
+
+    def test_periodo_excecao_substitui_reservados(self):
+        PeriodoExcecaoConfigLogistica.objects.create(
+            configuracao=self.cfg,
+            data_inicio=self.d0,
+            data_fim=self.d1,
+            pesado_reservado=4,
+            ligeiro_reservado=2,
+        )
+        p = self._pedido(50011)
+        self._tentativa(p, self.d0)
+
+        payload, err = montar_relatorio_fechamento(self.filial, self.d0, self.d0)
+        self.assertIsNone(err)
+        linha = payload["linhas"][0]
+        self.assertEqual(linha["ligeiro_quantidade"], "2")
+        self.assertEqual(linha["pesado_quantidade"], "4")
+
+    def test_data_individual_tem_prioridade_sobre_periodo(self):
+        PeriodoExcecaoConfigLogistica.objects.create(
+            configuracao=self.cfg,
+            data_inicio=self.d0,
+            data_fim=self.d1,
+            pesado_reservado=4,
+            ligeiro_reservado=2,
+        )
+        DataExcecaoConfigLogistica.objects.create(
+            configuracao=self.cfg,
+            data=self.d0,
+            pesado_reservado=9,
+            ligeiro_reservado=7,
+        )
+        p = self._pedido(50012)
+        self._tentativa(p, self.d0)
+
+        payload, err = montar_relatorio_fechamento(self.filial, self.d0, self.d0)
+        self.assertIsNone(err)
+        linha = payload["linhas"][0]
+        self.assertEqual(linha["ligeiro_quantidade"], "7")
+        self.assertEqual(linha["pesado_quantidade"], "9")
+
+    def test_periodo_excecao_aplica_em_data_dentro_do_intervalo_parcial(self):
+        """Período mais largo que o relatório: aplica valores na data coberta."""
+        PeriodoExcecaoConfigLogistica.objects.create(
+            configuracao=self.cfg,
+            data_inicio=date(2026, 6, 1),
+            data_fim=date(2026, 6, 30),
+            pesado_reservado=8,
+            ligeiro_reservado=6,
+        )
+        p = self._pedido(50013)
+        self._tentativa(p, self.d0)
+
+        payload, err = montar_relatorio_fechamento(self.filial, self.d0, self.d0)
+        self.assertIsNone(err)
+        linha = payload["linhas"][0]
+        self.assertEqual(linha["ligeiro_quantidade"], "6")
+        self.assertEqual(linha["pesado_quantidade"], "8")
+
+    def test_periodo_fora_do_relatorio_nao_aplica(self):
+        """Período sem sobreposição com o relatório mantém valores padrão."""
+        PeriodoExcecaoConfigLogistica.objects.create(
+            configuracao=self.cfg,
+            data_inicio=date(2026, 7, 1),
+            data_fim=date(2026, 7, 31),
+            pesado_reservado=8,
+            ligeiro_reservado=6,
+        )
+        p = self._pedido(50014)
+        self._tentativa(p, self.d0)
+
+        payload, err = montar_relatorio_fechamento(self.filial, self.d0, self.d0)
+        self.assertIsNone(err)
+        linha = payload["linhas"][0]
+        self.assertEqual(linha["ligeiro_quantidade"], "1")
+        self.assertEqual(linha["pesado_quantidade"], "3")
 
     def test_expresso_rf_entrada_por_data(self):
         p = self._pedido(50020)

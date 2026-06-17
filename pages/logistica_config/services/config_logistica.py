@@ -8,7 +8,12 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from pages.filial.services import get_filiais_escrita_queryset
-from pages.logistica_config.models import ConfiguracaoLogistica, DataExcecaoConfigLogistica
+from pages.logistica_config.models import (
+    ConfiguracaoLogistica,
+    DataExcecaoConfigLogistica,
+    PeriodoExcecaoConfigLogistica,
+)
+from pages.logistica_config.services.excecoes_resolucao import periodos_sobrepostos
 from sac_base.coercion import parse_date, parse_decimal, parse_int
 
 
@@ -24,6 +29,7 @@ def build_campos_iniciais():
         "valor_unitario_ligeiro": "0.00",
         "valor_excedente": "0.00",
         "excecoes": [],
+        "excecoes_periodo": [],
     }
 
 
@@ -43,6 +49,19 @@ def _small_int(val, label: str) -> int:
     if n > 32767:
         raise ValidationError(f"{label} excede o limite permitido.")
     return n
+
+
+def serializar_excecoes_periodo(config: ConfiguracaoLogistica):
+    return [
+        {
+            "id": ex.id,
+            "data_inicio": ex.data_inicio.isoformat() if ex.data_inicio else "",
+            "data_fim": ex.data_fim.isoformat() if ex.data_fim else "",
+            "pesado_reservado": str(ex.pesado_reservado),
+            "ligeiro_reservado": str(ex.ligeiro_reservado),
+        }
+        for ex in config.periodos_excecao.order_by("data_inicio", "data_fim")
+    ]
 
 
 def serializar_excecoes(config: ConfiguracaoLogistica):
@@ -69,6 +88,7 @@ def serializar_config(config: ConfiguracaoLogistica):
         "valor_unitario_ligeiro": f"{config.valor_unitario_ligeiro:.2f}",
         "valor_excedente": f"{config.valor_excedente:.2f}",
         "excecoes": serializar_excecoes(config),
+        "excecoes_periodo": serializar_excecoes_periodo(config),
     }
 
 
@@ -97,6 +117,33 @@ def _normalizar_payload_excecoes(raw) -> list[dict]:
     return resultado
 
 
+def _normalizar_payload_excecoes_periodo(raw) -> list[dict]:
+    if not isinstance(raw, list):
+        raise ValidationError("Lista de períodos de exceção inválida.")
+    resultado = []
+    for item in raw:
+        if not isinstance(item, dict):
+            raise ValidationError("Item de período de exceção inválido.")
+        dt_ini = parse_date(item.get("data_inicio"))
+        dt_fim = parse_date(item.get("data_fim"))
+        if not dt_ini or not dt_fim:
+            raise ValidationError("Cada período de exceção deve ter data inicial e final válidas.")
+        if dt_ini > dt_fim:
+            raise ValidationError("A data inicial do período não pode ser maior que a data final.")
+        resultado.append(
+            {
+                "data_inicio": dt_ini,
+                "data_fim": dt_fim,
+                "pesado_reservado": _small_int(item.get("pesado_reservado"), "Pesado reservado (período)"),
+                "ligeiro_reservado": _small_int(item.get("ligeiro_reservado"), "Ligeiro reservado (período)"),
+            }
+        )
+    if periodos_sobrepostos(resultado):
+        raise ValidationError("Existem períodos de exceção com datas sobrepostas.")
+    resultado.sort(key=lambda x: (x["data_inicio"], x["data_fim"]))
+    return resultado
+
+
 def persistir_configuracao(usuario, estado: str, campos: dict) -> ConfiguracaoLogistica:
     filial_id = campos.get("filial_id")
     try:
@@ -109,6 +156,7 @@ def persistir_configuracao(usuario, estado: str, campos: dict) -> ConfiguracaoLo
         raise ValidationError("Matriz/filial inválida ou sem vínculo de escrita.")
 
     excecoes_norm = _normalizar_payload_excecoes(campos.get("excecoes") or [])
+    excecoes_periodo_norm = _normalizar_payload_excecoes_periodo(campos.get("excecoes_periodo") or [])
 
     pedidos_pesado = _small_int(campos.get("pedidos_pesado"), "Pedidos pesado")
     pesado_reservado = _small_int(campos.get("pesado_reservado"), "Pesado reservado")
@@ -173,6 +221,20 @@ def persistir_configuracao(usuario, estado: str, campos: dict) -> ConfiguracaoLo
             ]
         )
 
+        PeriodoExcecaoConfigLogistica.objects.filter(configuracao=config).delete()
+        PeriodoExcecaoConfigLogistica.objects.bulk_create(
+            [
+                PeriodoExcecaoConfigLogistica(
+                    configuracao=config,
+                    data_inicio=row["data_inicio"],
+                    data_fim=row["data_fim"],
+                    pesado_reservado=row["pesado_reservado"],
+                    ligeiro_reservado=row["ligeiro_reservado"],
+                )
+                for row in excecoes_periodo_norm
+            ]
+        )
+
     config.refresh_from_db()
     return config
 
@@ -183,7 +245,7 @@ def obter_config_por_id(usuario, config_id: int) -> ConfiguracaoLogistica | None
             id=config_id,
             filial_id__in=get_filiais_escrita_queryset(usuario).values("id"),
         )
-        .prefetch_related("datas_excecao")
+        .prefetch_related("datas_excecao", "periodos_excecao")
         .first()
     )
 

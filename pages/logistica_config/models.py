@@ -60,3 +60,30 @@ class DataExcecaoConfigLogistica(models.Model):
 
     def __str__(self):
         return f"Exceção {self.data} — config {self.configuracao_id}"
+
+
+class PeriodoExcecaoConfigLogistica(models.Model):
+    """Substituição de vagas reservadas (ligeiro/pesado) para um intervalo de datas."""
+
+    id = models.BigAutoField(primary_key=True)
+    configuracao = models.ForeignKey(
+        ConfiguracaoLogistica,
+        on_delete=models.CASCADE,
+        db_column="configuracao_id",
+        related_name="periodos_excecao",
+    )
+    data_inicio = models.DateField()
+    data_fim = models.DateField()
+    pesado_reservado = models.PositiveSmallIntegerField(default=0)
+    ligeiro_reservado = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        db_table = "periodo_excecao_config_logistica"
+        verbose_name = "Período de exceção (logística)"
+        verbose_name_plural = "Períodos de exceção (logística)"
+        indexes = [
+            models.Index(fields=["configuracao", "data_inicio", "data_fim"]),
+        ]
+
+    def __str__(self):
+        return f"Exceção período {self.data_inicio}–{self.data_fim} — config {self.configuracao_id}"

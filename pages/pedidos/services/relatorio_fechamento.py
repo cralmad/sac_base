@@ -9,7 +9,11 @@ from decimal import Decimal
 from django.db.models import Count
 
 from pages.financeiro.models import RegistroFinanceiro, RegistroFinanceiroTipo
-from pages.logistica_config.models import ConfiguracaoLogistica, DataExcecaoConfigLogistica
+from pages.logistica_config.models import ConfiguracaoLogistica
+from pages.logistica_config.services.excecoes_resolucao import (
+    carregar_contexto_excecoes_intervalo,
+    resolver_reservados_para_data,
+)
 from pages.pedidos.models import TentativaEntrega
 
 PERIODO_MAXIMO_DIAS = 90
@@ -93,13 +97,7 @@ def montar_relatorio_fechamento(filial, data_ini: date, data_fim: date) -> tuple
         .order_by("data_tentativa")
     )
 
-    exce_map = {
-        e.data: e
-        for e in DataExcecaoConfigLogistica.objects.filter(
-            configuracao=cfg,
-            data__range=(data_ini, data_fim),
-        )
-    }
+    exce_individual, periodos_excecao = carregar_contexto_excecoes_intervalo(cfg, data_ini, data_fim)
 
     rf_por_data: dict[date, list[dict]] = defaultdict(list)
     for r in RegistroFinanceiro.objects.filter(
@@ -133,9 +131,7 @@ def montar_relatorio_fechamento(filial, data_ini: date, data_fim: date) -> tuple
     for row in agg_rows:
         d = row["data_tentativa"]
         qtd = row["qtd_pedidos"]
-        ex = exce_map.get(d)
-        qty_l = ex.ligeiro_reservado if ex else cfg.ligeiro_reservado
-        qty_p = ex.pesado_reservado if ex else cfg.pesado_reservado
+        qty_l, qty_p = resolver_reservados_para_data(d, cfg, exce_individual, periodos_excecao)
 
         valor_l = (Decimal(qty_l) * v_unit_l).quantize(Decimal("0.01"))
         valor_p = (Decimal(qty_p) * v_unit_p).quantize(Decimal("0.01"))

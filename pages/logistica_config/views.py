@@ -106,8 +106,16 @@ def cadastro_config_logistica_view(request):
     if not isinstance(excecoes, list):
         return JsonResponse(build_error_payload("Lista de datas de exceção inválida."), status=400)
 
+    excecoes_periodo = campos.get("excecoes_periodo", [])
+    if not isinstance(excecoes_periodo, list):
+        return JsonResponse(build_error_payload("Lista de períodos de exceção inválida."), status=400)
+
     try:
-        config = persistir_configuracao(usuario, estado, {**campos, "excecoes": excecoes})
+        config = persistir_configuracao(
+            usuario,
+            estado,
+            {**campos, "excecoes": excecoes, "excecoes_periodo": excecoes_periodo},
+        )
     except ValidationError as exc:
         return JsonResponse(build_error_payload(extract_validation_messages(exc)), status=422)
 

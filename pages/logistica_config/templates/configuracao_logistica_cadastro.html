@@ -73,9 +73,9 @@
 
       <div class="tab-pane fade" id="cfg-excecoes" role="tabpanel">
         <div class="container-xl my-3 mx-auto">
-          <div class="card">
+          <div class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">
-              <span>Datas de exceção (ligeiro / pesado reservado)</span>
+              <span>Datas individuais de exceção (ligeiro / pesado reservado)</span>
               <button type="button" id="btn-add-excecao-cfg" class="btn btn-sm btn-outline-primary">Adicionar data</button>
             </div>
             <div class="card-body p-0">
@@ -90,6 +90,32 @@
                     </tr>
                   </thead>
                   <tbody id="tabela-excecoes-cfg"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span>Períodos de exceção (ligeiro / pesado reservado)</span>
+              <button type="button" id="btn-add-excecao-periodo-cfg" class="btn btn-sm btn-outline-primary">Adicionar período</button>
+            </div>
+            <div class="card-body p-0">
+              <p class="text-muted small px-3 pt-2 mb-0">
+                Datas individuais têm prioridade sobre períodos. Períodos não podem sobrepor-se entre si.
+              </p>
+              <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Data início</th>
+                      <th>Data fim</th>
+                      <th>Pesado reservado</th>
+                      <th>Ligeiro reservado</th>
+                      <th class="text-center">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tabela-excecoes-periodo-cfg"></tbody>
                 </table>
               </div>
             </div>

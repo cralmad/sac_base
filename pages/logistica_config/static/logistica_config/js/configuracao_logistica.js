@@ -117,6 +117,24 @@ function atualizarExcecoesNoSisVar() {
   updateFormField(nomeForm, 'excecoes', excecoes);
 }
 
+function atualizarExcecoesPeriodoNoSisVar() {
+  const excecoesPeriodo = [];
+  document.querySelectorAll('#tabela-excecoes-periodo-cfg tr[data-index]').forEach((row) => {
+    excecoesPeriodo.push({
+      data_inicio: row.querySelector('.excecao-periodo-inicio')?.value || '',
+      data_fim: row.querySelector('.excecao-periodo-fim')?.value || '',
+      pesado_reservado: row.querySelector('.excecao-periodo-pesado')?.value || '0',
+      ligeiro_reservado: row.querySelector('.excecao-periodo-ligeiro')?.value || '0',
+    });
+  });
+  updateFormField(nomeForm, 'excecoes_periodo', excecoesPeriodo);
+}
+
+function atualizarTodasExcecoesNoSisVar() {
+  atualizarExcecoesNoSisVar();
+  atualizarExcecoesPeriodoNoSisVar();
+}
+
 function renderizarExcecoes() {
   const tbody = document.getElementById('tabela-excecoes-cfg');
   if (!tbody) return;
@@ -200,6 +218,98 @@ function renderizarExcecoes() {
   });
 }
 
+function renderizarExcecoesPeriodo() {
+  const tbody = document.getElementById('tabela-excecoes-periodo-cfg');
+  if (!tbody) return;
+  const excecoesPeriodo = getForm(nomeForm)?.campos?.excecoes_periodo || [];
+  const bloqueado = formEmVisualizacao();
+
+  tbody.replaceChildren();
+
+  if (!excecoesPeriodo.length) {
+    const trVazio = document.createElement('tr');
+    const tdVazio = document.createElement('td');
+    tdVazio.colSpan = 5;
+    tdVazio.className = 'text-center text-muted';
+    tdVazio.textContent = 'Nenhum período de exceção.';
+    trVazio.appendChild(tdVazio);
+    tbody.appendChild(trVazio);
+    return;
+  }
+
+  excecoesPeriodo.forEach((excecao, index) => {
+    const tr = document.createElement('tr');
+    tr.dataset.index = String(index);
+
+    const tdInicio = document.createElement('td');
+    const inputInicio = document.createElement('input');
+    inputInicio.type = 'date';
+    inputInicio.className = 'form-control excecao-periodo-inicio';
+    inputInicio.value = excecao.data_inicio || '';
+    inputInicio.disabled = bloqueado;
+    tdInicio.appendChild(inputInicio);
+
+    const tdFim = document.createElement('td');
+    const inputFim = document.createElement('input');
+    inputFim.type = 'date';
+    inputFim.className = 'form-control excecao-periodo-fim';
+    inputFim.value = excecao.data_fim || '';
+    inputFim.disabled = bloqueado;
+    tdFim.appendChild(inputFim);
+
+    const tdPesado = document.createElement('td');
+    const inputPesado = document.createElement('input');
+    inputPesado.type = 'number';
+    inputPesado.className = 'form-control excecao-periodo-pesado';
+    inputPesado.min = '0';
+    inputPesado.max = '32767';
+    inputPesado.step = '1';
+    inputPesado.value = excecao.pesado_reservado ?? '0';
+    inputPesado.disabled = bloqueado;
+    tdPesado.appendChild(inputPesado);
+
+    const tdLigeiro = document.createElement('td');
+    const inputLigeiro = document.createElement('input');
+    inputLigeiro.type = 'number';
+    inputLigeiro.className = 'form-control excecao-periodo-ligeiro';
+    inputLigeiro.min = '0';
+    inputLigeiro.max = '32767';
+    inputLigeiro.step = '1';
+    inputLigeiro.value = excecao.ligeiro_reservado ?? '0';
+    inputLigeiro.disabled = bloqueado;
+    tdLigeiro.appendChild(inputLigeiro);
+
+    const tdAcao = document.createElement('td');
+    tdAcao.className = 'text-center';
+    const btnRemover = document.createElement('button');
+    btnRemover.type = 'button';
+    btnRemover.className = 'btn btn-sm btn-outline-danger btn-remover-excecao-periodo-cfg';
+    btnRemover.disabled = bloqueado;
+    btnRemover.textContent = 'Remover';
+    tdAcao.appendChild(btnRemover);
+
+    tr.appendChild(tdInicio);
+    tr.appendChild(tdFim);
+    tr.appendChild(tdPesado);
+    tr.appendChild(tdLigeiro);
+    tr.appendChild(tdAcao);
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('input').forEach((input) => {
+    input.addEventListener('input', atualizarExcecoesPeriodoNoSisVar);
+    input.addEventListener('change', atualizarExcecoesPeriodoNoSisVar);
+  });
+  tbody.querySelectorAll('.btn-remover-excecao-periodo-cfg').forEach((button) => {
+    button.addEventListener('click', () => {
+      const idx = Number(button.closest('tr')?.dataset.index);
+      const proximas = (getForm(nomeForm)?.campos?.excecoes_periodo || []).filter((_, i) => i !== idx);
+      updateFormField(nomeForm, 'excecoes_periodo', proximas);
+      renderizarExcecoesPeriodo();
+    });
+  });
+}
+
 function aplicarDefaultsNovo() {
   updateFormField(nomeForm, 'id', null);
   updateFormField(nomeForm, 'pedidos_pesado', '0');
@@ -210,7 +320,9 @@ function aplicarDefaultsNovo() {
   updateFormField(nomeForm, 'valor_unitario_ligeiro', '0.00');
   updateFormField(nomeForm, 'valor_excedente', '0.00');
   updateFormField(nomeForm, 'excecoes', []);
+  updateFormField(nomeForm, 'excecoes_periodo', []);
   renderizarExcecoes();
+  renderizarExcecoesPeriodo();
   hidratarFormulario(nomeForm);
 }
 
@@ -226,7 +338,7 @@ form2.addEventListener('change', updater2);
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   clearMessages();
-  atualizarExcecoesNoSisVar();
+  atualizarTodasExcecoesNoSisVar();
   const formData = getForm(nomeForm);
   confirmar({
     titulo: 'Confirmar Salvamento',
@@ -245,6 +357,7 @@ form.addEventListener('submit', async (event) => {
       updateState(resultado.data);
       renderizarFiliais();
       renderizarExcecoes();
+      renderizarExcecoesPeriodo();
       hidratarFormulario(nomeForm);
     },
   });
@@ -265,6 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnSalvar = document.getElementById('btn-salvar');
   const tabelaCorpo = document.getElementById('tabela-cfg-corpo');
   const btnAddExcecao = document.getElementById('btn-add-excecao-cfg');
+  const btnAddExcecaoPeriodo = document.getElementById('btn-add-excecao-periodo-cfg');
   const selectFilial = document.getElementById('filial_id');
 
   function aplicarPermissoesNaInterface() {
@@ -275,6 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnAbrirPesquisa.classList.toggle('d-none', !permissoes.consultar);
     if (btnAddExcecao) btnAddExcecao.disabled = bloqueado;
+    if (btnAddExcecaoPeriodo) btnAddExcecaoPeriodo.disabled = bloqueado;
 
     botoesControlados.forEach((botao) => {
       const visivelNoEstado = botaoDeveFicarVisivel(botao, estadoAtual);
@@ -289,7 +404,10 @@ document.addEventListener('DOMContentLoaded', () => {
       aplicarDefaultsNovo();
     } else {
       updateFormField(nomeForm, 'excecoes', []);
+      updateFormField(nomeForm, 'excecoes_periodo', []);
       renderizarExcecoes();
+      renderizarExcecoesPeriodo();
+      renderizarExcecoesPeriodo();
       hidratarFormulario(nomeForm);
     }
     renderizarFiliais();
@@ -335,6 +453,16 @@ document.addEventListener('DOMContentLoaded', () => {
     renderizarExcecoes();
   });
 
+  btnAddExcecaoPeriodo?.addEventListener('click', () => {
+    if (formEmVisualizacao()) return;
+    const excecoesPeriodo = [
+      ...(getForm(nomeForm)?.campos?.excecoes_periodo || []),
+      { data_inicio: '', data_fim: '', pesado_reservado: '0', ligeiro_reservado: '0' },
+    ];
+    updateFormField(nomeForm, 'excecoes_periodo', excecoesPeriodo);
+    renderizarExcecoesPeriodo();
+  });
+
   btnEditar.addEventListener('click', () => {
     clearMessages();
     if (!podeExecutarAcao('editar')) {
@@ -343,6 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     setFormState(nomeForm, 'editar');
     renderizarExcecoes();
+    renderizarExcecoesPeriodo();
     aplicarPermissoesNaInterface();
   });
 
@@ -440,6 +569,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateState(resultado.data);
     renderizarFiliais();
     renderizarExcecoes();
+    renderizarExcecoesPeriodo();
     hidratarFormulario(nomeForm);
     aplicarPermissoesNaInterface();
     alternarTelas();
@@ -447,6 +577,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   renderizarFiliais();
   renderizarExcecoes();
+  renderizarExcecoesPeriodo();
   hidratarFormulario(nomeForm);
   aplicarPermissoesNaInterface();
   AppLoader.hide();
