@@ -39,6 +39,22 @@ const modalFotos = new bootstrap.Modal(modalFotosEl);
 
 const CAMPOS_TRAVADOS_IMPORTADO = ['filial_id', 'origem', 'id_vonzu', 'pedido', 'tipo', 'criado', 'cliente_id'];
 
+const VONZU_EXPEDITIONS_URL = 'https://app.vonzu.es/user/expeditions';
+
+function criarLinkVonzu(idVonzu) {
+  const id = Number.parseInt(idVonzu, 10);
+  if (!Number.isInteger(id) || id <= 0) return null;
+
+  const link = document.createElement('a');
+  link.href = `${VONZU_EXPEDITIONS_URL}/${id}`;
+  link.className = 'ped-ext-link';
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.title = 'Abrir expedição na VONZU';
+  link.textContent = String(id);
+  return link;
+}
+
 getDataBackEnd();
 
 function permissoes() {
@@ -1016,7 +1032,14 @@ function renderPesquisa(registros = []) {
     tr.appendChild(tdOrigem);
 
     const estadoExibicao = resolverEstadoExibicao(r);
-    [r.id_vonzu, r.pedido, r.tipo, estadoExibicao, r.prev_entrega, r.nome_dest].forEach(valor => {
+
+    const tdVonzu = document.createElement('td');
+    const linkVonzu = criarLinkVonzu(r.id_vonzu);
+    if (linkVonzu) tdVonzu.appendChild(linkVonzu);
+    else tdVonzu.textContent = String(r.id_vonzu ?? '');
+    tr.appendChild(tdVonzu);
+
+    [r.pedido, r.tipo, estadoExibicao, r.prev_entrega, r.nome_dest].forEach(valor => {
       const td = document.createElement('td');
       td.textContent = String(valor ?? '');
       tr.appendChild(td);

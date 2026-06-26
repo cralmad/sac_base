@@ -79,6 +79,7 @@ function normalizarReferencia(valor) {
 }
 
 const LEROY_MERLIN_SEARCH_URL = 'https://www.leroymerlin.pt/search';
+const VONZU_EXPEDITIONS_URL = 'https://app.vonzu.es/user/expeditions';
 
 function criarLinkLeroyMerlin(codigo) {
   const cod = String(codigo ?? '').trim();
@@ -92,6 +93,32 @@ function criarLinkLeroyMerlin(codigo) {
   link.title = 'Pesquisar na Leroy Merlin';
   link.textContent = cod;
   return link;
+}
+
+function criarLinkVonzu(idVonzu, textoExibicao) {
+  const id = Number.parseInt(idVonzu, 10);
+  if (!Number.isInteger(id) || id <= 0) return null;
+
+  const link = document.createElement('a');
+  link.href = `${VONZU_EXPEDITIONS_URL}/${id}`;
+  link.className = 'rr-cod-link';
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.title = 'Abrir expedição na VONZU';
+  link.textContent = String(textoExibicao ?? id);
+  return link;
+}
+
+function anexarReferenciaPedido(container, linha) {
+  const texto = linha.pedido ?? '';
+  const link = criarLinkVonzu(linha.id_vonzu, texto);
+  if (link) {
+    container.appendChild(link);
+    return;
+  }
+  const span = document.createElement('span');
+  span.textContent = texto;
+  container.appendChild(span);
 }
 
 function obterArtigosDaLinha(linha) {
@@ -278,7 +305,6 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
       const artigosLinha = obterArtigosDaLinha(linha);
 
       const campos = [
-        { val: linha.pedido },
         { val: linha.tipo,   cls: linha.tipo === 'R' ? 'rr-tipo-r' : 'rr-tipo-e' },
         { val: linha.nome_dest },
         { val: linha.fones },
@@ -291,17 +317,8 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
         { val: linha.obs_rota, cls: 'rr-obs' },
       ];
 
-      campos.forEach(({ val, cls, bold }) => {
-        const td = document.createElement('td');
-        td.textContent = val ?? '';
-        if (cls) td.className = cls;
-        if (bold) td.style.fontWeight = 'bold';
-        tr.appendChild(td);
-      });
-
+      const tdRef = document.createElement('td');
       if (artigosLinha?.length) {
-        const tdRef = tr.children[0];
-        tdRef.textContent = '';
         const refWrap = document.createElement('div');
         refWrap.className = 'rr-ref-wrap';
 
@@ -312,9 +329,7 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
         btnExpandir.innerHTML = '<i class="bi bi-chevron-right"></i>';
         refWrap.appendChild(btnExpandir);
 
-        const refTexto = document.createElement('span');
-        refTexto.textContent = linha.pedido ?? '';
-        refWrap.appendChild(refTexto);
+        anexarReferenciaPedido(refWrap, linha);
 
         if (linha.tem_devolucao) {
           refWrap.classList.add('rr-ref-dev');
@@ -326,20 +341,26 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
 
         tdRef.appendChild(refWrap);
       } else if (linha.tem_devolucao) {
-        const tdRef = tr.children[0];
-        tdRef.textContent = '';
         const refWrap = document.createElement('div');
-        refWrap.className = 'rr-ref-wrap';
-        refWrap.classList.add('rr-ref-dev');
-        const refTexto = document.createElement('span');
-        refTexto.textContent = linha.pedido ?? '';
-        refWrap.appendChild(refTexto);
+        refWrap.className = 'rr-ref-wrap rr-ref-dev';
+        anexarReferenciaPedido(refWrap, linha);
         const devBadge = document.createElement('span');
         devBadge.className = 'rr-dev-ref';
         devBadge.textContent = '(Dev)';
         refWrap.appendChild(devBadge);
         tdRef.appendChild(refWrap);
+      } else {
+        anexarReferenciaPedido(tdRef, linha);
       }
+      tr.appendChild(tdRef);
+
+      campos.forEach(({ val, cls, bold }) => {
+        const td = document.createElement('td');
+        td.textContent = val ?? '';
+        if (cls) td.className = cls;
+        if (bold) td.style.fontWeight = 'bold';
+        tr.appendChild(td);
+      });
 
       tbody.appendChild(tr);
 

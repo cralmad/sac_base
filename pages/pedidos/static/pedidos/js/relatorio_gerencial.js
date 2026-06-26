@@ -14,6 +14,22 @@ import {
   validateSmartText,
 } from '/static/js/smart_filter.js';
 
+const VONZU_EXPEDITIONS_URL = 'https://app.vonzu.es/user/expeditions';
+
+function criarLinkVonzu(idVonzu, textoExibicao) {
+  const id = Number.parseInt(idVonzu, 10);
+  if (!Number.isInteger(id) || id <= 0) return null;
+
+  const link = document.createElement('a');
+  link.href = `${VONZU_EXPEDITIONS_URL}/${id}`;
+  link.className = 'rg-cod-link';
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.title = 'Abrir expedição na VONZU';
+  link.textContent = String(textoExibicao ?? id);
+  return link;
+}
+
 const root       = document.getElementById('rg-root');
 const URL_BUSCAR = root?.dataset?.urlBuscar ?? '';
 
@@ -269,7 +285,7 @@ function renderizarRelatorio(linhas, dataFmt, totalPedidos, totalPeso) {
 
   const thead = document.createElement('thead');
   const trHead = document.createElement('tr');
-  ['Data', 'Referência', 'ID Vonzu', 'T', 'D', 'Cidade', 'C. Postal', 'Vol', 'Peso', 'Estado', 'Mov', 'Dev', 'Armazém'].forEach(h => {
+  ['Data', 'Referência', 'T', 'D', 'Cidade', 'C. Postal', 'Vol', 'Peso', 'Estado', 'Mov', 'Dev', 'Armazém'].forEach(h => {
     const th = document.createElement('th');
     th.textContent = h;
     trHead.appendChild(th);
@@ -287,8 +303,7 @@ function renderizarRelatorio(linhas, dataFmt, totalPedidos, totalPeso) {
 
     const campos = [
       { val: linha.data_tentativa },
-      { val: linha.pedido },
-      { val: linha.id_vonzu },
+      { val: linha.pedido, linkReferencia: true, idVonzu: linha.id_vonzu },
       { val: linha.tipo, cls: linha.tipo === 'R' ? 'rg-tipo-r' : 'rg-tipo-e' },
       { val: linha.tem_devolucao ? '\u2022' : '', cls: linha.tem_devolucao ? 'rg-dev-sim' : '' },
       { val: linha.cidade_dest },
@@ -301,9 +316,15 @@ function renderizarRelatorio(linhas, dataFmt, totalPedidos, totalPeso) {
       { val: linha.armazem },
     ];
 
-    campos.forEach(({ val, cls, bold }) => {
+    campos.forEach(({ val, cls, bold, linkReferencia, idVonzu }) => {
       const td = document.createElement('td');
-      td.textContent = val ?? '';
+      if (linkReferencia) {
+        const link = criarLinkVonzu(idVonzu, val);
+        if (link) td.appendChild(link);
+        else td.textContent = val ?? '';
+      } else {
+        td.textContent = val ?? '';
+      }
       if (cls) td.className = cls;
       if (bold) td.style.fontWeight = 'bold';
       tr.appendChild(td);

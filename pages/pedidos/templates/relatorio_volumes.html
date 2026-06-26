@@ -43,7 +43,17 @@
           <tbody>
             {% for p in pedidos %}
             <tr>
-              <td>{{ p.referencia }}</td>
+              <td>
+                {% if p.id_vonzu %}
+                <a href="https://app.vonzu.es/user/expeditions/{{ p.id_vonzu }}"
+                   class="rv-cod-link"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   title="Abrir expedição na VONZU">{{ p.referencia }}</a>
+                {% else %}
+                {{ p.referencia }}
+                {% endif %}
+              </td>
               <td class="text-end">{{ p.peso|default:"—" }}</td>
               <td class="text-end">{{ p.volume|default:"—" }}</td>
               <td>

@@ -58,6 +58,13 @@ table.rg-tabela td {
 }
 table.rg-tabela tr.rg-nao-segue td { background: #e0e0e0 !important; }
 
+.rg-cod-link {
+  color: #1a3a5c;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.rg-cod-link:hover { color: #0d2f52; }
+
 /* ── Multi-select de estados ── */
 #rg-estados {
   min-height: 6.5rem;
@@ -112,6 +119,7 @@ table.rg-tabela tr.rg-nao-segue td { background: #e0e0e0 !important; }
   h1 { font-size: .85rem !important; margin-bottom: .15rem !important; }
   #rg-titulo-data { font-size: 7.5pt; }
   #rg-col-btn-dev, #rg-modal-dev { display: none !important; }
+  .rg-cod-link { color: inherit !important; text-decoration: none !important; }
 }
 </style>
 {% endblock %}

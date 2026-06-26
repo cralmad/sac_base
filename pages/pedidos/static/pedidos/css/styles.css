@@ -211,8 +211,17 @@
 .rv-cod-link:hover {
   color: #0d2f52;
 }
+.ped-ext-link {
+  color: #1a3a5c;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ped-ext-link:hover {
+  color: #0d2f52;
+}
 @media print {
-  .rv-cod-link {
+  .rv-cod-link,
+  .ped-ext-link {
     color: inherit;
     text-decoration: none;
   }
