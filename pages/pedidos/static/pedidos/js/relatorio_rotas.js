@@ -78,6 +78,22 @@ function normalizarReferencia(valor) {
   return String(valor ?? '').trim();
 }
 
+const LEROY_MERLIN_SEARCH_URL = 'https://www.leroymerlin.pt/search';
+
+function criarLinkLeroyMerlin(codigo) {
+  const cod = String(codigo ?? '').trim();
+  if (!cod) return null;
+
+  const link = document.createElement('a');
+  link.href = `${LEROY_MERLIN_SEARCH_URL}?q=${encodeURIComponent(cod)}`;
+  link.className = 'rr-cod-link';
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.title = 'Pesquisar na Leroy Merlin';
+  link.textContent = cod;
+  return link;
+}
+
 function obterArtigosDaLinha(linha) {
   const idVonzu = Number.parseInt(linha?.id_vonzu, 10);
   if (Number.isInteger(idVonzu) && artigosPorIdVonzu.has(idVonzu)) {
@@ -355,7 +371,13 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
           const tdQuantidade = document.createElement('td');
           tdQuantidade.textContent = String(artigo.quantidade ?? '');
           const tdCodigo = document.createElement('td');
-          tdCodigo.textContent = artigo.cod_fornecedor ?? '';
+          tdCodigo.className = 'rr-codigo-cell';
+          const linkLm = criarLinkLeroyMerlin(artigo.cod_fornecedor);
+          if (linkLm) {
+            tdCodigo.appendChild(linkLm);
+          } else {
+            tdCodigo.textContent = artigo.cod_fornecedor ?? '';
+          }
           trItem.appendChild(tdDescricao);
           trItem.appendChild(tdQuantidade);
           trItem.appendChild(tdCodigo);

@@ -52,7 +52,17 @@
                   <li>
                     <span class="rv-qty">{{ artigo.quantidade }}x</span>
                     {{ artigo.descricao }}
-                    <span class="rv-cod">({{ artigo.cod_fornecedor }})</span>
+                    <span class="rv-cod">(
+                      {% if artigo.cod_fornecedor %}
+                      <a href="https://www.leroymerlin.pt/search?q={{ artigo.cod_fornecedor|urlencode }}"
+                         class="rv-cod-link"
+                         target="_blank"
+                         rel="noopener noreferrer"
+                         title="Pesquisar na Leroy Merlin">{{ artigo.cod_fornecedor }}</a>
+                      {% else %}
+                      {{ artigo.cod_fornecedor }}
+                      {% endif %}
+                    )</span>
                   </li>
                   {% endfor %}
                 </ul>
