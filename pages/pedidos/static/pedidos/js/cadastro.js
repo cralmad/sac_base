@@ -38,6 +38,7 @@ const modalFotosEl = document.getElementById('modalFotos');
 const modalFotos = new bootstrap.Modal(modalFotosEl);
 
 const CAMPOS_TRAVADOS_IMPORTADO = ['filial_id', 'origem', 'id_vonzu', 'pedido', 'tipo', 'criado', 'cliente_id'];
+const CAMPOS_SOMENTE_LEITURA = ['lat', 'lng'];
 
 const VONZU_EXPEDITIONS_URL = 'https://app.vonzu.es/user/expeditions';
 
@@ -813,6 +814,17 @@ function aplicarTravasImportados() {
         el.classList.toggle('bg-light-subtle', travar);
       } else {
         el.classList.remove('bg-light-subtle');
+      }
+    }
+  });
+
+  CAMPOS_SOMENTE_LEITURA.forEach(nome => {
+    const el = form.querySelector(`[name="${nome}"]`);
+    if (el) {
+      el.readOnly = true;
+      el.disabled = false;
+      if (podeAplicarEstiloSomenteLeitura(el)) {
+        el.classList.add('bg-light-subtle');
       }
     }
   });

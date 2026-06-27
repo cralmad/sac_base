@@ -123,14 +123,25 @@ function _fmtPeso(valor) {
 function _precisaoCor(precision) {
   if (precision === 'muito_impreciso') return '#dc3545';
   if (precision === 'impreciso') return '#ffc107';
+  if (precision === 'cp_pt' || precision === 'cp_pt_rua' || precision === 'cp_pt_fallback') return '#ffc107';
   return null;
+}
+
+function _precisaoTitulo(precision) {
+  if (precision === 'muito_impreciso') return 'Localiza\u00e7\u00e3o muito imprecisa';
+  if (precision === 'impreciso') return 'Localiza\u00e7\u00e3o imprecisa';
+  if (precision === 'cp_pt') return 'Coordenadas por c\u00f3digo postal';
+  if (precision === 'cp_pt_rua') return 'Coordenadas por c\u00f3digo postal e morada';
+  if (precision === 'cp_pt_fallback') return 'Coordenadas por c\u00f3digo postal (1\u00aa op\u00e7\u00e3o \u2014 morada amb\u00edgua)';
+  return '';
 }
 
 function conteudoPopup(p) {
   const conf = (p.volume != null && p.volume === p.volume_conf) ? '✅' : '❌';
   const corPrec = _precisaoCor(p.geocoding_precision);
+  const tituloPrec = _precisaoTitulo(p.geocoding_precision);
   const dotHtml = corPrec
-    ? `<span class="mapa-prec-dot" style="background:${corPrec}" title="${p.geocoding_precision === 'muito_impreciso' ? 'Localiza\u00e7\u00e3o muito imprecisa' : 'Localiza\u00e7\u00e3o imprecisa'}"></span>`
+    ? `<span class="mapa-prec-dot" style="background:${corPrec}" title="${tituloPrec}"></span>`
     : '';
   const displayLine = p.geocoding_display
     ? `<span class="mapa-geocoding-display">${_esc(p.geocoding_display)}</span><hr style="width:80%;margin:2px auto">`

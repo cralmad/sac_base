@@ -226,6 +226,19 @@ Observacoes:
 - teste sem envio real: `python manage.py enviar_email_avaliacao_automatico --dry-run`;
 - forcar envio ignorando horario: `python manage.py enviar_email_avaliacao_automatico --force`.
 
+### Scheduler de geocodificacao (codigo-postal.pt)
+O comando `pages/pedidos/management/commands/geocodificar_pedidos_sem_coord.py` deve ser agendado no Heroku Scheduler **uma vez por dia** (ex.: 03:00 Europe/Lisbon).
+
+Configurar job:
+- **Task:** `python manage.py geocodificar_pedidos_sem_coord`
+- **Frequency:** daily (1x/dia)
+
+Observacoes:
+- processa pedidos sem `lat`/`lng` com codigo postal, em lotes de 25 com pausas na mesma execucao (ate 1 h);
+- importacao e botao manual geocodificam ate 30 pedidos na request HTTP; o restante fica na fila da BD;
+- teste sem alterar dados: `python manage.py geocodificar_pedidos_sem_coord --dry-run`;
+- filial especifica: `python manage.py geocodificar_pedidos_sem_coord --filial-id=1`.
+
 ### Exemplo minimo de setup
 ```bash
 heroku config:set BANCO_DE_DADOS="postgres://..." \

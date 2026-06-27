@@ -35,6 +35,8 @@ def serialize_pedido_form(pedido):
         "endereco_dest": pedido.endereco_dest or "",
         "codpost_dest": pedido.codpost_dest or "",
         "cidade_dest": pedido.cidade_dest or "",
+        "lat": str(pedido.lat) if pedido.lat is not None else "",
+        "lng": str(pedido.lng) if pedido.lng is not None else "",
         "obs": pedido.obs or "",
         "obs_rota": pedido.obs_rota or "",
         "cliente_id": pedido.cliente_id,

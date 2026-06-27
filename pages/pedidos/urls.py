@@ -21,6 +21,8 @@ from .views import (
     pedidos_cadastro_view,
     pedidos_importacao_view,
     pedidos_importar_view,
+    pedidos_geocodificar_sem_coord_view,
+    pedidos_geocodificar_status_view,
     pedidos_relatorio_volumes_view,
 )
 
@@ -44,6 +46,16 @@ urlpatterns = [
     path("logistica/pedidos/inc/foto/del", pedido_inc_foto_del_view, name="pedidos_inc_foto_del"),
     path("logistica/pedidos/importacao/", pedidos_importacao_view, name="pedidos_importacao"),
     path("logistica/pedidos/importar", pedidos_importar_view, name="pedidos_importar"),
+    path(
+        "logistica/pedidos/geocodificar-sem-coordenadas/",
+        pedidos_geocodificar_sem_coord_view,
+        name="pedidos_geocodificar_sem_coord",
+    ),
+    path(
+        "logistica/pedidos/geocodificar-status/",
+        pedidos_geocodificar_status_view,
+        name="pedidos_geocodificar_status",
+    ),
     path("logistica/pedidos/relatorio-volumes/", pedidos_relatorio_volumes_view, name="pedidos_relatorio_volumes"),
 
     # Relatório de conferência de volumes

@@ -33,7 +33,11 @@ from .serializers import (
     serialize_pedido_form,
     serialize_tentativa,
 )
-from .services.importador_csv import importar_csv
+from .services.importador_csv import importar_csv, _stats_geocode_para_importacao
+from .services.codigo_postal_pt import (
+    _contar_restantes_filial,
+    geocodificar_filial_manual,
+)
 from .services.pedido_form import apply_prev_entrega_range_filters, persistir_pedido_cadastro
 
 PERMISSOES_PEDIDO = {
@@ -69,6 +73,8 @@ def _build_campos_pedido_iniciais():
         "endereco_dest": "",
         "codpost_dest": "",
         "cidade_dest": "",
+        "lat": "",
+        "lng": "",
         "obs": "",
         "obs_rota": "",
         "cliente_id": None,
@@ -149,6 +155,8 @@ def pedidos_cadastro_view(request):
             "endereco_dest": {"type": "string", "required": False, "value": ""},
             "codpost_dest": {"type": "string", "required": False, "value": ""},
             "cidade_dest": {"type": "string", "required": False, "value": ""},
+            "lat": {"type": "string", "required": False, "value": ""},
+            "lng": {"type": "string", "required": False, "value": ""},
             "obs": {"type": "string", "required": False, "value": ""},
             "obs_rota": {"type": "string", "required": False, "value": ""},
             "cliente_id": {"type": "string", "required": False, "value": ""},
@@ -885,6 +893,93 @@ def pedidos_importar_view(request):
             "relatorio_volumes_url": relatorio_url,
         }
     )
+
+
+@login_required
+@permission_required(PERMISSOES_PEDIDO["importar"], raise_exception=True)
+def pedidos_geocodificar_sem_coord_view(request):
+    if request.method != "POST":
+        return json_method_not_allowed()
+
+    filial_id = request.POST.get("filial_id")
+    usuario = getattr(request, "user", None)
+    filial = obter_filial_escrita(filial_id, usuario)
+    if not filial:
+        return JsonResponse(
+            build_error_payload("Filial inválida ou sem permissão de escrita."),
+            status=403,
+        )
+
+    stats_geocode = geocodificar_filial_manual(filial)
+    stats = _stats_geocode_para_importacao(stats_geocode)
+
+    atribuidas = stats_geocode.get("coords_atribuidas", 0)
+    restantes = stats_geocode.get("coords_restantes_filial", 0)
+    avisos = stats_geocode.get("avisos") or []
+
+    mensagens = {}
+    if not stats_geocode.get("site_ok", True):
+        mensagens["erro"] = {
+            "conteudo": [
+                "codigo-postal.pt indisponível ou com estrutura alterada. "
+                "Contacte o administrador.",
+            ],
+            "ignorar": False,
+        }
+    elif atribuidas > 0 and restantes > 0:
+        mensagens["aviso"] = {
+            "conteudo": [
+                f"{atribuidas} pedido(s) geocodificado(s). "
+                f"{restantes} restante(s) — clique novamente para continuar "
+                "ou aguarde o Scheduler noturno.",
+            ],
+            "ignorar": True,
+        }
+    elif atribuidas > 0:
+        mensagens["sucesso"] = {
+            "conteudo": [
+                f"{atribuidas} pedido(s) geocodificado(s).",
+            ],
+            "ignorar": True,
+        }
+    elif restantes > 0 and avisos:
+        mensagens["aviso"] = {
+            "conteudo": avisos[:3],
+            "ignorar": True,
+        }
+    elif restantes > 0:
+        mensagens["aviso"] = {
+            "conteudo": [
+                f"{restantes} pedido(s) pendente(s). "
+                "Nenhum geocodificado neste clique — tente novamente em instantes.",
+            ],
+            "ignorar": True,
+        }
+    else:
+        mensagens["aviso"] = {
+            "conteudo": [
+                "Nenhum pedido pendente de geocodificação nesta filial.",
+            ],
+            "ignorar": True,
+        }
+
+    return JsonResponse({"success": True, "stats": stats, "mensagens": mensagens})
+
+
+@login_required
+@permission_required(PERMISSOES_PEDIDO["importar"], raise_exception=True)
+def pedidos_geocodificar_status_view(request):
+    if request.method != "GET":
+        return json_method_not_allowed()
+
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse(build_error_payload("Filial ativa não encontrada."), status=403)
+
+    return JsonResponse({
+        "success": True,
+        "pendentes": _contar_restantes_filial(filial_ativa),
+    })
 
 
 @login_required
