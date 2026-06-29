@@ -235,7 +235,7 @@ Configurar job:
 
 Observacoes:
 - processa pedidos sem `lat`/`lng` com codigo postal, em lotes de 25 com pausas na mesma execucao (ate 1 h);
-- importacao e botao manual geocodificam ate 30 pedidos na request HTTP; o restante fica na fila da BD;
+- botao manual geocodifica ate 30 pedidos por clique; o restante fica na fila da BD para novo clique ou Scheduler;
 - teste sem alterar dados: `python manage.py geocodificar_pedidos_sem_coord --dry-run`;
 - filial especifica: `python manage.py geocodificar_pedidos_sem_coord --filial-id=1`.
 

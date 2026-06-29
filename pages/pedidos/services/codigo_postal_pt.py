@@ -426,37 +426,21 @@ def atribuir_coordenadas_pedidos(
             _liberar_lock(filial.id, origem)
 
 
-def geocodificar_apos_importacao(filial, id_vonzus):
-    """Geocodifica pedidos do CSV sem coordenadas; sync se <=30, senão modo noturno."""
-    stats = _stats_vazias()
-    if not id_vonzus:
-        return stats
-
-    ids = list(
-        Pedido.objects.filter(filial=filial, id_vonzu__in=id_vonzus)
-        .filter(Q(lat__isnull=True) | Q(lng__isnull=True))
-        .exclude(codpost_dest__isnull=True)
-        .exclude(codpost_dest="")
-        .values_list("id", flat=True)
-    )
-    total = len(ids)
-    if total == 0:
-        return stats
-
-    if total > GEOCODE_SYNC_MAX_PEDIDOS:
-        stats["modo"] = "noturno"
-        stats["coords_enfileiradas"] = total
-        stats["coords_restantes_filial"] = _contar_restantes_filial(filial)
-        return stats
-
-    resultado = atribuir_coordenadas_pedidos(
-        filial,
-        ids,
-        origem="importacao",
-        max_processar=GEOCODE_SYNC_MAX_PEDIDOS,
-    )
-    resultado["modo"] = "sync"
-    return resultado
+def stats_geocode_para_resposta(stats_geocode):
+    """Formata stats do serviço codigo-postal.pt para JSON SisVar (botão manual)."""
+    if not stats_geocode:
+        return {}
+    return {
+        "coords_atribuidas": stats_geocode.get("coords_atribuidas", 0),
+        "coords_cp_pt": stats_geocode.get("coords_cp_pt", 0),
+        "coords_cp_pt_rua": stats_geocode.get("coords_cp_pt_rua", 0),
+        "coords_cp_pt_fallback": stats_geocode.get("coords_cp_pt_fallback", 0),
+        "coords_enfileiradas": stats_geocode.get("coords_enfileiradas", 0),
+        "coords_restantes_filial": stats_geocode.get("coords_restantes_filial", 0),
+        "coords_cp_nao_encontrado": stats_geocode.get("coords_cp_nao_encontrado", 0),
+        "geocode_modo": stats_geocode.get("modo", "sync"),
+        "geocode_site_ok": stats_geocode.get("site_ok", True),
+    }
 
 
 def geocodificar_filial_manual(filial):

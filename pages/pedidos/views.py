@@ -33,10 +33,11 @@ from .serializers import (
     serialize_pedido_form,
     serialize_tentativa,
 )
-from .services.importador_csv import importar_csv, _stats_geocode_para_importacao
+from .services.importador_csv import importar_csv
 from .services.codigo_postal_pt import (
     _contar_restantes_filial,
     geocodificar_filial_manual,
+    stats_geocode_para_resposta,
 )
 from .services.pedido_form import apply_prev_entrega_range_filters, persistir_pedido_cadastro
 
@@ -911,7 +912,7 @@ def pedidos_geocodificar_sem_coord_view(request):
         )
 
     stats_geocode = geocodificar_filial_manual(filial)
-    stats = _stats_geocode_para_importacao(stats_geocode)
+    stats = stats_geocode_para_resposta(stats_geocode)
 
     atribuidas = stats_geocode.get("coords_atribuidas", 0)
     restantes = stats_geocode.get("coords_restantes_filial", 0)

@@ -17,7 +17,6 @@ from pages.pedidos.services.codigo_postal_pt import (
     atribuir_coordenadas_pedidos,
     consultar_codigo_postal_pt,
     executar_geocodificacao_diaria,
-    geocodificar_apos_importacao,
     geocodificar_filial_manual,
     resolver_coordenadas,
     verificar_estrutura_codigo_postal_pt,
@@ -218,61 +217,6 @@ class GeocodificacaoLoteTests(TestCase):
             )
             mock_consulta.assert_not_called()
             self.assertEqual(stats["coords_ignoradas_ja_possuiam"], 1)
-
-
-class GeocodificarAposImportacaoTests(TestCase):
-    def setUp(self):
-        cache.clear()
-        self.pais = Pais.objects.create(nome="PT-IMP", sigla="PT", codigo_tel="+351")
-        self.filial = Filial.objects.create(
-            codigo="IMP1", nome="FIL IMP", pais_atuacao=self.pais, is_matriz=True
-        )
-        now = timezone.now()
-
-        for i in range(GEOCODE_SYNC_MAX_PEDIDOS + 5):
-            Pedido.objects.create(
-                filial=self.filial,
-                id_vonzu=10000 + i,
-                tipo="ENTREGA",
-                criado=now,
-                atualizacao=now,
-                prev_entrega=now.date(),
-                endereco_dest=f"Rua {i}",
-                codpost_dest="7580-610",
-                cidade_dest="COMPORTA",
-            )
-
-    def tearDown(self):
-        cache.clear()
-
-    def test_modo_noturno_acima_limite_sync(self):
-        id_vonzus = list(range(10000, 10000 + GEOCODE_SYNC_MAX_PEDIDOS + 5))
-        stats = geocodificar_apos_importacao(self.filial, id_vonzus)
-        self.assertEqual(stats["modo"], "noturno")
-        self.assertEqual(stats["coords_enfileiradas"], GEOCODE_SYNC_MAX_PEDIDOS + 5)
-        self.assertEqual(stats["coords_atribuidas"], 0)
-
-    @patch("pages.pedidos.services.codigo_postal_pt.atribuir_coordenadas_pedidos")
-    def test_modo_sync_ate_limite(self, mock_atribuir):
-        mock_atribuir.return_value = {
-            "coords_atribuidas": 2,
-            "coords_cp_pt": 2,
-            "coords_cp_pt_rua": 0,
-            "coords_cp_pt_fallback": 0,
-            "coords_sem_cp": 0,
-            "coords_ignoradas_ja_possuiam": 0,
-            "coords_cp_nao_encontrado": 0,
-            "coords_falha_site": 0,
-            "coords_enfileiradas": 0,
-            "coords_restantes_filial": 0,
-            "modo": "sync",
-            "site_ok": True,
-            "avisos": [],
-        }
-        id_vonzus = [10000, 10001]
-        stats = geocodificar_apos_importacao(self.filial, id_vonzus)
-        self.assertEqual(stats["modo"], "sync")
-        mock_atribuir.assert_called_once()
 
 
 class GeocodificarFilialManualTests(TestCase):

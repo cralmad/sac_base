@@ -179,7 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ultimoRelatorio = data.relatorio;
         ultimoNomeRelatorio = data.nome_relatorio || 'relatorio_importacao.txt';
         exibirStats(data.stats || {});
-        processarMensagensGeocode({ stats: data.stats, mensagens: {} });
         btnBaixar.classList.remove('d-none');
         baixarRelatorio(ultimoRelatorio, ultimoNomeRelatorio);
         if (data.relatorio_volumes_url) {

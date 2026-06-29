@@ -13,7 +13,6 @@ from pages.pedidos.models import Pedido, TentativaEntrega
 from sac_base.coercion import parse_date, parse_datetime, parse_decimal, parse_int
 
 from .normalizacao import normalizar_estado
-from .codigo_postal_pt import geocodificar_apos_importacao
 
 logger = logging.getLogger(__name__)
 
@@ -393,49 +392,6 @@ def _gerar_relatorio(nome_arquivo, filial, total_lidas, ignoradas,
     return "\n".join(linhas)
 
 
-def _append_geocode_relatorio(linhas, stats_geocode):
-    if not stats_geocode:
-        return
-    linhas.append("--- COORDENADAS (codigo-postal.pt) ---")
-    modo = stats_geocode.get("modo", "sync")
-    linhas.append(f"Modo:                           {modo}")
-    if not stats_geocode.get("site_ok", True):
-        linhas.append("AVISO: estrutura do site codigo-postal.pt indisponível ou alterada.")
-    linhas.append(f"Coordenadas atribuídas:         {stats_geocode.get('coords_atribuidas', 0)}")
-    linhas.append(f"  Precisão CP (cp_pt):           {stats_geocode.get('coords_cp_pt', 0)}")
-    linhas.append(f"  Precisão morada (cp_pt_rua):   {stats_geocode.get('coords_cp_pt_rua', 0)}")
-    linhas.append(f"  Fallback 1ª opção:             {stats_geocode.get('coords_cp_pt_fallback', 0)}")
-    linhas.append(f"Enfileirados (noturno):         {stats_geocode.get('coords_enfileiradas', 0)}")
-    linhas.append(f"CP não encontrado / sem GPS:    {stats_geocode.get('coords_cp_nao_encontrado', 0)}")
-    linhas.append(f"Sem código postal:              {stats_geocode.get('coords_sem_cp', 0)}")
-    linhas.append(f"Restantes na filial:            {stats_geocode.get('coords_restantes_filial', 0)}")
-    if modo == "noturno" and stats_geocode.get("coords_enfileiradas", 0) > 0:
-        linhas.append(
-            "Pedidos enfileirados serão geocodificados na execução noturna (Heroku Scheduler)."
-        )
-    avisos = stats_geocode.get("avisos") or []
-    if avisos:
-        linhas.append(f"({len(avisos)} aviso(s) de fallback)")
-        linhas.extend(avisos)
-    linhas.append("")
-
-
-def _stats_geocode_para_importacao(stats_geocode):
-    if not stats_geocode:
-        return {}
-    return {
-        "coords_atribuidas": stats_geocode.get("coords_atribuidas", 0),
-        "coords_cp_pt": stats_geocode.get("coords_cp_pt", 0),
-        "coords_cp_pt_rua": stats_geocode.get("coords_cp_pt_rua", 0),
-        "coords_cp_pt_fallback": stats_geocode.get("coords_cp_pt_fallback", 0),
-        "coords_enfileiradas": stats_geocode.get("coords_enfileiradas", 0),
-        "coords_restantes_filial": stats_geocode.get("coords_restantes_filial", 0),
-        "coords_cp_nao_encontrado": stats_geocode.get("coords_cp_nao_encontrado", 0),
-        "geocode_modo": stats_geocode.get("modo", "sync"),
-        "geocode_site_ok": stats_geocode.get("site_ok", True),
-    }
-
-
 def importar_csv(conteudo_bytes, filial, nome_arquivo, analisar_movimentacoes_dia=False):
     """Importa um arquivo CSV VONZU para a filial indicada.
 
@@ -693,12 +649,6 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo, analisar_movimentacoes_di
         pedidos_mov_ausentes_no_arquivo=pedidos_mov_ausentes_no_arquivo,
     )
 
-    id_vonzus_csv = [dados["id_vonzu"] for _, dados in linhas_resolvidas]
-    stats_geocode = geocodificar_apos_importacao(filial, id_vonzus_csv)
-    linhas_relatorio = relatorio_volumes.split("\n")
-    _append_geocode_relatorio(linhas_relatorio, stats_geocode)
-    relatorio_volumes = "\n".join(linhas_relatorio)
-
     # Relatório de volumes: todos os pedidos que têm Description no CSV
     dados_volumes, _detalhes_linhas_volumes = _montar_dados_volumes_agrupados(linhas_norm)
 
@@ -714,7 +664,6 @@ def importar_csv(conteudo_bytes, filial, nome_arquivo, analisar_movimentacoes_di
             "sem_alteracao": sem_alteracao,
             "tentativas": tentativas,
             "avisos_fk": len(avisos_fk),
-            **_stats_geocode_para_importacao(stats_geocode),
         },
         "dados_volumes": dados_volumes,
     }
