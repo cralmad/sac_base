@@ -72,7 +72,8 @@ table.rf-tabela tfoot .rf-sub { font-weight: 600; }
 
 {% block content %}
 <div class="container-xl my-3" id="rf-root"
-     data-url-buscar="{% url 'relatorio_fechamento' %}">
+     data-url-buscar="{% url 'relatorio_fechamento' %}"
+     data-url-exportar-xlsx="{% url 'relatorio_fechamento_exportar_xlsx' %}">
 
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
     <h1 class="h4 mb-0"><i class="bi bi-calendar2-check me-2"></i>Relatório de Fechamento</h1>
@@ -97,6 +98,9 @@ table.rf-tabela tfoot .rf-sub { font-weight: 600; }
         </button>
         <button type="button" class="btn btn-outline-secondary d-none" id="rf-btn-imprimir" title="Imprimir relatório">
           <i class="bi bi-printer me-1"></i>Imprimir
+        </button>
+        <button type="button" class="btn btn-outline-success d-none" id="rf-btn-exportar-xlsx" title="Exportar para Excel">
+          <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
         </button>
       </div>
     </form>

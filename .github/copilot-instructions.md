@@ -255,9 +255,13 @@ heroku config:set BANCO_DE_DADOS="postgres://..." \
 
 ### Pos-deploy
 ```bash
+pip install -r requirements.txt
 heroku run python manage.py migrate
 heroku run python manage.py collectstatic --noinput
 ```
+
+Dependencias Python relevantes (ver `requirements.txt`):
+- `openpyxl` — exportacao `.xlsx` do Relatorio de Fechamento (`relatorio_fechamento/exportar-xlsx/`).
 
 ---
 

@@ -57,6 +57,15 @@ table.rr-tabela tr.rr-nao-segue td { background: #e0e0e0 !important; }
 .rr-artigos-toggle { color: #1a3a5c; text-decoration: none; }
 .rr-artigos-toggle:hover { color: #0d2f52; }
 .rr-artigos-toggle i { font-weight: 700; font-size: 1.05rem; }
+.rr-artigos-toggle.rr-artigos-toggle-critico,
+.rr-artigos-toggle.rr-artigos-toggle-critico:hover,
+.rr-artigos-toggle.rr-artigos-toggle-critico:focus {
+  color: #c1121f !important;
+}
+.rr-artigos-toggle.rr-artigos-toggle-critico i { color: #c1121f; }
+.rr-artigos-table tr.rr-artigo-critico td {
+  background: #fde8e8;
+}
 .rr-artigos-table {
   width: 100%;
   border-collapse: collapse;
@@ -69,12 +78,18 @@ table.rr-tabela tr.rr-nao-segue td { background: #e0e0e0 !important; }
   font-size: .78rem;
 }
 .rr-codigo-cell { white-space: nowrap; }
-.rr-cod-link {
+.rr-acao-dropdown { display: inline-block; }
+.rr-acao-toggle {
   color: #1a3a5c;
   text-decoration: underline;
   text-underline-offset: 2px;
+  font-size: inherit;
+  line-height: inherit;
 }
-.rr-cod-link:hover { color: #0d2f52; }
+.rr-acao-toggle:hover,
+.rr-acao-toggle:focus { color: #0d2f52; }
+.rr-acao-dropdown .dropdown-toggle::after { margin-left: .2rem; }
+.rr-acao-dropdown .dropdown-menu { font-size: .82rem; min-width: 7rem; }
 
 /* ── Multi-select de motoristas ── */
 #rr-motoristas {
@@ -115,7 +130,13 @@ table.rr-tabela tr.rr-nao-segue td { background: #e0e0e0 !important; }
   #rr-titulo-data { font-size: 7.5pt; }
   .rr-grupo-header .rr-badge-totais { display: none !important; }
   .rr-artigos-toggle { display: none !important; }
-  .rr-cod-link { color: inherit !important; text-decoration: none !important; }
+  .rr-artigos-table tr.rr-artigo-critico td {
+    background: #fde8e8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .rr-acao-toggle { color: inherit !important; text-decoration: none !important; }
+  .rr-acao-dropdown .dropdown-toggle::after { display: none !important; }
   tr.d-none { display: table-row !important; }
 }
 </style>
@@ -125,7 +146,9 @@ table.rr-tabela tr.rr-nao-segue td { background: #e0e0e0 !important; }
 <div class="container-xl my-3" id="rr-root"
      data-url-buscar="{% url 'relatorio_rotas' %}"
      data-url-link="{% url 'mapa_publico_gerar_link' %}"
-     data-url-importar-artigos="{% url 'relatorio_rotas_importar_artigos' %}">
+     data-url-importar-artigos="{% url 'relatorio_rotas_importar_artigos' %}"
+     data-url-produto-critico="{% url 'relatorio_rotas_cadastrar_produto_critico' %}"
+     data-url-pedidos="{% url 'pedidos' %}">
 
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
     <h1 class="h4 mb-0"><i class="bi bi-truck me-2"></i>Rotas por <span id="rr-titulo-agrup">Carro</span></h1>

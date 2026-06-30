@@ -85,6 +85,16 @@ class RelatorioLogisticaMotoristaGSheetsTests(TestCase):
         self.assertIn(t_ok.id, ids)
         self.assertEqual(len(ids), 1)
 
+    def test_listar_exclui_estados_danos_recusa(self):
+        p_ok = self._pedido(20011)
+        t_ok = self._tentativa(p_ok, estado="CA")
+        excluidos = ("DVP", "CI", "PNR", "RCD", "recusa_parcial")
+        for idx, estado in enumerate(excluidos):
+            p = self._pedido(20012 + idx)
+            self._tentativa(p, estado=estado)
+        ids = [x.id for x in listar_tentativas_para_gsheets(self.filial, self.dt, self.dt, None)]
+        self.assertEqual(ids, [t_ok.id])
+
     def test_listar_exclui_interno(self):
         p1 = self._pedido(20007)
         t_ok = self._tentativa(p1, interno=False)

@@ -1175,10 +1175,19 @@ document.addEventListener('DOMContentLoaded', () => {
   hidratarFormulario(nomeForm);
   aplicarPermissoesNaInterface();
   preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
-  carregarMovimentacoes();
-  carregarDevolucoes();
-  carregarIncidencias();
-  renderAvaliacao(getDataBackEnd()?.avaliacao || null);
+
+  if (getDataset('preload_pedido_visualizar', false)) {
+    const preload = getDataset('pedido_preload', {});
+    aplicarListasPedidoDoPayload(preload).then(() => {
+      setFormState(nomeForm, 'visualizar');
+      aplicarPermissoesNaInterface();
+    });
+  } else {
+    carregarMovimentacoes();
+    carregarDevolucoes();
+    carregarIncidencias();
+    renderAvaliacao(getDataBackEnd()?.avaliacao || null);
+  }
 
   const areaCadastro = document.getElementById('area-cadastro');
   const divPesquisa = document.getElementById('div-pesquisa');

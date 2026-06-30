@@ -356,3 +356,26 @@ class Incidencia(models.Model):
 
     def __str__(self):
         return f"Incidência {self.tipo} — Pedido {self.pedido_id}"
+
+
+class ProdutoCritico(models.Model):
+    """Catálogo de produtos críticos (código + descrição)."""
+
+    id = models.BigAutoField(primary_key=True)
+    codigo = models.CharField(max_length=20)
+    descricao = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = "produto_critico"
+        verbose_name = "Produto crítico"
+        verbose_name_plural = "Produtos críticos"
+        ordering = ["codigo"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["codigo"],
+                name="unique_produto_critico_codigo",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.codigo} — {self.descricao}"

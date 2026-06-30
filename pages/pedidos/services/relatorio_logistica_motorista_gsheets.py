@@ -19,9 +19,18 @@ MSG_PLANILHA_NAO_NATIVA = (
     "Crie uma nova planilha em sheets.google.com (não faça upload de um ficheiro Excel) "
     "e use o ID dessa nova planilha nas configurações da filial."
 )
+ESTADOS_EXCLUIDOS_GSHEETS_LOGISTICA_MOTORISTA = frozenset({
+    "completed",
+    "DVP",
+    "CI",
+    "PNR",
+    "RCD",
+    "recusa_parcial",
+})
+
 MSG_NENHUMA_ELEGIVEL = (
     "Nenhuma tentativa elegível para envio "
-    "(Concluído, interno ou sem registros no período)."
+    "(Concluído, interno, estados de danos/recusa ou sem registros no período)."
 )
 
 
@@ -76,7 +85,7 @@ def listar_tentativas_para_gsheets(
 ) -> list[TentativaEntrega]:
     return list(
         _qs_tentativas_periodo_gsheets(filial_ativa, data_inicio, data_fim, motorista_ids)
-        .exclude(estado="completed")
+        .exclude(estado__in=ESTADOS_EXCLUIDOS_GSHEETS_LOGISTICA_MOTORISTA)
         .filter(interno=False)
     )
 

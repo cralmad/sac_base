@@ -1,5 +1,6 @@
 """Relatório de Fechamento — agregação, exceções e RF ENTRADA."""
 
+import importlib.util
 from datetime import date
 from decimal import Decimal
 
@@ -17,9 +18,23 @@ from pages.logistica_config.models import (
 from pages.pedidos.models import Pedido, TentativaEntrega
 from pages.pedidos.services.relatorio_fechamento import (
     formatar_decimal_pt_br,
+    gerar_xlsx_relatorio_fechamento,
     montar_relatorio_fechamento,
+    parse_decimal_pt_br,
+    parse_inteiro_pt_br,
     validar_periodo,
 )
+
+
+class RelatorioFechamentoFormatacaoTests(TestCase):
+    def test_parse_inteiro_pt_br(self):
+        self.assertEqual(parse_inteiro_pt_br("11.111"), 11111)
+        self.assertEqual(parse_inteiro_pt_br("3"), 3)
+        self.assertIsNone(parse_inteiro_pt_br(""))
+
+    def test_parse_decimal_pt_br(self):
+        self.assertEqual(parse_decimal_pt_br("11.111,11"), Decimal("11111.11"))
+        self.assertEqual(parse_decimal_pt_br("6,00"), Decimal("6.00"))
 
 
 class RelatorioFechamentoServiceTests(TestCase):
@@ -270,3 +285,26 @@ class RelatorioFechamentoServiceTests(TestCase):
         self.assertEqual(t["pedidos_excedentes_valor"], "6,00")
         self.assertEqual(payload["periodo_texto"], "10/06/2026 a 10/06/2026")
         self.assertEqual(payload["valor_total_consolidado"], "40,00")
+
+    def test_gerar_xlsx_retorna_arquivo_zip(self):
+        if importlib.util.find_spec("openpyxl") is None:
+            self.skipTest("openpyxl não instalado")
+        from io import BytesIO
+
+        from openpyxl import load_workbook
+
+        p = self._pedido(62001)
+        self._tentativa(p, self.d0)
+        payload, err = montar_relatorio_fechamento(self.filial, self.d0, self.d0)
+        self.assertIsNone(err)
+        data = gerar_xlsx_relatorio_fechamento(payload)
+        self.assertTrue(data.startswith(b"PK"))
+        self.assertGreater(len(data), 100)
+
+        wb = load_workbook(BytesIO(data))
+        ws = wb.active
+        data_row = 4 if payload.get("periodo_texto") else 2
+        self.assertIsInstance(ws.cell(row=data_row, column=2).value, int)
+        self.assertIsInstance(ws.cell(row=data_row, column=3).value, int)
+        val_ligeiro = ws.cell(row=data_row, column=4).value
+        self.assertIsInstance(val_ligeiro, (int, float))

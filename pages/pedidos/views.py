@@ -176,12 +176,30 @@ def pedidos_cadastro_view(request):
     }
 
     if request.method == "GET":
+        filiais_ids = list(get_filiais_escrita_queryset(usuario).values_list("id", flat=True))
+        campos_form = _build_campos_pedido_iniciais()
+        estado_form_inicial = "novo" if acoes["incluir"] else "visualizar"
+        preload_pedido_visualizar = False
+        pedido_preload = None
+        visualizar_id = parse_int(request.GET.get("visualizar"), context="form")
+        if visualizar_id:
+            pedido_qs = Pedido.objects.filter(id=visualizar_id, filial_id__in=filiais_ids)
+            filial_ativa = getattr(request, "filial_ativa", None)
+            if filial_ativa:
+                pedido_qs = pedido_qs.filter(filial_id=filial_ativa.pk)
+            pedido = pedido_qs.first()
+            if pedido:
+                campos_form = serialize_pedido_form(pedido)
+                estado_form_inicial = "visualizar"
+                preload_pedido_visualizar = True
+                pedido_preload = build_pedido_extra_payload(pedido)
+
         request.sisvar_extra = build_sisvar_payload(
             schema=schema,
             forms={
                 nome_form: build_form_state(
-                    estado="novo" if acoes["incluir"] else "visualizar",
-                    campos=_build_campos_pedido_iniciais(),
+                    estado=estado_form_inicial,
+                    campos=campos_form,
                 ),
                 nome_cons: build_form_state(
                     campos={
@@ -203,7 +221,11 @@ def pedidos_cadastro_view(request):
                 "periodos_mov": [{"value": k, "label": v} for k, v in PERIODO_CHOICES],
                 "motivos_dev": [{"value": k, "label": v} for k, v in MOTIVO_CHOICES],
             },
-            datasets={"filiais_escrita": listar_filiais_escrita(usuario)},
+            datasets={
+                "filiais_escrita": listar_filiais_escrita(usuario),
+                "preload_pedido_visualizar": preload_pedido_visualizar,
+                "pedido_preload": pedido_preload,
+            },
         )
         return render(request, "pedidos_cadastro.html")
 

@@ -61,6 +61,31 @@ def formatar_decimal_pt_br(valor: Decimal, casas_decimais: int = 2) -> str:
     return ("-" if neg else "") + ip_fmt + "," + parte_frac
 
 
+def parse_inteiro_pt_br(texto) -> int | None:
+    """Converte inteiro formatado pt-BR (ex.: '11.111') para int."""
+    if texto is None or texto == "":
+        return None
+    s = str(texto).strip().replace(".", "")
+    if not s or s == "-":
+        return None
+    return int(s)
+
+
+def parse_decimal_pt_br(texto) -> Decimal | None:
+    """Converte decimal formatado pt-BR (ex.: '11.111,11') para Decimal."""
+    if texto is None or texto == "":
+        return None
+    s = str(texto).strip()
+    if not s:
+        return None
+    neg = s.startswith("-")
+    s = s.lstrip("-").replace(".", "").replace(",", ".")
+    if not s:
+        return None
+    d = Decimal(s)
+    return -d if neg else d
+
+
 def _item_expresso_linha_payload(item: dict) -> dict:
     """Monta o dict de exibição a partir do item em rf_por_data (só obs + valor formatado)."""
     raw_valor = item.get("valor", "0")
@@ -191,3 +216,125 @@ def montar_relatorio_fechamento(filial, data_ini: date, data_fim: date) -> tuple
         "valor_total_consolidado": formatar_decimal_pt_br(valor_total_consolidado),
         "periodo_maximo_dias": PERIODO_MAXIMO_DIAS,
     }, None
+
+
+_RF_SEP = " | "
+_RF_SEP_OBS_VALOR = " — "
+_FMT_DECIMAL_XLSX = "#,##0.00"
+
+
+def _celula_int_xlsx(valor_fmt):
+    n = parse_inteiro_pt_br(valor_fmt)
+    return n if n is not None else None
+
+
+def _celula_decimal_xlsx(valor_fmt):
+    d = parse_decimal_pt_br(valor_fmt)
+    return float(d) if d is not None else None
+
+
+def _formatar_lancamento_expresso_export(item: dict) -> str:
+    obs = (item.get("observacao") or "").strip()
+    val = item.get("valor")
+    val_s = str(val) if val not in (None, "") else ""
+    if obs:
+        return f"{obs}{_RF_SEP_OBS_VALOR}{val_s}"
+    return val_s
+
+
+def _juntar_lista_expresso_export(lista) -> str:
+    if not lista:
+        return ""
+    partes = [_formatar_lancamento_expresso_export(x) for x in lista]
+    return _RF_SEP.join(p for p in partes if p)
+
+
+def gerar_xlsx_relatorio_fechamento(payload: dict) -> bytes:
+    """Gera workbook .xlsx com colunas numéricas para quantidades e valores."""
+    from io import BytesIO
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Fechamento"
+
+    periodo = payload.get("periodo_texto") or ""
+    valor_total = payload.get("valor_total_consolidado") or ""
+    if periodo:
+        ws.append([f"Período: {periodo} — {valor_total}"])
+        ws["A1"].font = Font(bold=True)
+        ws.append([])
+
+    cabecalhos = [
+        "Data",
+        "Pedidos",
+        "Ligeiro Qtd",
+        "Ligeiro Valor",
+        "Pesado Qtd",
+        "Pesado Valor",
+        "Reservados",
+        "Excedentes",
+        "Excedentes Valor",
+        "Expresso (Obs. / Valor)",
+    ]
+    ws.append(cabecalhos)
+    header_row = ws.max_row
+    for cell in ws[header_row]:
+        cell.font = Font(bold=True)
+
+    colunas_decimais = {4, 6, 9, 10}
+
+    for linha in payload.get("linhas") or []:
+        row_idx = ws.max_row + 1
+        ws.append([
+            linha.get("data") or "",
+            _celula_int_xlsx(linha.get("qtd_pedidos")),
+            _celula_int_xlsx(linha.get("ligeiro_quantidade")),
+            _celula_decimal_xlsx(linha.get("ligeiro_valor")),
+            _celula_int_xlsx(linha.get("pesado_quantidade")),
+            _celula_decimal_xlsx(linha.get("pesado_valor")),
+            _celula_int_xlsx(linha.get("pedidos_reservados")),
+            _celula_int_xlsx(linha.get("pedidos_excedentes")),
+            None,
+            _juntar_lista_expresso_export(linha.get("expresso")),
+        ])
+        for col in colunas_decimais:
+            cell = ws.cell(row=row_idx, column=col)
+            if isinstance(cell.value, (int, float)):
+                cell.number_format = _FMT_DECIMAL_XLSX
+
+    totais = payload.get("totais")
+    if totais:
+        row_idx = ws.max_row + 1
+        ws.append([
+            "Totais",
+            _celula_int_xlsx(totais.get("qtd_pedidos")),
+            _celula_int_xlsx(totais.get("ligeiro_quantidade")),
+            _celula_decimal_xlsx(totais.get("ligeiro_valor")),
+            _celula_int_xlsx(totais.get("pesado_quantidade")),
+            _celula_decimal_xlsx(totais.get("pesado_valor")),
+            _celula_int_xlsx(totais.get("pedidos_reservados")),
+            _celula_int_xlsx(totais.get("pedidos_excedentes")),
+            _celula_decimal_xlsx(totais.get("pedidos_excedentes_valor")),
+            _celula_decimal_xlsx(totais.get("expresso_valor")),
+        ])
+        for cell in ws[row_idx]:
+            cell.font = Font(bold=True)
+        for col in colunas_decimais:
+            cell = ws.cell(row=row_idx, column=col)
+            if isinstance(cell.value, (int, float)):
+                cell.number_format = _FMT_DECIMAL_XLSX
+
+    for col in ws.columns:
+        max_len = 0
+        letter = col[0].column_letter
+        for cell in col:
+            if cell.value is not None:
+                max_len = max(max_len, len(str(cell.value)))
+        ws.column_dimensions[letter].width = min(max(max_len + 2, 10), 48)
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

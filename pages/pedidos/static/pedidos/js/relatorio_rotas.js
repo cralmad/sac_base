@@ -1,4 +1,4 @@
-import { getCsrfToken, clearMessages, definirMensagem, getOptions } from '/static/js/sisVar.js';
+import { getCsrfToken, clearMessages, definirMensagem, getOptions, confirmar, getDataset } from '/static/js/sisVar.js';
 import { AppLoader } from '/static/js/loader.js';
 import { validateSmartNumber, getMultiSelectValues } from '/static/js/smart_filter.js';
 
@@ -6,6 +6,8 @@ const root       = document.getElementById('rr-root');
 const URL_BUSCAR = root?.dataset?.urlBuscar ?? '';
 const URL_LINK   = root?.dataset?.urlLink   ?? '';
 const URL_IMPORTAR_ARTIGOS = root?.dataset?.urlImportarArtigos ?? '';
+const URL_PRODUTO_CRITICO = root?.dataset?.urlProdutoCritico ?? '';
+const URL_PEDIDOS = root?.dataset?.urlPedidos ?? '/app/logistica/pedidos/';
 
 const form       = document.getElementById('rr-form');
 const inpData    = document.getElementById('rr-data');
@@ -31,6 +33,25 @@ let artigosPorIdVonzu = new Map();
 let artigosPorReferencia = new Map();
 let totalPedidosComArtigos = 0;
 let totalArtigosImportados = 0;
+let ultimosGrupos = [];
+let ultimaDataFmt = '';
+let ultimoAgrupamento = 'carro';
+const codigosProdutosCriticos = new Set(
+  (getDataset('produtos_criticos_codigos', []) || []).map(c => normalizarCodigoProduto(c)).filter(Boolean),
+);
+
+function normalizarCodigoProduto(codigo) {
+  return String(codigo ?? '').trim();
+}
+
+function produtoEhCritico(codigo) {
+  const cod = normalizarCodigoProduto(codigo);
+  return Boolean(cod) && codigosProdutosCriticos.has(cod);
+}
+
+function linhaTemProdutoCritico(artigos) {
+  return (artigos || []).some(artigo => produtoEhCritico(artigo?.cod_fornecedor));
+}
 
 // ─── Popula select de motoristas a partir da sisVar ───────────────────────────
 function preencherMotoristas() {
@@ -81,44 +102,162 @@ function normalizarReferencia(valor) {
 const LEROY_MERLIN_SEARCH_URL = 'https://www.leroymerlin.pt/search';
 const VONZU_EXPEDITIONS_URL = 'https://app.vonzu.es/user/expeditions';
 
-function criarLinkLeroyMerlin(codigo) {
-  const cod = String(codigo ?? '').trim();
-  if (!cod) return null;
+function criarDropdownAcao(texto, opcoes) {
+  const wrap = document.createElement('div');
+  wrap.className = 'dropdown rr-acao-dropdown';
 
-  const link = document.createElement('a');
-  link.href = `${LEROY_MERLIN_SEARCH_URL}?q=${encodeURIComponent(cod)}`;
-  link.className = 'rr-cod-link';
-  link.target = '_blank';
-  link.rel = 'noopener noreferrer';
-  link.title = 'Pesquisar na Leroy Merlin';
-  link.textContent = cod;
-  return link;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn-link p-0 rr-acao-toggle dropdown-toggle';
+  btn.setAttribute('data-bs-toggle', 'dropdown');
+  btn.setAttribute('aria-expanded', 'false');
+  btn.textContent = texto;
+
+  const menu = document.createElement('ul');
+  menu.className = 'dropdown-menu';
+
+  (opcoes || []).forEach(opt => {
+    const li = document.createElement('li');
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'dropdown-item';
+    item.textContent = opt.label;
+    if (opt.disabled) {
+      item.classList.add('disabled');
+      item.disabled = true;
+    } else if (opt.href) {
+      item.addEventListener('click', () => {
+        window.open(opt.href, '_blank', 'noopener,noreferrer');
+      });
+    } else if (opt.onClick) {
+      item.addEventListener('click', opt.onClick);
+    }
+    li.appendChild(item);
+    menu.appendChild(li);
+  });
+
+  wrap.appendChild(btn);
+  wrap.appendChild(menu);
+  return wrap;
 }
 
-function criarLinkVonzu(idVonzu, textoExibicao) {
-  const id = Number.parseInt(idVonzu, 10);
-  if (!Number.isInteger(id) || id <= 0) return null;
-
-  const link = document.createElement('a');
-  link.href = `${VONZU_EXPEDITIONS_URL}/${id}`;
-  link.className = 'rr-cod-link';
-  link.target = '_blank';
-  link.rel = 'noopener noreferrer';
-  link.title = 'Abrir expedição na VONZU';
-  link.textContent = String(textoExibicao ?? id);
-  return link;
+function opcoesReferenciaPedido(linha) {
+  const opcoes = [];
+  const idVonzu = Number.parseInt(linha?.id_vonzu, 10);
+  if (Number.isInteger(idVonzu) && idVonzu > 0) {
+    opcoes.push({
+      label: 'VONZU',
+      href: `${VONZU_EXPEDITIONS_URL}/${idVonzu}`,
+    });
+  }
+  const pedidoId = Number.parseInt(linha?.pedido_id, 10);
+  if (Number.isInteger(pedidoId) && pedidoId > 0) {
+    const base = URL_PEDIDOS.replace(/\/?$/, '/');
+    opcoes.push({
+      label: 'SACBASE',
+      href: `${base}?visualizar=${pedidoId}`,
+    });
+  }
+  return opcoes;
 }
 
-function anexarReferenciaPedido(container, linha) {
+function anexarReferenciaPedido(container, linha, comArtigos = false) {
   const texto = linha.pedido ?? '';
-  const link = criarLinkVonzu(linha.id_vonzu, texto);
-  if (link) {
-    container.appendChild(link);
-    return;
+  if (comArtigos) {
+    const opcoes = opcoesReferenciaPedido(linha);
+    if (opcoes.length) {
+      container.appendChild(criarDropdownAcao(texto || '—', opcoes));
+      return;
+    }
+  } else {
+    const idVonzu = Number.parseInt(linha?.id_vonzu, 10);
+    if (Number.isInteger(idVonzu) && idVonzu > 0) {
+      const link = document.createElement('a');
+      link.href = `${VONZU_EXPEDITIONS_URL}/${idVonzu}`;
+      link.className = 'rr-acao-toggle';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.title = 'Abrir expedição na VONZU';
+      link.textContent = texto;
+      container.appendChild(link);
+      return;
+    }
   }
   const span = document.createElement('span');
   span.textContent = texto;
   container.appendChild(span);
+}
+
+function anexarCodigoProduto(container, artigo) {
+  const cod = String(artigo?.cod_fornecedor ?? '').trim();
+  if (!cod) {
+    container.textContent = '';
+    return;
+  }
+  const opcoes = [
+    {
+      label: 'LEROY',
+      href: `${LEROY_MERLIN_SEARCH_URL}?q=${encodeURIComponent(cod)}`,
+    },
+    {
+      label: 'CRÍTICO',
+      onClick: () => confirmarCadastroProdutoCritico(cod, artigo?.descricao ?? ''),
+    },
+  ];
+  container.appendChild(criarDropdownAcao(cod, opcoes));
+}
+
+function confirmarCadastroProdutoCritico(codigo, descricao) {
+  const cod = String(codigo ?? '').trim();
+  const desc = String(descricao ?? '').trim();
+  confirmar({
+    titulo: 'Cadastrar produto crítico',
+    mensagem: `Deseja cadastrar o produto ${cod}${desc ? ` — ${desc}` : ''} na lista de críticos?`,
+    onConfirmar: () => cadastrarProdutoCritico(cod, desc),
+  });
+}
+
+async function cadastrarProdutoCritico(codigo, descricao) {
+  clearMessages();
+  if (!URL_PRODUTO_CRITICO) {
+    definirMensagem('erro', 'URL de cadastro de produto crítico não configurada.', false);
+    return;
+  }
+  AppLoader.show();
+  try {
+    const resp = await fetch(URL_PRODUTO_CRITICO, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+      body: JSON.stringify({ codigo, descricao }),
+    });
+    const json = await resp.json();
+    if (!json.success) {
+      const erros = json?.mensagens?.erro?.conteudo;
+      definirMensagem(
+        'erro',
+        Array.isArray(erros) && erros.length ? erros[0] : (json.mensagem || 'Erro ao cadastrar produto crítico.'),
+        false,
+      );
+      return;
+    }
+    const sucesso = json?.mensagens?.sucesso?.conteudo;
+    definirMensagem(
+      'sucesso',
+      Array.isArray(sucesso) && sucesso.length ? sucesso[0] : 'Produto crítico cadastrado.',
+      false,
+    );
+    const codCadastrado = normalizarCodigoProduto(json.produto_critico_codigo || codigo);
+    if (codCadastrado) {
+      codigosProdutosCriticos.add(codCadastrado);
+    }
+    if (ultimosGrupos.length) {
+      renderizarGrupos(ultimosGrupos, ultimaDataFmt, ultimoAgrupamento);
+    }
+  } catch {
+    definirMensagem('erro', 'Erro de comunicação ao cadastrar produto crítico.', false);
+  } finally {
+    AppLoader.hide();
+  }
 }
 
 function obterArtigosDaLinha(linha) {
@@ -325,11 +464,16 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
         const btnExpandir = document.createElement('button');
         btnExpandir.type = 'button';
         btnExpandir.className = 'btn btn-sm btn-link p-0 rr-artigos-toggle';
-        btnExpandir.title = `Mostrar produtos (${artigosLinha.length})`;
+        if (linhaTemProdutoCritico(artigosLinha)) {
+          btnExpandir.classList.add('rr-artigos-toggle-critico');
+          btnExpandir.title = `Produtos críticos (${artigosLinha.length} item(ns))`;
+        } else {
+          btnExpandir.title = `Mostrar produtos (${artigosLinha.length})`;
+        }
         btnExpandir.innerHTML = '<i class="bi bi-chevron-right"></i>';
         refWrap.appendChild(btnExpandir);
 
-        anexarReferenciaPedido(refWrap, linha);
+        anexarReferenciaPedido(refWrap, linha, true);
 
         if (linha.tem_devolucao) {
           refWrap.classList.add('rr-ref-dev');
@@ -387,18 +531,16 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
         const bodyArtigos = document.createElement('tbody');
         artigosLinha.forEach(artigo => {
           const trItem = document.createElement('tr');
+          if (produtoEhCritico(artigo?.cod_fornecedor)) {
+            trItem.classList.add('rr-artigo-critico');
+          }
           const tdDescricao = document.createElement('td');
           tdDescricao.textContent = artigo.descricao ?? '';
           const tdQuantidade = document.createElement('td');
           tdQuantidade.textContent = String(artigo.quantidade ?? '');
           const tdCodigo = document.createElement('td');
           tdCodigo.className = 'rr-codigo-cell';
-          const linkLm = criarLinkLeroyMerlin(artigo.cod_fornecedor);
-          if (linkLm) {
-            tdCodigo.appendChild(linkLm);
-          } else {
-            tdCodigo.textContent = artigo.cod_fornecedor ?? '';
-          }
+          anexarCodigoProduto(tdCodigo, artigo);
           trItem.appendChild(tdDescricao);
           trItem.appendChild(tdQuantidade);
           trItem.appendChild(tdCodigo);
@@ -493,6 +635,9 @@ async function importarArtigos() {
     }
     aplicarDadosImportados(json.pedidos || []);
     definirMensagem('sucesso', 'Artigos importados com sucesso.', false);
+    if (ultimosGrupos.length) {
+      renderizarGrupos(ultimosGrupos, ultimaDataFmt, ultimoAgrupamento);
+    }
     arquivoArtigosEl.value = '';
     modalImportarArtigos?.hide();
   } catch {
@@ -624,6 +769,9 @@ async function buscar() {
       return;
     }
     renderizarGrupos(json.grupos || [], json.data_fmt || '', json.agrupamento || 'carro');
+    ultimosGrupos = json.grupos || [];
+    ultimaDataFmt = json.data_fmt || '';
+    ultimoAgrupamento = json.agrupamento || 'carro';
   } catch {
     definirMensagem('erro', 'Erro de comunicação com o servidor.', false);
   } finally {

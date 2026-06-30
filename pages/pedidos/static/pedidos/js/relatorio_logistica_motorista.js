@@ -320,7 +320,7 @@ async function enviarAoGSheets() {
   }
   confirmar({
     titulo: 'Enviar ao Google Sheets',
-    mensagem: 'Deseja enviar ao Google Sheets as tentativas do relatório (exceto Concluído e interno)?',
+    mensagem: 'Deseja enviar ao Google Sheets as tentativas do relatório (exceto Concluído, interno e estados de danos/recusa)?',
     onConfirmar: async () => {
       clearMessages();
       if (btnGSheets) btnGSheets.disabled = true;

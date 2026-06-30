@@ -7,6 +7,7 @@ import { AppLoader } from '/static/js/loader.js';
 
 const root = document.getElementById('rf-root');
 const URL_BUSCAR = root?.dataset?.urlBuscar ?? '';
+const URL_EXPORTAR_XLSX = root?.dataset?.urlExportarXlsx ?? '';
 
 const form = document.getElementById('rf-form');
 const inpIni = document.getElementById('rf-data-ini');
@@ -16,6 +17,7 @@ const tfoot = document.getElementById('rf-tfoot');
 const wrap = document.getElementById('rf-tabela-wrapper');
 const vazio = document.getElementById('rf-vazio');
 const btnImprimir = document.getElementById('rf-btn-imprimir');
+const btnExportarXlsx = document.getElementById('rf-btn-exportar-xlsx');
 const linhaResumo = document.getElementById('rf-linha-resumo');
 const celulaResumo = document.getElementById('rf-celula-resumo');
 
@@ -148,6 +150,11 @@ function renderRodape(totais) {
   tfoot.appendChild(tr);
 }
 
+function alternarBotoesResultado(visivel) {
+  btnImprimir?.classList.toggle('d-none', !visivel);
+  btnExportarXlsx?.classList.toggle('d-none', !visivel);
+}
+
 function renderTabela(linhas, totais, meta) {
   corpo.replaceChildren();
   atualizarResumoPeriodo(meta);
@@ -162,19 +169,73 @@ function renderTabela(linhas, totais, meta) {
     trV.appendChild(tdV);
     corpo.appendChild(trV);
     renderRodape(totais || null);
-    btnImprimir?.classList.remove('d-none');
+    alternarBotoesResultado(true);
     return;
   }
   vazio.classList.add('d-none');
   wrap.classList.remove('d-none');
   linhas.forEach((l) => corpo.appendChild(renderLinha(l)));
   renderRodape(totais || null);
-  btnImprimir?.classList.remove('d-none');
+  alternarBotoesResultado(true);
 }
 
 btnImprimir?.addEventListener('click', () => {
   window.print();
 });
+
+async function exportarXlsx() {
+  if (!inpIni.value || !inpFim.value) {
+    definirMensagem('erro', 'Informe data inicial e final.', false);
+    return;
+  }
+  if (!URL_EXPORTAR_XLSX) {
+    definirMensagem('erro', 'Exportação Excel indisponível.', false);
+    return;
+  }
+  AppLoader.show();
+  try {
+    const resp = await fetch(URL_EXPORTAR_XLSX, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken(),
+      },
+      body: JSON.stringify({
+        filtros: {
+          data_inicial: inpIni.value,
+          data_final: inpFim.value,
+        },
+      }),
+    });
+    const tipo = resp.headers.get('Content-Type') || '';
+    if (!resp.ok || tipo.includes('application/json')) {
+      let mensagem = 'Erro ao exportar Excel.';
+      try {
+        const data = await resp.json();
+        mensagem = data.mensagem || mensagem;
+      } catch {
+        /* resposta não-JSON */
+      }
+      definirMensagem('erro', mensagem, false);
+      return;
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fechamento_${inpIni.value}_${inpFim.value}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch {
+    definirMensagem('erro', 'Falha de rede ao exportar Excel.', false);
+  } finally {
+    AppLoader.hide();
+  }
+}
+
+btnExportarXlsx?.addEventListener('click', exportarXlsx);
 
 form?.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -205,7 +266,7 @@ form?.addEventListener('submit', async (e) => {
       vazio.classList.add('d-none');
       atualizarResumoPeriodo(null);
       renderRodape(null);
-      btnImprimir?.classList.add('d-none');
+      alternarBotoesResultado(false);
       return;
     }
     renderTabela(data.linhas, data.totais, {
@@ -216,7 +277,7 @@ form?.addEventListener('submit', async (e) => {
     definirMensagem('erro', 'Falha de rede ao buscar o relatório.', false);
     atualizarResumoPeriodo(null);
     renderRodape(null);
-    btnImprimir?.classList.add('d-none');
+    alternarBotoesResultado(false);
   } finally {
     AppLoader.hide();
   }

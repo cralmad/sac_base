@@ -9,6 +9,8 @@ from datetime import datetime
 from itertools import groupby
 from decimal import Decimal
 
+from sac_base.sisvar_builders import build_error_payload, build_success_payload, build_sisvar_payload
+
 from pages.pedidos.models import (
     TentativaEntrega,
     Pedido,
@@ -34,6 +36,7 @@ from pages.pedidos.services.sms_relatorio import (
     sigla_pais_operacao_filial,
 )
 from pages.pedidos.services.importador_csv import parse_csv_artigos_sem_persistir
+from pages.pedidos.services.produto_critico import cadastrar_produto_critico, listar_codigos_produtos_criticos
 from pages.pedidos.services.dashboard_avaliacao_respostas import (
     montar_sisvar_relatorio_avaliacao_dashboard_get,
     validar_e_montar_dashboard_avaliacao_respostas,
@@ -46,9 +49,12 @@ from pages.pedidos.services.relatorio_incidencias import (
     montar_sisvar_relatorio_incidencias_get,
     validar_e_montar_relatorio_incidencias,
 )
-from pages.pedidos.services.relatorio_fechamento import montar_relatorio_fechamento, validar_periodo
+from pages.pedidos.services.relatorio_fechamento import (
+    gerar_xlsx_relatorio_fechamento,
+    montar_relatorio_fechamento,
+    validar_periodo,
+)
 from sac_base.permissions_utils import build_action_permissions
-from sac_base.sisvar_builders import build_sisvar_payload
 from sac_base.sms_service import montar_mensagem
 from sac_base.smart_filter import apply_smart_number_filter, apply_smart_text_filter
 
@@ -256,6 +262,7 @@ def relatorio_rotas_view(request):
         request.sisvar_extra = build_sisvar_payload(
             permissions={"rotas": build_action_permissions(request.user, PERMISSOES_ROTAS)},
             options={"motoristas": motoristas_choices},
+            datasets={"produtos_criticos_codigos": listar_codigos_produtos_criticos()},
         )
         return render(request, "relatorio_rotas.html")
 
@@ -347,6 +354,7 @@ def relatorio_rotas_view(request):
             tem_tentativa_posterior = p.id in pedidos_com_tentativa_posterior
             zona_entrega, faixa_entrega = resolver_zona_e_faixa_entrega(p.codpost_dest, regras_zona)
             linhas.append({
+                "pedido_id": p.id,
                 "pedido": p.pedido or str(p.id_vonzu),
                 "id_vonzu": p.id_vonzu,
                 "tipo": tipo_abrev,
@@ -404,6 +412,24 @@ def relatorio_rotas_importar_artigos_view(request):
         )
 
     return JsonResponse({"success": True, "pedidos": resultado["pedidos"]})
+
+
+@login_required
+@permission_required(PERMISSOES_ROTAS["acessar"], raise_exception=True)
+@csrf_protect
+@require_POST
+def relatorio_rotas_cadastrar_produto_critico_view(request):
+    data = request.sisvar_front or {}
+    codigo = str(data.get("codigo", "")).strip()
+    descricao = str(data.get("descricao", "")).strip()
+
+    obj, erro = cadastrar_produto_critico(codigo=codigo, descricao=descricao)
+    if erro:
+        return JsonResponse(build_error_payload(erro), status=400)
+    return JsonResponse(build_success_payload(
+        f"Produto {obj.codigo} cadastrado como crítico.",
+        extra_payload={"produto_critico_id": obj.id, "produto_critico_codigo": obj.codigo},
+    ))
 
 
 # ─── Relatório de Envio de SMS ────────────────────────────────────────────────
@@ -916,6 +942,41 @@ PERMISSOES_FECHAMENTO = {
 }
 
 
+def _filtros_relatorio_fechamento_ou_erro(request):
+    """Extrai datas do POST SisVar; retorna (dt_ini, dt_fim, None) ou (None, None, JsonResponse)."""
+    data = request.sisvar_front or {}
+    filtros = data.get("filtros", {})
+    data_inicial = (filtros.get("data_inicial") or "").strip()
+    data_final = (filtros.get("data_final") or "").strip()
+
+    if not data_inicial:
+        return None, None, JsonResponse(
+            {"success": False, "mensagem": "A data inicial é obrigatória."}, status=400,
+        )
+    if not data_final:
+        return None, None, JsonResponse(
+            {"success": False, "mensagem": "A data final é obrigatória."}, status=400,
+        )
+
+    try:
+        dt_ini = datetime.strptime(data_inicial, "%Y-%m-%d").date()
+        dt_fim = datetime.strptime(data_final, "%Y-%m-%d").date()
+    except ValueError:
+        return None, None, JsonResponse({"success": False, "mensagem": "Data inválida."}, status=400)
+
+    err_periodo = validar_periodo(dt_ini, dt_fim)
+    if err_periodo:
+        return None, None, JsonResponse({"success": False, "mensagem": err_periodo}, status=400)
+
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return None, None, JsonResponse(
+            {"success": False, "mensagem": "Filial ativa não encontrada na sessão."}, status=403,
+        )
+
+    return dt_ini, dt_fim, None
+
+
 @login_required
 @permission_required(PERMISSOES_FECHAMENTO["acessar"], raise_exception=True)
 @csrf_protect
@@ -927,35 +988,52 @@ def relatorio_fechamento_view(request):
         )
         return render(request, "relatorio_fechamento.html")
 
-    data = request.sisvar_front or {}
-    filtros = data.get("filtros", {})
-    data_inicial = (filtros.get("data_inicial") or "").strip()
-    data_final = (filtros.get("data_final") or "").strip()
+    dt_ini, dt_fim, err_resp = _filtros_relatorio_fechamento_ou_erro(request)
+    if err_resp is not None:
+        return err_resp
 
-    if not data_inicial:
-        return JsonResponse({"success": False, "mensagem": "A data inicial é obrigatória."}, status=400)
-    if not data_final:
-        return JsonResponse({"success": False, "mensagem": "A data final é obrigatória."}, status=400)
-
-    try:
-        dt_ini = datetime.strptime(data_inicial, "%Y-%m-%d").date()
-        dt_fim = datetime.strptime(data_final, "%Y-%m-%d").date()
-    except ValueError:
-        return JsonResponse({"success": False, "mensagem": "Data inválida."}, status=400)
-
-    err_periodo = validar_periodo(dt_ini, dt_fim)
-    if err_periodo:
-        return JsonResponse({"success": False, "mensagem": err_periodo}, status=400)
-
-    filial_ativa = getattr(request, "filial_ativa", None)
-    if not filial_ativa:
-        return JsonResponse({"success": False, "mensagem": "Filial ativa não encontrada na sessão."}, status=403)
-
+    filial_ativa = request.filial_ativa
     payload, err_msg = montar_relatorio_fechamento(filial_ativa, dt_ini, dt_fim)
     if err_msg:
         return JsonResponse({"success": False, "mensagem": err_msg}, status=400)
 
     return JsonResponse({"success": True, **payload})
+
+
+@login_required
+@permission_required(PERMISSOES_FECHAMENTO["acessar"], raise_exception=True)
+@csrf_protect
+@require_POST
+def relatorio_fechamento_exportar_xlsx_view(request):
+    dt_ini, dt_fim, err_resp = _filtros_relatorio_fechamento_ou_erro(request)
+    if err_resp is not None:
+        return err_resp
+
+    filial_ativa = request.filial_ativa
+    payload, err_msg = montar_relatorio_fechamento(filial_ativa, dt_ini, dt_fim)
+    if err_msg:
+        return JsonResponse({"success": False, "mensagem": err_msg}, status=400)
+
+    try:
+        conteudo = gerar_xlsx_relatorio_fechamento(payload)
+    except ImportError:
+        return JsonResponse(
+            {"success": False, "mensagem": "Biblioteca Excel (openpyxl) não disponível no servidor."},
+            status=500,
+        )
+    except (OSError, ValueError, TypeError):
+        return JsonResponse(
+            {"success": False, "mensagem": "Não foi possível gerar o arquivo Excel."},
+            status=500,
+        )
+
+    nome = f"fechamento_{dt_ini.isoformat()}_{dt_fim.isoformat()}.xlsx"
+    response = HttpResponse(
+        conteudo,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{nome}"'
+    return response
 
 
 # ─── Relatório de respostas à pesquisa de satisfação (logística) ─────────────
