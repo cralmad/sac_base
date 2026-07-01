@@ -143,6 +143,13 @@ function criarDropdownAcao(texto, opcoes) {
 
 function opcoesReferenciaPedido(linha) {
   const opcoes = [];
+  const texto = normalizarReferencia(linha?.pedido);
+  if (texto) {
+    opcoes.push({
+      label: 'Copiar',
+      onClick: () => copiarReferenciaPedido(texto),
+    });
+  }
   const idVonzu = Number.parseInt(linha?.id_vonzu, 10);
   if (Number.isInteger(idVonzu) && idVonzu > 0) {
     opcoes.push({
@@ -161,27 +168,12 @@ function opcoesReferenciaPedido(linha) {
   return opcoes;
 }
 
-function anexarReferenciaPedido(container, linha, comArtigos = false) {
+function anexarReferenciaPedido(container, linha) {
   const texto = linha.pedido ?? '';
-  if (comArtigos) {
-    const opcoes = opcoesReferenciaPedido(linha);
-    if (opcoes.length) {
-      container.appendChild(criarDropdownAcao(texto || '—', opcoes));
-      return;
-    }
-  } else {
-    const idVonzu = Number.parseInt(linha?.id_vonzu, 10);
-    if (Number.isInteger(idVonzu) && idVonzu > 0) {
-      const link = document.createElement('a');
-      link.href = `${VONZU_EXPEDITIONS_URL}/${idVonzu}`;
-      link.className = 'rr-acao-toggle';
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.title = 'Abrir expedição na VONZU';
-      link.textContent = texto;
-      container.appendChild(link);
-      return;
-    }
+  const opcoes = opcoesReferenciaPedido(linha);
+  if (opcoes.length) {
+    container.appendChild(criarDropdownAcao(texto || '—', opcoes));
+    return;
   }
   const span = document.createElement('span');
   span.textContent = texto;
@@ -473,7 +465,7 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
         btnExpandir.innerHTML = '<i class="bi bi-chevron-right"></i>';
         refWrap.appendChild(btnExpandir);
 
-        anexarReferenciaPedido(refWrap, linha, true);
+        anexarReferenciaPedido(refWrap, linha);
 
         if (linha.tem_devolucao) {
           refWrap.classList.add('rr-ref-dev');
@@ -645,6 +637,21 @@ async function importarArtigos() {
   } finally {
     btnConfirmarImportacao.disabled = false;
     AppLoader.hide();
+  }
+}
+
+// ─── Copiar referência individual ───────────────────────────────────────────
+async function copiarReferenciaPedido(referencia) {
+  const texto = normalizarReferencia(referencia);
+  if (!texto) {
+    definirMensagem('aviso', 'Referência vazia.', false);
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(texto);
+    definirMensagem('sucesso', 'Referência copiada.', false);
+  } catch {
+    definirMensagem('erro', 'Não foi possível copiar. Verifique as permissões do navegador.', false);
   }
 }
 

@@ -136,7 +136,16 @@ table.rr-tabela tr.rr-nao-segue td { background: #e0e0e0 !important; }
     print-color-adjust: exact;
   }
   .rr-acao-toggle { color: inherit !important; text-decoration: none !important; }
+  .rr-acao-dropdown .dropdown-menu { display: none !important; }
   .rr-acao-dropdown .dropdown-toggle::after { display: none !important; }
+  table.rr-tabela .rr-acao-dropdown .rr-acao-toggle,
+  table.rr-artigos-table .rr-acao-dropdown .rr-acao-toggle {
+    display: inline !important;
+    border: none !important;
+    background: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
   tr.d-none { display: table-row !important; }
 }
 </style>
