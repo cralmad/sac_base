@@ -101,6 +101,20 @@ function normalizarReferencia(valor) {
 
 const LEROY_MERLIN_SEARCH_URL = 'https://www.leroymerlin.pt/search';
 const VONZU_EXPEDITIONS_URL = 'https://app.vonzu.es/user/expeditions';
+const FEEDBACK_COPIA_MS = 1100;
+
+function aplicarFeedbackCopia(el, tipo = 'ok') {
+  if (!el) return;
+  el.classList.remove('rr-copia-ok', 'rr-copia-erro');
+  el.classList.add(tipo === 'erro' ? 'rr-copia-erro' : 'rr-copia-ok');
+  window.setTimeout(() => {
+    el.classList.remove('rr-copia-ok', 'rr-copia-erro');
+  }, FEEDBACK_COPIA_MS);
+}
+
+function obterToggleDropdown(ev) {
+  return ev?.currentTarget?.closest('.rr-acao-dropdown')?.querySelector('.rr-acao-toggle') ?? null;
+}
 
 function criarDropdownAcao(texto, opcoes) {
   const wrap = document.createElement('div');
@@ -130,7 +144,7 @@ function criarDropdownAcao(texto, opcoes) {
         window.open(opt.href, '_blank', 'noopener,noreferrer');
       });
     } else if (opt.onClick) {
-      item.addEventListener('click', opt.onClick);
+      item.addEventListener('click', (ev) => opt.onClick(ev));
     }
     li.appendChild(item);
     menu.appendChild(li);
@@ -147,7 +161,7 @@ function opcoesReferenciaPedido(linha) {
   if (texto) {
     opcoes.push({
       label: 'Copiar',
-      onClick: () => copiarReferenciaPedido(texto),
+      onClick: (ev) => copiarReferenciaPedido(texto, obterToggleDropdown(ev)),
     });
   }
   const idVonzu = Number.parseInt(linha?.id_vonzu, 10);
@@ -641,17 +655,17 @@ async function importarArtigos() {
 }
 
 // ─── Copiar referência individual ───────────────────────────────────────────
-async function copiarReferenciaPedido(referencia) {
+async function copiarReferenciaPedido(referencia, elFeedback = null) {
   const texto = normalizarReferencia(referencia);
   if (!texto) {
-    definirMensagem('aviso', 'Referência vazia.', false);
+    aplicarFeedbackCopia(elFeedback, 'erro');
     return;
   }
   try {
     await navigator.clipboard.writeText(texto);
-    definirMensagem('sucesso', 'Referência copiada.', false);
+    aplicarFeedbackCopia(elFeedback, 'ok');
   } catch {
-    definirMensagem('erro', 'Não foi possível copiar. Verifique as permissões do navegador.', false);
+    aplicarFeedbackCopia(elFeedback, 'erro');
   }
 }
 
