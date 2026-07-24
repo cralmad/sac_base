@@ -15,6 +15,9 @@ const LABELS_STATS = {
   sem_alteracao: 'Pedidos sem alteração',
   tentativas: 'Tentativas criadas',
   avisos_fk: 'Avisos de FK não resolvida',
+  ids_remapeados: 'IDs remapeados (VONZU → ENOVO)',
+  ignorados_prioridade_enovo: 'Ignorados (referência já no ENOVO)',
+  ignorados_encargo: 'Linhas ENCARGO ignoradas',
   coords_atribuidas: 'Coordenadas atribuídas',
   coords_cp_pt: 'Geocode CP (cp_pt)',
   coords_cp_pt_rua: 'Geocode morada (cp_pt_rua)',
@@ -92,6 +95,9 @@ function processarMensagensGeocode(data) {
 document.addEventListener('DOMContentLoaded', () => {
   preencherFiliais();
 
+  const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+  [...tooltipTriggerList].forEach(el => new bootstrap.Tooltip(el));
+
   const form = document.getElementById('formImportacao');
   const btnBaixar = document.getElementById('btn-baixar-relatorio');
   const btnGeocodificar = document.getElementById('btn-geocodificar');
@@ -139,24 +145,32 @@ document.addEventListener('DOMContentLoaded', () => {
     clearMessages();
 
     const filialId = document.getElementById('filial_id').value;
-    const arquivoInput = document.getElementById('arquivo_csv');
+    const arquivoInput = document.getElementById('arquivo_importacao');
     const verificarVolumes = document.getElementById('verificar_volumes')?.checked ? '1' : '0';
     const analisarMovimentacoesDia = document.getElementById('analisar_movimentacoes_dia')?.checked ? '1' : '0';
+    const forcarAtualizacao = document.getElementById('forcar_atualizacao')?.checked ? '1' : '0';
 
     if (!filialId) {
       definirMensagem('erro', 'Selecione uma filial.');
       return;
     }
     if (!arquivoInput.files.length) {
-      definirMensagem('erro', 'Selecione um arquivo CSV.');
+      definirMensagem('erro', 'Selecione um arquivo CSV ou XLSX.');
+      return;
+    }
+
+    const nomeArquivo = arquivoInput.files[0].name.toLowerCase();
+    if (!nomeArquivo.endsWith('.csv') && !nomeArquivo.endsWith('.xlsx') && !nomeArquivo.endsWith('.xlsm')) {
+      definirMensagem('erro', 'O arquivo deve ter extensão .csv, .xlsx ou .xlsm.');
       return;
     }
 
     const formData = new FormData();
     formData.append('filial_id', filialId);
-    formData.append('arquivo_csv', arquivoInput.files[0]);
+    formData.append('arquivo', arquivoInput.files[0]);
     formData.append('verificar_volumes', verificarVolumes);
     formData.append('analisar_movimentacoes_dia', analisarMovimentacoesDia);
+    formData.append('forcar_atualizacao', forcarAtualizacao);
 
     AppLoader.show();
     btnBaixar.classList.add('d-none');

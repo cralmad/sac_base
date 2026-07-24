@@ -11,7 +11,7 @@ from django.utils import timezone
 Context = Literal["form", "csv"]
 
 _DATETIME_FORMATS_FORM = ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M")
-_DATETIME_FORMATS_CSV = ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d")
+_DATETIME_FORMATS_CSV = ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d")
 
 
 def parse_int(valor, *, context: Context = "form"):

@@ -23,9 +23,9 @@ from pages.pedidos.models import (
     exclude_tentativas_com_data_posterior,
 )
 from pages.motorista.models import Motorista
-from pages.pedidos.services.zona_entrega_pedido import (
-    carregar_regras_zona_por_filial,
-    resolver_zona_e_faixa_entrega,
+from pages.pedidos.services.relatorio_rotas import (
+    gerar_xlsx_relatorio_rotas,
+    montar_relatorio_rotas,
 )
 from pages.pedidos.services.sms_relatorio import (
     complemento_verificacao_solicitacao,
@@ -36,6 +36,7 @@ from pages.pedidos.services.sms_relatorio import (
     sigla_pais_operacao_filial,
 )
 from pages.pedidos.services.importador_csv import parse_csv_artigos_sem_persistir
+from pages.pedidos.services.importador_xlsx import parse_xlsx_artigos_sem_persistir
 from pages.pedidos.services.produto_critico import cadastrar_produto_critico, listar_codigos_produtos_criticos
 from pages.pedidos.services.dashboard_avaliacao_respostas import (
     montar_sisvar_relatorio_avaliacao_dashboard_get,
@@ -267,125 +268,16 @@ def relatorio_rotas_view(request):
         return render(request, "relatorio_rotas.html")
 
     # POST: retorna grupos por carro ou motorista
-    data = request.sisvar_front or {}
-    filtros = data.get("filtros", {})
-    data_tentativa = filtros.get("data_tentativa", "").strip()
-    carro_filtro = filtros.get("carro", "").strip()
-    motorista_ids = filtros.get("motoristas", [])
-    if not isinstance(motorista_ids, list):
-        motorista_ids = []
-    motorista_ids = [int(v) for v in motorista_ids if str(v).isdigit()]
-    agrupamento = filtros.get("agrupamento", "carro").strip().lower()
-    if agrupamento not in ("carro", "motorista"):
-        agrupamento = "carro"
-
-    if not data_tentativa:
-        return JsonResponse({"success": False, "mensagem": "A data é obrigatória."}, status=400)
-
-    try:
-        dt = datetime.strptime(data_tentativa, "%Y-%m-%d").date()
-    except ValueError:
-        return JsonResponse({"success": False, "mensagem": "Data inválida."}, status=400)
-
-    qs = (
-        TentativaEntrega.objects
-        .select_related("pedido", "motorista")
-        .filter(data_tentativa=dt)
-    )
-    filial_ativa = getattr(request, "filial_ativa", None)
-    if filial_ativa:
-        qs = qs.filter(pedido__filial=filial_ativa)
-    if carro_filtro:
-        qs = apply_smart_number_filter(qs, 'carro', carro_filtro)
-    if motorista_ids:
-        qs = qs.filter(motorista_id__in=motorista_ids)
-
-    if agrupamento == "motorista":
-        qs = qs.order_by("motorista__nome", "pedido__codpost_dest", "pedido__pedido")
-        key_fn = lambda m: (m.motorista_id, m.motorista.nome if m.motorista_id else "")
-    else:
-        qs = qs.order_by("carro", "pedido__codpost_dest", "pedido__pedido")
-        key_fn = lambda m: m.carro
-
-    movs = list(qs)
-    pedido_ids = {m.pedido_id for m in movs}
-    pedidos_com_tentativa_posterior = set()
-    if pedido_ids:
-        pedidos_com_tentativa_posterior = set(
-            TentativaEntrega.objects
-            .filter(pedido_id__in=pedido_ids, data_tentativa__gt=dt)
-            .values_list("pedido_id", flat=True)
-            .distinct()
-        )
-
-    pedidos_com_devolucao = set()
-    if pedido_ids:
-        dq = Devolucao.objects.filter(pedido_id__in=pedido_ids)
-        if filial_ativa:
-            dq = dq.filter(pedido__filial=filial_ativa)
-        pedidos_com_devolucao = set(dq.values_list("pedido_id", flat=True).distinct())
-
-    regras_zona = carregar_regras_zona_por_filial(filial_ativa)
-
-    grupos = []
-    for grupo_key, items in groupby(movs, key=key_fn):
-        linhas = []
-        data_str = None
-        motorista_nome = ""
-        carro_val = None
-        for mov in items:
-            p = mov.pedido
-            if data_str is None:
-                data_str = mov.data_tentativa.strftime("%d/%m/%Y")
-            if agrupamento == "motorista":
-                motorista_nome = mov.motorista.nome if mov.motorista_id else ""
-                carro_val = None
-            else:
-                carro_val = mov.carro
-            tipo_abrev = "R" if (p.tipo or "").upper() == "RECOLHA" else "E"
-            fones = " / ".join(f for f in [p.fone_dest or "", p.fone_dest2 or ""] if f)
-            peso_str = ""
-            if p.peso is not None:
-                try:
-                    peso_str = str(int(p.peso))
-                except Exception:
-                    peso_str = str(p.peso)
-            segue_para_entrega = estado_segue_para_entrega(mov.estado)
-            tem_tentativa_posterior = p.id in pedidos_com_tentativa_posterior
-            zona_entrega, faixa_entrega = resolver_zona_e_faixa_entrega(p.codpost_dest, regras_zona)
-            linhas.append({
-                "pedido_id": p.id,
-                "pedido": p.pedido or str(p.id_vonzu),
-                "id_vonzu": p.id_vonzu,
-                "tipo": tipo_abrev,
-                "nome_dest": p.nome_dest or "",
-                "fones": fones,
-                "endereco_dest": p.endereco_dest or "",
-                "cidade_dest": p.cidade_dest or "",
-                "codpost_dest": p.codpost_dest or "",
-                "volumes": f"{p.volume_conf or 0}/{p.volume or 0}",
-                "peso": peso_str,
-                "periodo": mov.periodo or "",
-                "zona_entrega": zona_entrega,
-                "faixa_entrega": faixa_entrega,
-                "obs_rota": p.obs_rota or "",
-                "segue_para_entrega": segue_para_entrega,
-                "nao_segue_para_entrega": (not segue_para_entrega) or tem_tentativa_posterior,
-                "tem_devolucao": p.id in pedidos_com_devolucao,
-            })
-        grupos.append({
-            "carro": str(carro_val) if carro_val is not None else "—",
-            "motorista_nome": motorista_nome,
-            "data_tentativa": data_str or dt.strftime("%d/%m/%Y"),
-            "total": len(linhas),
-            "linhas": linhas,
-        })
-
+    filtros = (request.sisvar_front or {}).get("filtros") or {}
+    payload, err = montar_relatorio_rotas(getattr(request, "filial_ativa", None), filtros)
+    if err:
+        status = 403 if "Filial ativa" in err else 400
+        return JsonResponse({"success": False, "mensagem": err}, status=status)
     return JsonResponse({
         "success": True,
-        "grupos": grupos,
-        "data_fmt": dt.strftime("%d/%m/%Y"),
-        "agrupamento": agrupamento,
+        "grupos": payload["grupos"],
+        "data_fmt": payload["data_fmt"],
+        "agrupamento": payload["agrupamento"],
     })
 
 
@@ -393,15 +285,63 @@ def relatorio_rotas_view(request):
 @permission_required(PERMISSOES_ROTAS["acessar"], raise_exception=True)
 @csrf_protect
 @require_POST
+def relatorio_rotas_exportar_xlsx_view(request):
+    filtros = (request.sisvar_front or {}).get("filtros") or {}
+    payload, err = montar_relatorio_rotas(getattr(request, "filial_ativa", None), filtros)
+    if err:
+        status = 403 if "Filial ativa" in err else 400
+        return JsonResponse({"success": False, "mensagem": err}, status=status)
+
+    try:
+        conteudo = gerar_xlsx_relatorio_rotas(payload)
+    except ImportError:
+        return JsonResponse(
+            {"success": False, "mensagem": "Biblioteca Excel (openpyxl) não disponível no servidor."},
+            status=500,
+        )
+    except (OSError, ValueError, TypeError):
+        return JsonResponse(
+            {"success": False, "mensagem": "Não foi possível gerar o arquivo Excel."},
+            status=500,
+        )
+
+    data_iso = payload.get("data_iso") or "rotas"
+    agrup = payload.get("agrupamento") or "carro"
+    nome = f"rotas_por_{agrup}_{data_iso}.xlsx"
+    response = HttpResponse(
+        conteudo,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{nome}"'
+    return response
+
+
+@login_required
+@permission_required(PERMISSOES_ROTAS["acessar"], raise_exception=True)
+@csrf_protect
+@require_POST
 def relatorio_rotas_importar_artigos_view(request):
-    arquivo = request.FILES.get("arquivo_csv")
+    arquivo = request.FILES.get("arquivo_csv") or request.FILES.get("arquivo")
     if not arquivo:
-        return JsonResponse({"success": False, "mensagem": "Arquivo CSV não enviado."}, status=400)
+        return JsonResponse(
+            {"success": False, "mensagem": "Arquivo CSV ou XLSX não enviado."},
+            status=400,
+        )
 
-    if not arquivo.name.lower().endswith(".csv"):
-        return JsonResponse({"success": False, "mensagem": "O arquivo deve ter extensão .csv."}, status=400)
+    nome_lower = arquivo.name.lower()
+    if nome_lower.endswith(".csv"):
+        resultado = parse_csv_artigos_sem_persistir(arquivo.read())
+    elif nome_lower.endswith((".xlsx", ".xlsm")):
+        resultado = parse_xlsx_artigos_sem_persistir(arquivo.read())
+    else:
+        return JsonResponse(
+            {
+                "success": False,
+                "mensagem": "O arquivo deve ter extensão .csv, .xlsx ou .xlsm.",
+            },
+            status=400,
+        )
 
-    resultado = parse_csv_artigos_sem_persistir(arquivo.read())
     if not resultado["sucesso"]:
         return JsonResponse(
             {

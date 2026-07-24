@@ -34,6 +34,7 @@ from .serializers import (
     serialize_tentativa,
 )
 from .services.importador_csv import importar_csv
+from .services.importador_xlsx import importar_xlsx
 from .services.codigo_postal_pt import (
     _contar_restantes_filial,
     geocodificar_filial_manual,
@@ -852,16 +853,33 @@ def pedidos_importar_view(request):
     if request.method != "POST":
         return json_method_not_allowed()
 
-    arquivo = request.FILES.get("arquivo_csv")
+    arquivo = request.FILES.get("arquivo") or request.FILES.get("arquivo_csv")
     filial_id = request.POST.get("filial_id")
     verificar_volumes = request.POST.get("verificar_volumes") == "1"
     analisar_movimentacoes_dia = request.POST.get("analisar_movimentacoes_dia") == "1"
+    forcar_atualizacao = request.POST.get("forcar_atualizacao") == "1"
 
     if not arquivo:
-        return JsonResponse(build_error_payload("Arquivo CSV não enviado."), status=400)
+        return JsonResponse(build_error_payload("Arquivo não enviado."), status=400)
 
-    if not arquivo.name.lower().endswith(".csv"):
-        return JsonResponse(build_error_payload("O arquivo deve ter extensão .csv."), status=400)
+    nome_lower = arquivo.name.lower()
+    if nome_lower.endswith(".csv"):
+        importar_fn = importar_csv
+        kwargs_import = {
+            "analisar_movimentacoes_dia": analisar_movimentacoes_dia,
+            "forcar_atualizacao": forcar_atualizacao,
+        }
+    elif nome_lower.endswith((".xlsx", ".xlsm")):
+        importar_fn = importar_xlsx
+        kwargs_import = {
+            "analisar_movimentacoes_dia": analisar_movimentacoes_dia,
+            "forcar_atualizacao": forcar_atualizacao,
+        }
+    else:
+        return JsonResponse(
+            build_error_payload("O arquivo deve ter extensão .csv, .xlsx ou .xlsm."),
+            status=400,
+        )
 
     filial = obter_filial_escrita(filial_id, usuario)
     if not filial:
@@ -872,12 +890,7 @@ def pedidos_importar_view(request):
     conteudo = arquivo.read()
     nome_arquivo = arquivo.name
 
-    resultado = importar_csv(
-        conteudo,
-        filial,
-        nome_arquivo,
-        analisar_movimentacoes_dia=analisar_movimentacoes_dia,
-    )
+    resultado = importar_fn(conteudo, filial, nome_arquivo, **kwargs_import)
 
     if not resultado["sucesso"]:
         return JsonResponse(
@@ -906,11 +919,14 @@ def pedidos_importar_view(request):
         }
         relatorio_url = "/app/logistica/pedidos/relatorio-volumes/"
 
+    nome_base = nome_arquivo
+    for ext in (".csv", ".xlsx", ".xlsm", ".CSV", ".XLSX", ".XLSM"):
+        nome_base = nome_base.replace(ext, "")
     return JsonResponse(
         {
             "success": True,
             "relatorio": resultado["relatorio"],
-            "nome_relatorio": f"relatorio_{nome_arquivo.replace('.csv', '')}.txt",
+            "nome_relatorio": f"relatorio_{nome_base}.txt",
             "stats": stats,
             "mensagens": {"sucesso": {"conteudo": [resumo], "ignorar": True}},
             "relatorio_volumes_url": relatorio_url,

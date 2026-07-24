@@ -173,6 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         registro.id,
         registro.filial,
         registro.codigo || '',
+        registro.id_enovo || '',
         registro.nome,
         registro.telefone,
         registro.categoria || '',

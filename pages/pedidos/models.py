@@ -55,12 +55,15 @@ PERIODO_CHOICES = [
     ("TARDE", "TARDE"),
 ]
 
-ESTADO_DEFINITIONS = [# valor, label, entrega_efetivamente_concluida, segue_para_entrega
+# valor, label, entrega_efetivamente_concluida, segue_para_entrega[, label_enovo]
+# label_enovo: texto da coluna "Último Estado" no XLSX ENOVO → valor canónico.
+# Importação ENOVO só aceita labels presentes neste 5.º campo (sem fallback UNKNOWN).
+ESTADO_DEFINITIONS = [
     ("created", "Criado", 0, 1),
-    ("assigned", "Atribuído", 0, 1),
+    ("assigned", "Atribuído", 0, 1, "Atribuido Motorista"),
     ("pending", "Em distribuição", 0, 1),
-    ("completed", "Concluído", 1, 0),
-    ("EA", "Entrada em armazém e está OK", 0, 1),
+    ("completed", "Concluído", 1, 0, "Entregue"),
+    ("EA", "Entrada em armazém e está OK", 0, 1, "Entrada Armazém"),
     ("CA", "Cliente ausente", 0, 1),
     ("R", "Entrega recusada", 0, 0),
     ("DA", "Difícil acesso (rua)", 0, 1),
@@ -76,7 +79,7 @@ ESTADO_DEFINITIONS = [# valor, label, entrega_efetivamente_concluida, segue_para
     ("PIT", "Pedido incompleto: responsabilidade da transportadora", 1, 1),
     ("reschedule_client", "Reagendamento Responsabilidade Cliente", 0, 1),
     ("reschedule_logisticOperator", "Reagendamento Responsabilidade Transportador", 0, 1),
-    ("orders_vonzu", "Entrada em Vonzu", 0, 1),
+    ("orders_vonzu", "Entrada em Vonzu", 0, 1, "Pendente"),
     ("(orders_vonzu)", "CONTACTO CONFIRMADO", 0, 1),
     ("(orders_vonzu))", "PENDENTE CONTACTO", 0, 1),
     ("ExtraviadoOperador", "Extraviado no Operador", 1, 0),
@@ -88,20 +91,35 @@ ESTADO_DEFINITIONS = [# valor, label, entrega_efetivamente_concluida, segue_para
     ("Reagendamento_Leroy_Merlin", "Reagendamento responsabilidade Leroy Merlin", 0, 1),
     ("returned_to_sender", "Devolvido ao Cliente", 0, 0),
     ("UNKNOWN", "Estado desconhecido", 0, 0),
+    ("Incidência", "Incidência", 0, 1, "Incidência"),
+    ("Agendado", "Agendado", 0, 1, "Agendado"),
+    ("Aceite", "Aceite", 0, 1, "Aceite"),
+    ("Recolhido", "Recolhido", 1, 0, "Recolhido"),
 ]
 
 # Django choices deve conter pares (valor, label)
 ESTADO_CHOICES = [(valor, label) for valor, label, *_ in ESTADO_DEFINITIONS]
 ESTADO_LABEL_POR_VALOR = {valor: label for valor, label, *_ in ESTADO_DEFINITIONS}
 
+# label ENOVO (5.º campo) → valor canónico; só labels explícitos entram no mapa
+ESTADO_ENOVO_PARA_CANONICO = {
+    str(rest[0]).strip(): valor
+    for valor, _label, _concluida, _segue, *rest in ESTADO_DEFINITIONS
+    if rest and str(rest[0]).strip()
+}
+
 # Estados marcados para uso futuro em identificação de entrega efetivamente concluída
 ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA = {
-    valor for valor, _label, concluida, _segue in ESTADO_DEFINITIONS if bool(concluida)
+    valor
+    for valor, _label, concluida, _segue, *_ in ESTADO_DEFINITIONS
+    if bool(concluida)
 }
 
 # Estados em que o pedido segue para nova tentativa de entrega
 ESTADOS_SEGUE_PARA_ENTREGA = {
-    valor for valor, _label, _concluida, segue in ESTADO_DEFINITIONS if bool(segue)
+    valor
+    for valor, _label, _concluida, segue, *_ in ESTADO_DEFINITIONS
+    if bool(segue)
 }
 
 

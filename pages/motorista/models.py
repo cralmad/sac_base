@@ -13,6 +13,7 @@ class Motorista(AuditFieldsMixin, SoftDeleteMixin, models.Model):
     id = models.BigAutoField(primary_key=True)
     filial = models.ForeignKey(Filial, on_delete=models.PROTECT, related_name="motoristas")
     codigo = models.CharField(max_length=20, null=True, blank=True)
+    id_enovo = models.CharField(max_length=40, null=True, blank=True)
     nome = models.CharField(max_length=100)
     telefone = models.CharField(max_length=20)
     categoria = models.CharField(
@@ -33,6 +34,11 @@ class Motorista(AuditFieldsMixin, SoftDeleteMixin, models.Model):
                 name="unique_motorista_codigo_ativo_por_filial",
             ),
             models.UniqueConstraint(
+                fields=["filial", "id_enovo"],
+                condition=Q(is_deleted=False) & ~Q(id_enovo="") & Q(id_enovo__isnull=False),
+                name="unique_motorista_id_enovo_ativo_por_filial",
+            ),
+            models.UniqueConstraint(
                 fields=["filial", "nome"],
                 condition=Q(is_deleted=False),
                 name="unique_motorista_nome_ativo_por_filial",
@@ -41,6 +47,7 @@ class Motorista(AuditFieldsMixin, SoftDeleteMixin, models.Model):
 
     def save(self, *args, **kwargs):
         self.codigo = (self.codigo or "").strip().upper()
+        self.id_enovo = (self.id_enovo or "").strip()
         self.nome = (self.nome or "").strip().upper()
         self.telefone = (self.telefone or "").strip()
         if self.categoria:

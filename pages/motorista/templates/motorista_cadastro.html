@@ -25,11 +25,26 @@
               tabindex="0"
               data-bs-toggle="tooltip"
               data-bs-placement="top"
-              data-bs-title="Identificador curto da entidade (ex.: CLI001, MOT-PT01). Use um código único no cadastro. Também é a fonte de pesquisa na importação de pedidos, pois o ID interno é diferente.">
+              data-bs-title="Identificador curto da entidade (ex.: CLI001, MOT-PT01). Use um código único no cadastro. Também é a fonte de pesquisa na importação CSV VONZU de pedidos.">
               <i class="bi bi-question-circle"></i>
             </span>
           </label>
           <input type="text" id="codigo" name="codigo" class="form-control smart-input" data-textcase="upper" maxlength="20">
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label mb-0 d-flex align-items-center gap-1" for="id_enovo">
+            <span>ID ENOVO</span>
+            <span
+              class="text-primary"
+              role="button"
+              tabindex="0"
+              data-bs-toggle="tooltip"
+              data-bs-placement="top"
+              data-bs-title="Código do motorista no ENOVO (coluna Cód. Motorista do XLSX). Usado na importação de pedidos ENOVO.">
+              <i class="bi bi-question-circle"></i>
+            </span>
+          </label>
+          <input type="text" id="id_enovo" name="id_enovo" class="form-control smart-input" maxlength="40">
         </div>
         <div class="col-12 col-md-4">
           <label class="form-label mb-0">Nome</label>
@@ -119,6 +134,7 @@
                 <th>ID</th>
                 <th>Filial</th>
                 <th>Código</th>
+                <th>ID ENOVO</th>
                 <th>Nome</th>
                 <th>Telefone</th>
                 <th>Categoria</th>

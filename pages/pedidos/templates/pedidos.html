@@ -9,7 +9,7 @@
   <div class="container-xl my-3 mx-auto container-form-importacao">
     <div class="card shadow-sm">
       <div class="card-header bg-primary text-white">
-        <i class="bi bi-upload"></i> Importar CSV VONZU
+        <i class="bi bi-upload"></i> Importar pedidos (CSV VONZU / XLSX ENOVO)
       </div>
       <div class="card-body">
         <form id="formImportacao" enctype="multipart/form-data" novalidate>
@@ -21,13 +21,13 @@
               </select>
             </div>
             <div class="col-12 col-md-6">
-              <label class="form-label mb-0" for="arquivo_csv">Arquivo CSV</label>
+              <label class="form-label mb-0" for="arquivo_importacao">Arquivo CSV ou XLSX</label>
               <input
                 type="file"
-                id="arquivo_csv"
-                name="arquivo_csv"
+                id="arquivo_importacao"
+                name="arquivo"
                 class="form-control"
-                accept=".csv"
+                accept=".csv,.xlsx,.xlsm"
                 required
               >
             </div>
@@ -46,6 +46,21 @@
                     data-bs-toggle="tooltip"
                     data-bs-placement="top"
                     data-bs-title="Quando marcado, compara os pedidos do arquivo com as movimentações de entrega da data importada. Pedidos com movimentação no dia e ausentes no arquivo são incluídos no relatório. Exige arquivo com apenas uma data de previsão.">
+                    <i class="bi bi-question-circle"></i>
+                  </span>
+                </label>
+              </div>
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="forcar_atualizacao" name="forcar_atualizacao">
+                <label class="form-check-label d-flex align-items-center gap-1" for="forcar_atualizacao">
+                  <span>Actualizar todos os registos (ignorar data de última actualização)</span>
+                  <span
+                    class="text-primary"
+                    role="button"
+                    tabindex="0"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    data-bs-title="Por omissão, pedidos cuja data de última actualização no ficheiro é igual à já gravada são ignorados. Marque esta opção para forçar a actualização de todos os registos — útil no ENOVO, que nem sempre altera essa data quando há outras mudanças.">
                     <i class="bi bi-question-circle"></i>
                   </span>
                 </label>

@@ -37,6 +37,13 @@ _CSP = (
 )
 
 
+def build_csp(*, frame_src: str | None = None) -> str:
+    """CSP base; opcionalmente acrescenta frame-src (páginas de teste de embed)."""
+    if not frame_src:
+        return _CSP
+    return f"{_CSP} frame-src {frame_src};"
+
+
 class CSPMiddleware:
     """Adiciona o cabeçalho Content-Security-Policy a todas as respostas HTML."""
 

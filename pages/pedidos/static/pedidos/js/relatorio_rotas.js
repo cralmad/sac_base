@@ -1,9 +1,14 @@
 import { getCsrfToken, clearMessages, definirMensagem, getOptions, confirmar, getDataset } from '/static/js/sisVar.js';
 import { AppLoader } from '/static/js/loader.js';
 import { validateSmartNumber, getMultiSelectValues } from '/static/js/smart_filter.js';
+import {
+  buildScriptConsoleSelecionarRefs,
+  referenciasDoGrupoRotas,
+} from '/static/js/enovo_selecionar_refs.js';
 
 const root       = document.getElementById('rr-root');
 const URL_BUSCAR = root?.dataset?.urlBuscar ?? '';
+const URL_EXPORTAR_XLSX = root?.dataset?.urlExportarXlsx ?? '';
 const URL_LINK   = root?.dataset?.urlLink   ?? '';
 const URL_IMPORTAR_ARTIGOS = root?.dataset?.urlImportarArtigos ?? '';
 const URL_PRODUTO_CRITICO = root?.dataset?.urlProdutoCritico ?? '';
@@ -23,6 +28,7 @@ const loader     = document.getElementById('rr-loader');
 const vazio      = document.getElementById('rr-vazio');
 const tituloData = document.getElementById('rr-titulo-data');
 const btnImprimir = document.getElementById('rr-btn-imprimir');
+const btnExportarXlsx = document.getElementById('rr-btn-exportar-xlsx');
 const arquivoArtigosEl = document.getElementById('rr-arquivo-artigos');
 const btnConfirmarImportacao = document.getElementById('rr-btn-confirmar-importacao');
 const importacaoStatusEl = document.getElementById('rr-importacao-status');
@@ -419,6 +425,17 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
     btnCopiarRefs.addEventListener('click', () => copiarReferenciasGrupo(grupo, btnCopiarRefs));
     header.appendChild(btnCopiarRefs);
 
+    const btnCopiarScriptEnovo = document.createElement('button');
+    btnCopiarScriptEnovo.type = 'button';
+    btnCopiarScriptEnovo.className = 'btn btn-sm btn-light';
+    btnCopiarScriptEnovo.title =
+      'Copiar código para colar no console do eNovoTMS (selecionar por referência)';
+    btnCopiarScriptEnovo.innerHTML = '<i class="bi bi-code-slash"></i>';
+    btnCopiarScriptEnovo.addEventListener('click', () =>
+      copiarScriptConsoleEnovoGrupo(grupo, btnCopiarScriptEnovo)
+    );
+    header.appendChild(btnCopiarScriptEnovo);
+
     if (agrupamento !== 'motorista' && grupo.carro !== '\u2014') {
       const btnLink = document.createElement('button');
       btnLink.type = 'button';
@@ -604,6 +621,7 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
   });
 
   btnImprimir.disabled = false;
+  if (btnExportarXlsx) btnExportarXlsx.disabled = false;
 }
 
 async function importarArtigos() {
@@ -614,11 +632,16 @@ async function importarArtigos() {
   }
   const arquivo = arquivoArtigosEl?.files?.[0];
   if (!arquivo) {
-    definirMensagem('erro', 'Selecione um arquivo CSV para importar.', false);
+    definirMensagem('erro', 'Selecione um arquivo CSV ou XLSX para importar.', false);
     return;
   }
-  if (!arquivo.name.toLowerCase().endsWith('.csv')) {
-    definirMensagem('erro', 'O arquivo deve ter extensão .csv.', false);
+  const nomeArquivo = arquivo.name.toLowerCase();
+  if (
+    !nomeArquivo.endsWith('.csv')
+    && !nomeArquivo.endsWith('.xlsx')
+    && !nomeArquivo.endsWith('.xlsm')
+  ) {
+    definirMensagem('erro', 'O arquivo deve ter extensão .csv, .xlsx ou .xlsm.', false);
     return;
   }
 
@@ -669,26 +692,11 @@ async function copiarReferenciaPedido(referencia, elFeedback = null) {
   }
 }
 
-// ─── Copiar referências do grupo (ref1, ref2, …) ────────────────────────────
-async function copiarReferenciasGrupo(grupo, btn) {
-  clearMessages();
-  const refs = (grupo.linhas || [])
-    .map(l => {
-      const p = l.pedido;
-      if (p == null) return '';
-      const s = String(p).trim();
-      return s;
-    })
-    .filter(Boolean);
-  if (!refs.length) {
-    definirMensagem('aviso', 'Nenhuma referência neste grupo.', false);
-    return;
-  }
-  const texto = refs.join(', ');
+// ─── Feedback visual curto em botões do cabeçalho do grupo ───────────────────
+function feedbackBotaoCopiar(btn, ok) {
   const textoOriginal = btn.innerHTML;
   btn.disabled = true;
-  try {
-    await navigator.clipboard.writeText(texto);
+  if (ok) {
     btn.innerHTML = '<i class="bi bi-check-lg"></i>';
     btn.classList.replace('btn-light', 'btn-success');
     setTimeout(() => {
@@ -696,10 +704,45 @@ async function copiarReferenciasGrupo(grupo, btn) {
       btn.classList.replace('btn-success', 'btn-light');
       btn.disabled = false;
     }, 2000);
-  } catch {
-    definirMensagem('erro', 'Não foi possível copiar. Verifique as permissões do navegador.', false);
+  } else {
     btn.innerHTML = textoOriginal;
     btn.disabled = false;
+  }
+}
+
+// ─── Copiar referências do grupo (ref1, ref2, …) ────────────────────────────
+async function copiarReferenciasGrupo(grupo, btn) {
+  clearMessages();
+  const refs = referenciasDoGrupoRotas(grupo);
+  if (!refs.length) {
+    definirMensagem('aviso', 'Nenhuma referência neste grupo.', false);
+    return;
+  }
+  const texto = refs.join(', ');
+  try {
+    await navigator.clipboard.writeText(texto);
+    feedbackBotaoCopiar(btn, true);
+  } catch {
+    definirMensagem('erro', 'Não foi possível copiar. Verifique as permissões do navegador.', false);
+    feedbackBotaoCopiar(btn, false);
+  }
+}
+
+// ─── Copiar script console eNovoTMS (com referências do grupo) ───────────────
+async function copiarScriptConsoleEnovoGrupo(grupo, btn) {
+  clearMessages();
+  const refs = referenciasDoGrupoRotas(grupo);
+  if (!refs.length) {
+    definirMensagem('aviso', 'Nenhuma referência neste grupo.', false);
+    return;
+  }
+  const script = buildScriptConsoleSelecionarRefs(refs);
+  try {
+    await navigator.clipboard.writeText(script);
+    feedbackBotaoCopiar(btn, true);
+  } catch {
+    definirMensagem('erro', 'Não foi possível copiar. Verifique as permissões do navegador.', false);
+    feedbackBotaoCopiar(btn, false);
   }
 }
 
@@ -748,37 +791,89 @@ async function gerarECopiarLink(carro, btn) {
 }
 
 // ─── Buscar ───────────────────────────────────────────────────────────────────
-async function buscar() {
-  clearMessages();
-  const data = inpData.value;
-  if (!data) {
-    definirMensagem('erro', 'Informe a data para buscar.', false);
-    return;
-  }
+function montarFiltrosRotas() {
+  return {
+    data_tentativa: inpData.value,
+    carro: inpCarro.value.trim(),
+    motoristas: getMultiSelectValues(selMotoristas),
+    agrupamento: selAgrupamento.value || 'carro',
+  };
+}
 
+function validarFiltrosRotas() {
+  if (!inpData.value) {
+    definirMensagem('erro', 'Informe a data para buscar.', false);
+    return false;
+  }
   if (!validateSmartNumber(inpCarro.value)) {
     erroCarroEl.classList.remove('d-none');
     inpCarro.classList.add('is-invalid');
-    return;
+    return false;
   }
   erroCarroEl.classList.add('d-none');
   inpCarro.classList.remove('is-invalid');
+  return true;
+}
+
+async function exportarXlsx() {
+  clearMessages();
+  if (!validarFiltrosRotas()) return;
+  if (!URL_EXPORTAR_XLSX) {
+    definirMensagem('erro', 'Exportação Excel indisponível.', false);
+    return;
+  }
+  AppLoader.show();
+  try {
+    const resp = await fetch(URL_EXPORTAR_XLSX, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken(),
+      },
+      body: JSON.stringify({ filtros: montarFiltrosRotas() }),
+    });
+    const tipo = resp.headers.get('Content-Type') || '';
+    if (!resp.ok || tipo.includes('application/json')) {
+      let mensagem = 'Erro ao exportar Excel.';
+      try {
+        const data = await resp.json();
+        mensagem = data.mensagem || mensagem;
+      } catch {
+        /* resposta não-JSON */
+      }
+      definirMensagem('erro', mensagem, false);
+      return;
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const agrup = selAgrupamento.value || 'carro';
+    a.download = `rotas_por_${agrup}_${inpData.value}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch {
+    definirMensagem('erro', 'Falha de rede ao exportar Excel.', false);
+  } finally {
+    AppLoader.hide();
+  }
+}
+
+async function buscar() {
+  clearMessages();
+  if (!validarFiltrosRotas()) return;
 
   loader.classList.remove('d-none');
   resultado.replaceChildren();
   vazio.classList.add('d-none');
   btnImprimir.disabled = true;
+  if (btnExportarXlsx) btnExportarXlsx.disabled = true;
   AppLoader.show();
 
   try {
-    const payload = {
-      filtros: {
-        data_tentativa: data,
-        carro: inpCarro.value.trim(),
-        motoristas: getMultiSelectValues(selMotoristas),
-        agrupamento: selAgrupamento.value || 'carro',
-      },
-    };
+    const payload = { filtros: montarFiltrosRotas() };
     const resp = await fetch(URL_BUSCAR, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
@@ -804,6 +899,7 @@ async function buscar() {
 // ─── Eventos ──────────────────────────────────────────────────────────────────
 form.addEventListener('submit', e => { e.preventDefault(); buscar(); });
 btnImprimir.addEventListener('click', () => window.print());
+btnExportarXlsx?.addEventListener('click', exportarXlsx);
 btnConfirmarImportacao?.addEventListener('click', importarArtigos);
 preencherMotoristas();
 atualizarResumoImportacao();

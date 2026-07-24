@@ -43,6 +43,7 @@ def build_campos_iniciais():
         "id": None,
         "filial_id": None,
         "codigo": "",
+        "id_enovo": "",
         "nome": "",
         "telefone": "",
         "categoria": "",
@@ -55,6 +56,7 @@ def serializar_form_motorista(motorista):
         "id": motorista.id,
         "filial_id": motorista.filial_id,
         "codigo": motorista.codigo,
+        "id_enovo": motorista.id_enovo or "",
         "nome": motorista.nome,
         "telefone": motorista.telefone,
         "categoria": motorista.categoria,
@@ -83,6 +85,7 @@ def cadastro_motorista_view(request):
         nome_form: {
             "filial_id": {"type": "string", "required": True, "value": ""},
             "codigo": {"type": "string", "maxlength": 20, "required": False, "value": ""},
+            "id_enovo": {"type": "string", "maxlength": 40, "required": False, "value": ""},
             "nome": {"type": "string", "maxlength": 100, "minlength": 3, "required": True, "value": ""},
             "telefone": {"type": "string", "maxlength": 20, "minlength": 8, "required": True, "value": ""},
             "categoria": {
@@ -147,6 +150,7 @@ def cadastro_motorista_view(request):
 
     motorista_id = campos.get("id")
     codigo = (campos.get("codigo") or "").strip().upper()
+    id_enovo = (campos.get("id_enovo") or "").strip()
     nome = (campos.get("nome") or "").strip().upper()
     telefone = (campos.get("telefone") or "").strip()
     categoria = (campos.get("categoria") or "").strip().upper()
@@ -159,6 +163,7 @@ def cadastro_motorista_view(request):
                 motorista = Motorista(
                     filial=filial,
                     codigo=codigo,
+                    id_enovo=id_enovo,
                     nome=nome,
                     telefone=telefone,
                     categoria=categoria,
@@ -177,6 +182,7 @@ def cadastro_motorista_view(request):
                 before = snapshot_instance(motorista)
                 motorista.filial = filial
                 motorista.codigo = codigo
+                motorista.id_enovo = id_enovo
                 motorista.nome = nome
                 motorista.telefone = telefone
                 motorista.categoria = categoria
@@ -258,6 +264,7 @@ def cadastro_motorista_cons_view(request):
             "id": motorista.id,
             "filial": f"{motorista.filial.codigo} - {motorista.filial.nome}",
             "codigo": motorista.codigo,
+            "id_enovo": motorista.id_enovo or "",
             "nome": motorista.nome,
             "telefone": motorista.telefone,
             "categoria": motorista.get_categoria_display(),

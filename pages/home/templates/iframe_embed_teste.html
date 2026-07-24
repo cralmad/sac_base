@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Teste iframe embed{% endblock %}
+
+{% block page_title %}Teste de embed (eNovoTMS){% endblock %}
+
+{% block estilo %}
+<style>
+  #iet-root { max-width: 1400px; }
+  #iet-painel {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: .5rem;
+    padding: 1rem;
+  }
+  #iet-log {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .75rem;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border-radius: .35rem;
+    padding: .75rem;
+    height: 280px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  #iet-log .iet-ok { color: #6a9955; }
+  #iet-log .iet-warn { color: #dcdcaa; }
+  #iet-log .iet-err { color: #f14c4c; }
+  #iet-log .iet-info { color: #9cdcfe; }
+  #iet-frame-wrap {
+    border: 1px solid #adb5bd;
+    border-radius: .35rem;
+    overflow: hidden;
+    background: #fff;
+    min-height: 520px;
+  }
+  #iet-iframe {
+    width: 100%;
+    height: 70vh;
+    min-height: 520px;
+    border: 0;
+    display: block;
+    background: #fafafa;
+  }
+  .iet-badge-estado {
+    font-size: .75rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0" id="iet-root"
+     data-url-probe="{{ url_probe }}"
+     data-url-inicial="{{ url_inicial }}"
+     data-origem-frame="{{ origem_frame }}"
+     data-debug-modo="{{ debug_modo|yesno:'1,0' }}">
+
+  <div class="alert alert-warning small" role="alert">
+    <strong>Página de diagnóstico.</strong>
+    Visível com <code>DEBUG</code> ou utilizador superuser.
+    Hosts de probe: {% for h in hosts_permitidos %}<code>{{ h }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}.
+    O CSP desta resposta inclui <code>frame-src</code> para a origem do alvo.
+  </div>
+
+  <div class="alert alert-danger small" role="alert" id="iet-alerta-login-iframe">
+    <strong>Login no iframe a “piscar” e funcionar só em nova aba</strong> =
+    o browser trata o eNovoTMS como <em>third-party</em> nesta página e
+    <strong>não grava / não envia o cookie de sessão</strong> no contexto do iframe
+    (SameSite + bloqueio de cookies de terceiros no Chrome/Edge/Firefox).
+    Fluxo típico: POST do login → redirect autenticado → sem cookie → volta ao login (flash).
+    <strong>Isto não se corrige no SisVar</strong> sem o fornecedor permitir cookies
+    <code>SameSite=None; Secure</code> (raro e frágil) ou sem integração por API / proxy same-origin.
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-5">
+      <div id="iet-painel">
+        <div class="mb-2">
+          <label class="form-label mb-1" for="iet-url">URL do alvo</label>
+          <input type="url" class="form-control form-control-sm" id="iet-url"
+                 value="{{ url_inicial }}" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <button type="button" class="btn btn-sm btn-primary" id="iet-btn-carregar">
+            <i class="bi bi-play-fill"></i> Carregar no iframe
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="iet-btn-reload">
+            <i class="bi bi-arrow-clockwise"></i> Reload
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="iet-btn-blank">
+            Blank
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-primary" id="iet-btn-nova-aba">
+            <i class="bi bi-box-arrow-up-right"></i> Nova aba
+          </button>
+        </div>
+
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="iet-sem-sandbox">
+          <label class="form-check-label small" for="iet-sem-sandbox">
+            Remover <code>sandbox</code> do iframe (reteste do login; se continuar a piscar, confirma cookies third-party)
+          </label>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <button type="button" class="btn btn-sm btn-dark" id="iet-btn-probe">
+            <i class="bi bi-radar"></i> Probe headers (servidor)
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-dark" id="iet-btn-same-origin">
+            Testar same-origin
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-dark" id="iet-btn-fetch-browser">
+            Fetch CORS (browser)
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="iet-btn-limpar-log">
+            Limpar log
+          </button>
+        </div>
+
+        <div class="mb-2 small">
+          <span class="me-2">Estado iframe:</span>
+          <span id="iet-estado" class="badge text-bg-secondary iet-badge-estado">idle</span>
+        </div>
+
+        <div class="mb-2">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="small fw-semibold">Log de debug</span>
+            <span class="small text-muted" id="iet-log-count">0</span>
+          </div>
+          <div id="iet-log" aria-live="polite"></div>
+        </div>
+
+        <details class="small mt-2">
+          <summary>Como interpretar</summary>
+          <ul class="mb-0 mt-2">
+            <li><strong>Login pisca no iframe, OK em nova aba</strong> → cookie de sessão third-party bloqueado (conclusão prática deste teste).</li>
+            <li><strong>Sem sandbox e ainda pisca</strong> → não é o atributo sandbox; é política de cookies do browser.</li>
+            <li><strong>same-origin = SecurityError</strong> → esperado; não dá para “selecionar pedidos” via JS desta app.</li>
+            <li><strong>Fetch CORS falha</strong> → integração browser-side inviável; caminho = API / export / automação acordada com o fornecedor.</li>
+          </ul>
+        </details>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div id="iet-frame-wrap">
+        <iframe id="iet-iframe"
+                title="Alvo embed teste"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+                referrerpolicy="no-referrer-when-downgrade"
+                src="about:blank"></iframe>
+      </div>
+      <p class="small text-muted mt-2 mb-0">
+        Sandbox com scripts/forms/same-origin no documento enquadrado (necessário para login).
+        A origem continua distinta da SisVar → DOM inacessível ao painel.
+      </p>
+    </div>
+  </div>
+
+  <div class="card border-success mt-4" id="iet-alt-bookmarklet">
+    <div class="card-header bg-success-subtle">
+      <strong>Alternativa: selecionar por Referência (ou TRK) no eNovoTMS</strong>
+    </div>
+    <div class="card-body">
+      <p class="small mb-3">
+        O JS da SisVar <strong>não</strong> pode marcar checkboxes no TMS (origem diferente).
+        Um bookmarklet corre <strong>dentro</strong> da aba autenticada e marca linhas cujo
+        <code>reference</code> (Referência → SisVar <code>Pedido.pedido</code>) ou
+        <code>tracking_code</code> (TRK → <code>Pedido.id_vonzu</code>) coincide com a lista.
+      </p>
+      <ol class="small mb-3">
+        <li>Cole o formato de <em>Rotas por Carro</em>: <code>ref1, ref2, …</code> (ou uma por linha).</li>
+        <li>
+          <em>Copiar código console</em> → no eNovoTMS (Envios): F12 → Console →
+          <code>allow pasting</code> → colar → Enter.
+        </li>
+        <li>Opcional: <em>Atualizar bookmarklet</em> e arrastar o link verde para favoritos.</li>
+      </ol>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label small mb-1" for="iet-trks">Lista (Referência ou TRK)</label>
+          <textarea class="form-control form-control-sm font-monospace" id="iet-trks" rows="8"
+                    placeholder="574100_008, 574100_009, 574100_010" spellcheck="false"></textarea>
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            <button type="button" class="btn btn-sm btn-primary" id="iet-btn-console-copiar">
+              <i class="bi bi-code-slash"></i> Copiar código console
+            </button>
+            <button type="button" class="btn btn-sm btn-success" id="iet-btn-bm-atualizar">
+              Atualizar bookmarklet
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="iet-btn-trks-copiar">
+              Copiar lista
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="iet-btn-trks-colar">
+              Colar da área de transferência
+            </button>
+          </div>
+          <p class="small text-muted mt-2 mb-0" id="iet-trks-count">0 itens</p>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small mb-1">Favorito (arrastar para a barra)</label>
+          <div class="p-3 border rounded bg-light">
+            <a id="iet-bm-link" class="btn btn-success" href="#">SisVar → marcar Referências no eNovoTMS</a>
+          </div>
+          <p class="small text-muted mt-2 mb-1">
+            Match: primeiro igualdade em <code>reference</code> / <code>reference2</code> /
+            <code>reference3</code> / <code>tracking_code</code>; depois substring nesses campos.
+            Só linhas <strong>já carregadas</strong> (filtro de data + <code>length=500</code>).
+          </p>
+          <p class="small mb-0" id="iet-bm-status"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="{% static 'home/js/iframe_embed_teste.js' %}"></script>
+{% endblock %}
