@@ -61,7 +61,7 @@ PERIODO_CHOICES = [
 ESTADO_DEFINITIONS = [
     ("created", "Criado", 0, 1),
     ("assigned", "Atribuído", 0, 1, "Atribuido Motorista"),
-    ("pending", "Em distribuição", 0, 1),
+    ("pending", "Em distribuição", 0, 1, "Em distribuição"),
     ("completed", "Concluído", 1, 0, "Entregue"),
     ("EA", "Entrada em armazém e está OK", 0, 1, "Entrada Armazém"),
     ("CA", "Cliente ausente", 0, 1),
