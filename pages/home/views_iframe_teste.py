@@ -1,4 +1,4 @@
-"""Página de teste: embed iframe eNovoTMS + painel de debug."""
+"""Página de teste: embed iframe (VONZU / eNovoTMS) + painel de debug."""
 
 from __future__ import annotations
 
@@ -21,8 +21,8 @@ from sac_base.csp_middleware import build_csp
 from sac_base.http_json import json_method_not_allowed
 from sac_base.sisvar_builders import build_error_payload
 
-URL_PADRAO = "https://3dboxportugal.enovotms.com/admin"
-ORIGEM_PADRAO_FRAME = "https://3dboxportugal.enovotms.com"
+URL_PADRAO = "https://app.vonzu.es/user/expeditions"
+ORIGEM_PADRAO_FRAME = "https://app.vonzu.es"
 
 
 def _acesso_teste_permitido(request) -> bool:

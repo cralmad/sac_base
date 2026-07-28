@@ -149,7 +149,6 @@ def gerar_relatorio_importacao(
     data_analise=None,
     pedidos_mov_ausentes_no_arquivo=None,
     remapeamentos=None,
-    ignorados_prioridade_enovo=None,
 ):
     agora = timezone.localtime(timezone.now()).strftime("%Y-%m-%d %H:%M:%S")
     linhas = [
@@ -176,23 +175,12 @@ def gerar_relatorio_importacao(
     linhas.append("")
     remapeamentos = remapeamentos or []
     if remapeamentos:
-        linhas.append("--- ID EXTERNO REMAPEADO (VONZU → ENOVO via Referência) ---")
+        linhas.append("--- ID EXTERNO REMAPEADO POR REFERÊNCIA ---")
         linhas.append(f"({len(remapeamentos)} pedido(s))")
         for item in remapeamentos:
             linhas.append(
                 f"  ref={item.get('ref') or '-'} | "
                 f"id_vonzu {item['id_anterior']} → {item['id_novo']}"
-            )
-        linhas.append("")
-    ignorados_prioridade_enovo = ignorados_prioridade_enovo or []
-    if ignorados_prioridade_enovo:
-        linhas.append("--- IGNORADOS: REFERÊNCIA JÁ EXISTE (PRIORIDADE ENOVO) ---")
-        linhas.append(f"({len(ignorados_prioridade_enovo)} linha(s))")
-        for item in ignorados_prioridade_enovo:
-            linhas.append(
-                f"  ref={item.get('ref') or '-'} | "
-                f"id_vonzu_csv={item.get('id_vonzu')} | "
-                f"já existe id_vonzu={item.get('id_existente')}"
             )
         linhas.append("")
     if analise_movimentacao_ativada:
@@ -289,7 +277,6 @@ def persistir_pedidos_importados(
     linhas_resolvidas,
     *,
     match_por_referencia=False,
-    ignorar_criacao_se_referencia_alheia=False,
     forcar_atualizacao=False,
 ):
     """Upsert Pedido + TentativaEntrega a partir de linhas já normalizadas/resolvidas.
@@ -300,10 +287,6 @@ def persistir_pedidos_importados(
     um pedido legado (Referência igual e id_vonzu fora deste ficheiro), remapeando o ID.
     Várias linhas ENOVO com a mesma Referência e TRKs distintos são permitidas.
 
-    ignorar_criacao_se_referencia_alheia (VONZU): se o Id VONZU não existir mas a
-    Referência já estiver noutro pedido (ex.: importado pelo ENOVO), a linha é ignorada
-    — prioridade ENOVO.
-
     forcar_atualizacao: se True, actualiza mesmo quando a data de actualização do
     ficheiro é igual à do pedido existente (útil quando o ENOVO não altera essa data).
 
@@ -311,7 +294,6 @@ def persistir_pedidos_importados(
     """
     criados = atualizados = sem_alteracao = tentativas = 0
     remapeamentos = []
-    ignorados_prioridade_enovo = []
 
     with transaction.atomic():
         id_vonzus = [d["id_vonzu"] for _, d in linhas_resolvidas]
@@ -325,24 +307,6 @@ def persistir_pedidos_importados(
         if match_por_referencia:
             refs = [(d.get("pedido") or "").strip() for _, d in linhas_resolvidas]
             por_ref = _indexar_existentes_por_referencia(filial, refs)
-
-        refs_ocupadas_por_outro_id = {}
-        if ignorar_criacao_se_referencia_alheia:
-            refs = [
-                (d.get("pedido") or "").strip()
-                for _, d in linhas_resolvidas
-                if (d.get("pedido") or "").strip()
-            ]
-            if refs:
-                for p in Pedido.objects.filter(filial=filial, pedido__in=refs).only(
-                    "id_vonzu", "pedido"
-                ):
-                    ref = (p.pedido or "").strip()
-                    if not ref:
-                        continue
-                    # Mantém um id existente (ENOVO ou outro) distinto dos Ids deste CSV
-                    if p.id_vonzu not in trks_no_ficheiro:
-                        refs_ocupadas_por_outro_id.setdefault(ref, p.id_vonzu)
 
         resolvidos = []  # (num_linha, dados, existente|None, id_anterior|None)
         erros_resolve = []
@@ -398,20 +362,6 @@ def persistir_pedidos_importados(
             id_vonzu = dados["id_vonzu"]
 
             if existente is None:
-                ref = (dados.get("pedido") or "").strip()
-                if (
-                    ignorar_criacao_se_referencia_alheia
-                    and ref
-                    and ref in refs_ocupadas_por_outro_id
-                ):
-                    ignorados_prioridade_enovo.append({
-                        "ref": ref,
-                        "id_vonzu": id_vonzu,
-                        "id_existente": refs_ocupadas_por_outro_id[ref],
-                        "num_linha": num_linha,
-                    })
-                    continue
-
                 p = Pedido(
                     filial=filial,
                     origem="IMPORTADO",
@@ -543,7 +493,6 @@ def persistir_pedidos_importados(
         sem_alteracao,
         tentativas,
         remapeamentos,
-        ignorados_prioridade_enovo,
     )
 
 
@@ -552,7 +501,6 @@ def persistir_ou_erro(
     linhas_resolvidas,
     *,
     match_por_referencia=False,
-    ignorar_criacao_se_referencia_alheia=False,
     forcar_atualizacao=False,
 ):
     """Wrapper que captura erros de BD/validação e devolve (ok, stats_ou_erros)."""
@@ -563,12 +511,10 @@ def persistir_ou_erro(
             sem_alteracao,
             tentativas,
             remapeamentos,
-            ignorados_prioridade_enovo,
         ) = persistir_pedidos_importados(
             filial,
             linhas_resolvidas,
             match_por_referencia=match_por_referencia,
-            ignorar_criacao_se_referencia_alheia=ignorar_criacao_se_referencia_alheia,
             forcar_atualizacao=forcar_atualizacao,
         )
         return True, {
@@ -577,7 +523,6 @@ def persistir_ou_erro(
             "sem_alteracao": sem_alteracao,
             "tentativas": tentativas,
             "remapeamentos": remapeamentos,
-            "ignorados_prioridade_enovo": ignorados_prioridade_enovo,
         }
     except ValidationError as exc:
         msgs = exc.messages if hasattr(exc, "messages") else [str(exc)]

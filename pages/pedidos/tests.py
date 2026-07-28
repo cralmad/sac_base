@@ -174,8 +174,8 @@ class ImportadorCSVTests(TestCase):
         self.assertEqual(resultado["stats"]["ignoradas"], 1)
         self.assertEqual(Pedido.objects.count(), 1)
 
-    def test_vonzu_ignora_referencia_ja_existente_com_id_enovo(self):
-        """Prioridade ENOVO: CSV VONZU não cria pedido se a Referência já tem outro id."""
+    def test_vonzu_remapeia_por_referencia_para_id_do_csv(self):
+        """Prioridade VONZU: CSV remapeia id_vonzu quando a Referência já existe."""
         Pedido.objects.create(
             filial=self.filial,
             origem="IMPORTADO",
@@ -192,10 +192,12 @@ class ImportadorCSVTests(TestCase):
         resultado = importar_csv(csv_bytes, self.filial, "vonzu.csv")
         self.assertTrue(resultado["sucesso"], resultado["erros"])
         self.assertEqual(resultado["stats"]["criados"], 0)
-        self.assertEqual(resultado["stats"]["ignorados_prioridade_enovo"], 1)
+        self.assertEqual(resultado["stats"]["atualizados"], 1)
+        self.assertEqual(resultado["stats"]["ids_remapeados"], 1)
         self.assertEqual(Pedido.objects.filter(filial=self.filial).count(), 1)
-        self.assertFalse(Pedido.objects.filter(id_vonzu=1001).exists())
-        self.assertIn("PRIORIDADE ENOVO", resultado["relatorio"])
+        pedido = Pedido.objects.get(filial=self.filial, pedido="REF001")
+        self.assertEqual(pedido.id_vonzu, 1001)
+        self.assertIn("ID EXTERNO REMAPEADO", resultado["relatorio"])
 
     def test_upsert_pedido_existente_sem_alteracao(self):
         csv_bytes = _make_csv(_csv_row())

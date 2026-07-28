@@ -308,7 +308,7 @@ def importar_csv(
     ok, resultado = persistir_ou_erro(
         filial,
         linhas_resolvidas,
-        ignorar_criacao_se_referencia_alheia=True,
+        match_por_referencia=True,
         forcar_atualizacao=forcar_atualizacao,
     )
     if not ok:
@@ -318,8 +318,6 @@ def importar_csv(
     atualizados = resultado["atualizados"]
     sem_alteracao = resultado["sem_alteracao"]
     tentativas = resultado["tentativas"]
-    ignorados_prio = resultado.get("ignorados_prioridade_enovo") or []
-
     if analisar_movimentacoes_dia:
         id_vonzus_importados = {dados["id_vonzu"] for _, dados in linhas_resolvidas}
         pedidos_mov_ausentes_no_arquivo = coletar_pedidos_movimentacao_ausentes_no_arquivo(
@@ -341,7 +339,7 @@ def importar_csv(
         analise_movimentacao_ativada=analisar_movimentacoes_dia,
         data_analise=data_analise_movimentacao,
         pedidos_mov_ausentes_no_arquivo=pedidos_mov_ausentes_no_arquivo,
-        ignorados_prioridade_enovo=ignorados_prio,
+        remapeamentos=resultado.get("remapeamentos") or [],
     )
 
     dados_volumes, _detalhes = montar_dados_volumes_agrupados(linhas_norm)
@@ -358,7 +356,7 @@ def importar_csv(
             "sem_alteracao": sem_alteracao,
             "tentativas": tentativas,
             "avisos_fk": len(avisos_fk),
-            "ignorados_prioridade_enovo": len(ignorados_prio),
+            "ids_remapeados": len(resultado.get("remapeamentos") or []),
         },
         "dados_volumes": dados_volumes,
     }

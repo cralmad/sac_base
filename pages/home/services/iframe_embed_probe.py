@@ -9,6 +9,8 @@ import requests
 # Apenas estes hosts podem ser sondados (evita SSRF).
 HOSTS_PERMITIDOS = frozenset(
     {
+        "app.vonzu.es",
+        "vonzu.es",
         "3dboxportugal.enovotms.com",
         "enovotms.com",
     }
