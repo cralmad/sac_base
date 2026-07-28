@@ -474,7 +474,7 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
         { val: linha.cidade_dest },
         { val: linha.codpost_dest },
         { val: linha.volumes, bold: (() => { const p = (linha.volumes || '').split('/'); return p.length === 2 && parseInt(p[0], 10) < parseInt(p[1], 10); })() },
-        { val: linha.peso },
+        { val: linha.peso, alertaPeso: !!linha.tem_incidencia_peso_pendente },
         { val: linha.periodo, cls: linha.periodo ? `rr-periodo-${linha.periodo}` : '' },
         { val: linha.obs_rota, cls: 'rr-obs' },
       ];
@@ -521,9 +521,19 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
       }
       tr.appendChild(tdRef);
 
-      campos.forEach(({ val, cls, bold }) => {
+      campos.forEach(({ val, cls, bold, alertaPeso }) => {
         const td = document.createElement('td');
-        td.textContent = val ?? '';
+        if (alertaPeso) {
+          const spanPeso = document.createElement('span');
+          spanPeso.textContent = val ?? '';
+          td.appendChild(spanPeso);
+          const icon = document.createElement('i');
+          icon.className = 'bi bi-exclamation-triangle-fill rr-peso-alerta';
+          icon.title = 'Incidência Peso/Volume não resolvida';
+          td.appendChild(icon);
+        } else {
+          td.textContent = val ?? '';
+        }
         if (cls) td.className = cls;
         if (bold) td.style.fontWeight = 'bold';
         tr.appendChild(td);

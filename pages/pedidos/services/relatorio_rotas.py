@@ -6,7 +6,7 @@ from datetime import date, datetime
 from io import BytesIO
 from itertools import groupby
 
-from pages.pedidos.models import Devolucao, TentativaEntrega, estado_segue_para_entrega
+from pages.pedidos.models import Devolucao, Incidencia, TentativaEntrega, estado_segue_para_entrega
 from pages.pedidos.services.zona_entrega_pedido import (
     carregar_regras_zona_por_filial,
     resolver_zona_e_faixa_entrega,
@@ -88,6 +88,20 @@ def montar_relatorio_rotas(filial_ativa, filtros: dict) -> tuple[dict | None, st
             .distinct()
         )
 
+    pedidos_com_incidencia_peso_pendente = set()
+    if pedido_ids:
+        pedidos_com_incidencia_peso_pendente = set(
+            Incidencia.objects
+            .filter(
+                pedido_id__in=pedido_ids,
+                pedido__filial=filial_ativa,
+                tipo="Peso/Volume",
+                resolvido=False,
+            )
+            .values_list("pedido_id", flat=True)
+            .distinct()
+        )
+
     regras_zona = carregar_regras_zona_por_filial(filial_ativa)
 
     grupos = []
@@ -135,6 +149,7 @@ def montar_relatorio_rotas(filial_ativa, filtros: dict) -> tuple[dict | None, st
                 "segue_para_entrega": segue_para_entrega,
                 "nao_segue_para_entrega": (not segue_para_entrega) or tem_tentativa_posterior,
                 "tem_devolucao": p.id in pedidos_com_devolucao,
+                "tem_incidencia_peso_pendente": p.id in pedidos_com_incidencia_peso_pendente,
             })
         grupos.append({
             "carro": str(carro_val) if carro_val is not None else "—",

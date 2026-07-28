@@ -359,6 +359,7 @@ class Incidencia(models.Model):
     )
     obs = models.TextField(null=True, blank=True)
     fotos = models.JSONField(default=list, blank=True)
+    resolvido = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

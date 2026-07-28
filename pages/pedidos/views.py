@@ -565,6 +565,7 @@ def pedido_inc_save_view(request):
     inc.valor = parse_decimal(data.get("valor"))
     inc.motorista_id = motorista_id
     inc.obs = (data.get("obs") or "").strip() or None
+    inc.resolvido = bool(data.get("resolvido", False))
     inc.save()
     return JsonResponse(build_success_payload(
         "Incidência salva com sucesso!",

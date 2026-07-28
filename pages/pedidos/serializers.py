@@ -97,6 +97,7 @@ def serialize_incidencia(reg):
         "motorista_id": reg.motorista_id,
         "motorista_nome": reg.motorista.nome if reg.motorista_id else "",
         "obs": reg.obs or "",
+        "resolvido": bool(reg.resolvido),
         "fotos": fotos_publicas,
         "fotos_count": len(fotos_publicas),
     }

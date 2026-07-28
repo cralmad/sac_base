@@ -576,7 +576,7 @@ function renderIncidencias(registros = []) {
   if (!registros.length) {
     const tr = document.createElement('tr');
     const td = document.createElement('td');
-    td.colSpan = 10;
+    td.colSpan = 11;
     td.className = 'text-center text-muted';
     td.textContent = 'Nenhuma incidência';
     tr.appendChild(td);
@@ -597,6 +597,7 @@ function renderIncidencias(registros = []) {
       inc.valor !== null && inc.valor !== undefined ? inc.valor : '',
       inc.motorista_nome,
       inc.obs,
+      inc.resolvido ? 'Sim' : 'Não',
     ];
     colunas.forEach(valor => {
       const td = document.createElement('td');
@@ -638,6 +639,7 @@ function renderIncidencias(registros = []) {
     btnEditar.dataset.valor       = String(inc.valor ?? '');
     btnEditar.dataset.motoristaId = String(inc.motorista_id ?? '');
     btnEditar.dataset.obs         = String(inc.obs ?? '');
+    btnEditar.dataset.resolvido   = inc.resolvido ? 'true' : 'false';
 
     const btnExcluir = document.createElement('button');
     btnExcluir.type = 'button';
@@ -671,6 +673,7 @@ function abrirModalInc(reg = null) {
   document.getElementById('inc_artigo').value   = reg?.artigo || '';
   document.getElementById('inc_valor').value    = reg?.valor ?? '';
   document.getElementById('inc_obs').value      = reg?.obs || '';
+  document.getElementById('inc_resolvido').checked = !!reg?.resolvido;
 
   const selOrigem = document.getElementById('inc_origem');
   selOrigem.value = reg?.origem || '';
@@ -707,6 +710,7 @@ async function salvarIncidencia() {
     valor:        document.getElementById('inc_valor').value,
     motorista_id: document.getElementById('inc_motorista').value || null,
     obs:          document.getElementById('inc_obs').value,
+    resolvido:    document.getElementById('inc_resolvido').checked,
   };
 
   const resp = await fazerRequisicao('/app/logistica/pedidos/inc/save', payload);
@@ -1499,6 +1503,7 @@ document.addEventListener('DOMContentLoaded', () => {
         valor:        btnEditar.dataset.valor,
         motorista_id: btnEditar.dataset.motoristaId,
         obs:          btnEditar.dataset.obs,
+        resolvido:    btnEditar.dataset.resolvido === 'true',
       });
       return;
     }

@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from pages.core.models import Pais
 from pages.filial.models import Filial
-from pages.pedidos.models import Pedido, TentativaEntrega
+from pages.pedidos.models import Incidencia, Pedido, TentativaEntrega
 from pages.pedidos.services.relatorio_rotas import (
     gerar_xlsx_relatorio_rotas,
     montar_relatorio_rotas,
@@ -96,3 +96,43 @@ class RelatorioRotasServiceTests(TestCase):
         # título + linha vazia + cabeçalho + 1 dado
         self.assertEqual(ws.cell(row=4, column=1).value, "Carro 7")
         self.assertEqual(ws.cell(row=4, column=3).value, "REF-X")
+
+    def test_tem_incidencia_peso_pendente(self):
+        p_pendente = self._pedido(91010, "REF-PESO")
+        p_resolvido = self._pedido(91011, "REF-OK")
+        p_outro_tipo = self._pedido(91012, "REF-OUTRO")
+        self._tentativa(p_pendente, carro=1)
+        self._tentativa(p_resolvido, carro=1)
+        self._tentativa(p_outro_tipo, carro=1)
+
+        Incidencia.objects.create(
+            pedido=p_pendente,
+            data=self.d0,
+            origem="Cliente",
+            tipo="Peso/Volume",
+            resolvido=False,
+        )
+        Incidencia.objects.create(
+            pedido=p_resolvido,
+            data=self.d0,
+            origem="Cliente",
+            tipo="Peso/Volume",
+            resolvido=True,
+        )
+        Incidencia.objects.create(
+            pedido=p_outro_tipo,
+            data=self.d0,
+            origem="Cliente",
+            tipo="Data/Horário",
+            resolvido=False,
+        )
+
+        payload, err = montar_relatorio_rotas(
+            self.filial,
+            {"data_tentativa": self.d0.isoformat(), "agrupamento": "carro"},
+        )
+        self.assertIsNone(err)
+        por_ref = {ln["pedido"]: ln for ln in payload["grupos"][0]["linhas"]}
+        self.assertTrue(por_ref["REF-PESO"]["tem_incidencia_peso_pendente"])
+        self.assertFalse(por_ref["REF-OK"]["tem_incidencia_peso_pendente"])
+        self.assertFalse(por_ref["REF-OUTRO"]["tem_incidencia_peso_pendente"])
