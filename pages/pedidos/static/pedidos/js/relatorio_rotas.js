@@ -630,6 +630,24 @@ function renderizarGrupos(grupos, dataFmt, agrupamento) {
     resultado.appendChild(wrapper);
   });
 
+  let totalPedidos = 0;
+  let pesoTotal = 0;
+  let volumeTotal = 0;
+  grupos.forEach(grupo => {
+    const linhas = grupo.linhas || [];
+    totalPedidos += linhas.length;
+    linhas.forEach(linha => {
+      pesoTotal += pesoParaNumero(linha.peso);
+      volumeTotal += volumePedidoParaNumero(linha.volumes);
+    });
+  });
+
+  const rodape = document.createElement('div');
+  rodape.className = 'rr-rodape-totais';
+  rodape.textContent =
+    `Totais: ${totalPedidos} pedido(s) • ${formatarPeso(pesoTotal)} kg • ${volumeTotal} vol`;
+  resultado.appendChild(rodape);
+
   btnImprimir.disabled = false;
   if (btnExportarXlsx) btnExportarXlsx.disabled = false;
 }
