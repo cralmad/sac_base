@@ -5,10 +5,14 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_protect
 from django.contrib.auth.decorators import login_required, permission_required
 from django.http import JsonResponse
-from pages.pedidos.models import TentativaEntrega, Pedido
-from django.db import transaction
+from pages.pedidos.models import TentativaEntrega
+from django.db import transaction, DatabaseError, IntegrityError
+from django.core.exceptions import ValidationError
+import logging
 
 from pages.pedidos.consumers import GRUPO_RELATORIO
+
+logger = logging.getLogger(__name__)
 
 
 @require_POST
@@ -58,8 +62,17 @@ def relatorio_conferencia_salvar_view(request):
                 pedido.obs_rota = obs_rota
                 pedido.volume_conf = int(volume_conf) if str(volume_conf).strip() else 0
                 pedido.save(update_fields=['obs_rota', 'volume_conf'])
-    except Exception as exc:
-        return JsonResponse({'success': False, 'mensagem': str(exc)}, status=422)
+    except (ValueError, TypeError, ValidationError):
+        return JsonResponse(
+            {'success': False, 'mensagem': 'Dados inválidos para salvar a conferência.'},
+            status=400,
+        )
+    except (IntegrityError, DatabaseError) as exc:
+        logger.error(exc, exc_info=True)
+        return JsonResponse(
+            {'success': False, 'mensagem': 'Não foi possível salvar. Tente novamente.'},
+            status=422,
+        )
 
     # Broadcast via WebSocket para todos os usuários conectados à tela
     try:

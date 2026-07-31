@@ -441,6 +441,56 @@ export function confirmar({ titulo, mensagem, onConfirmar }) {
 }
 
 /**
+ * Abre o modal de alerta global definido em base.html (apenas OK).
+ * Use para erros/avisos que precisam interromper o fluxo do usuário.
+ *
+ * @param {object} opcoes
+ * @param {string} [opcoes.titulo='Atenção'] - Título do modal
+ * @param {string} opcoes.mensagem           - Texto exibido ao usuário
+ * @param {'erro'|'aviso'|'info'} [opcoes.tipo='erro'] - Visual do cabeçalho
+ * @param {Function} [opcoes.onOk]           - Callback após fechar (opcional)
+ */
+export function alertar({ titulo = 'Atenção', mensagem, tipo = 'erro', onOk } = {}) {
+  const modalEl = document.getElementById('modal-alerta');
+  if (!modalEl) {
+    console.warn('Modal #modal-alerta não encontrado. Verifique o base.html.');
+    window.alert(`${titulo}\n\n${mensagem || ''}`);
+    if (typeof onOk === 'function') onOk();
+    return;
+  }
+
+  const headerEl = document.getElementById('modal-alerta-header');
+  const tituloEl = document.getElementById('modal-alerta-titulo');
+  const msgEl = document.getElementById('modal-alerta-mensagem');
+  const btnOk = document.getElementById('modal-alerta-btn-ok');
+
+  tituloEl.textContent = titulo || 'Atenção';
+  msgEl.textContent = mensagem || '';
+
+  const headerClasses = {
+    erro: 'modal-header text-bg-danger',
+    aviso: 'modal-header text-bg-warning',
+    info: 'modal-header text-bg-info',
+  };
+  headerEl.className = headerClasses[tipo] || headerClasses.erro;
+
+  const btnClasses = {
+    erro: 'btn btn-danger',
+    aviso: 'btn btn-warning',
+    info: 'btn btn-info',
+  };
+  btnOk.className = btnClasses[tipo] || btnClasses.erro;
+
+  const modal = bootstrap.Modal.getInstance(modalEl) ?? new bootstrap.Modal(modalEl);
+
+  if (typeof onOk === 'function') {
+    modalEl.addEventListener('hidden.bs.modal', () => onOk(), { once: true });
+  }
+
+  modal.show();
+}
+
+/**
  * FIX #4: hidratarFormulario() agora dispara eventos 'input' para triggers de formatação
  * Hidrata os campos de um formulário com os dados do sisVar
  */

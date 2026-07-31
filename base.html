@@ -605,6 +605,24 @@
             </div>
         </div>
 
+        <!-- MODAL DE ALERTA GLOBAL (erro / aviso / info) -->
+        <div class="modal fade" id="modal-alerta" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header" id="modal-alerta-header">
+                        <h5 class="modal-title" id="modal-alerta-titulo"></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <div class="modal-body" id="modal-alerta-mensagem"></div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" id="modal-alerta-btn-ok">
+                            <i class="bi bi-check-circle"></i> OK
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Loader Global -->
         <div id="global-loader">
             <div class="spinner-border text-light" role="status">

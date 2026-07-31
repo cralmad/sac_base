@@ -1,5 +1,5 @@
 
-import { getCsrfToken, hasScreenPermission } from '/static/js/sisVar.js';
+import { getCsrfToken, hasScreenPermission, alertar } from '/static/js/sisVar.js';
 import { AppLoader } from '/static/js/loader.js';
 
 let pagina = 1;
@@ -486,11 +486,27 @@ movLista.addEventListener('click', async e => {
       setTimeout(() => { btn.innerHTML = '<i class="bi bi-check"></i> Salvar'; btn.disabled = false; }, 1000);
     } else {
       btn.innerHTML = '<i class="bi bi-x-circle"></i> Erro';
-      setTimeout(() => { btn.innerHTML = '<i class="bi bi-check"></i> Salvar'; btn.disabled = false; }, 2000);
+      btn.disabled = false;
+      alertar({
+        titulo: 'Erro ao salvar',
+        mensagem: data.mensagem || 'Não foi possível salvar a conferência. Verifique os dados e tente novamente.',
+        tipo: 'erro',
+        onOk: () => {
+          btn.innerHTML = '<i class="bi bi-check"></i> Salvar';
+        },
+      });
     }
   } catch {
     btn.innerHTML = '<i class="bi bi-x-circle"></i> Erro';
-    setTimeout(() => { btn.innerHTML = '<i class="bi bi-check"></i> Salvar'; btn.disabled = false; }, 2000);
+    btn.disabled = false;
+    alertar({
+      titulo: 'Erro ao salvar',
+      mensagem: 'Falha de comunicação ao salvar. Verifique a conexão e tente novamente.',
+      tipo: 'erro',
+      onOk: () => {
+        btn.innerHTML = '<i class="bi bi-check"></i> Salvar';
+      },
+    });
   } finally {
     AppLoader.hide();
   }
