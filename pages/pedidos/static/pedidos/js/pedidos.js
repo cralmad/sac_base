@@ -18,12 +18,14 @@ const LABELS_STATS = {
   ids_remapeados: 'IDs remapeados por referência',
   ignorados_encargo: 'Linhas ENCARGO ignoradas',
   coords_atribuidas: 'Coordenadas atribuídas',
-  coords_cp_pt: 'Geocode CP (cp_pt)',
+  coords_cp7_local: 'Geocode CP (índice local)',
+  coords_cp_pt: 'Geocode CP (codigo-postal.pt)',
   coords_cp_pt_rua: 'Geocode morada (cp_pt_rua)',
   coords_cp_pt_fallback: 'Geocode fallback (1ª opção)',
   coords_enfileiradas: 'Enfileirados (noturno)',
   coords_restantes_filial: 'Restantes sem coordenadas',
-  coords_cp_nao_encontrado: 'CP sem GPS no site',
+  coords_cp_nao_encontrado: 'CP sem coordenadas no índice/site',
+  cps_nao_geocodificados: 'CP não geocodificados',
   geocode_modo: 'Modo geocodificação',
 };
 

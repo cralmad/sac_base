@@ -1,23 +1,33 @@
-"""Geocodificação de pedidos via scraping de codigo-postal.pt (Portugal)."""
+"""Geocodificação de pedidos por código postal (Portugal).
 
+Fonte primária: índice local `pages/pedidos/data/cp7_pt.csv.gz`
+(CTT/temospena nov.2022 unido a Eurostat GISCO 2025).
+Overrides manuais: `pages/pedidos/data/cp7_overrides.csv`.
+Fallback: scraping de codigo-postal.pt quando o CP não está no índice.
+"""
+
+import csv
+import gzip
 import logging
 import re
 import time
 import unicodedata
 from decimal import Decimal
+from pathlib import Path
 
 import requests
 from django.core.cache import cache
 from django.db.models import Q
 
 from pages.pedidos.models import Pedido
-from pages.pedidos.services.zona_entrega_pedido import normalizar_cp7_num
 
 logger = logging.getLogger(__name__)
 
 CODIGO_POSTAL_PT_BASE = "https://www.codigo-postal.pt"
 CP_REFERENCIA_ESTRUTURA = "7580-610"
 USER_AGENT = "Mozilla/5.0 (compatible; sac-base-geocode/1.0)"
+CP7_DATASET_PATH = Path(__file__).resolve().parent.parent / "data" / "cp7_pt.csv.gz"
+CP7_OVERRIDES_PATH = Path(__file__).resolve().parent.parent / "data" / "cp7_overrides.csv"
 
 GEOCODE_SYNC_MAX_PEDIDOS = 30
 GEOCODE_INTERVALO_CP_SEG = 1.0
@@ -29,6 +39,7 @@ GEOCODE_TIMEOUT_DIARIO_SEG = 3600
 GPS_TOLERANCIA = 1e-5
 _SITE_CHECK_TTL_SEG = 900
 _MAX_AVISOS_RELATORIO = 20
+_MAX_CPS_MENSAGEM = 40
 
 _RE_MARCADOR_GPS = re.compile(r"class=['\"]pull-right gps['\"]", re.I)
 _RE_MARCADOR_GPS_TAG = re.compile(r"<b>GPS:</b>", re.I)
@@ -52,11 +63,13 @@ _PALAVRAS_GENERICAS_END = frozenset({
 })
 
 _SITE_CHECK_CACHE = {"expira_em": 0.0, "resultado": None}
+_indice_cp7 = None
 
 
 def _stats_vazias():
     return {
         "coords_atribuidas": 0,
+        "coords_cp7_local": 0,
         "coords_cp_pt": 0,
         "coords_cp_pt_rua": 0,
         "coords_cp_pt_fallback": 0,
@@ -68,6 +81,7 @@ def _stats_vazias():
         "coords_restantes_filial": 0,
         "modo": "sync",
         "site_ok": True,
+        "usou_site": False,
         "avisos": [],
     }
 
@@ -86,10 +100,11 @@ def _palavras_significativas(texto):
 
 
 def _cp_para_url(codpost):
-    _cp4, cp7 = normalizar_cp7_num(codpost)
-    if cp7 is None:
+    """CP7 canónico (XXXX-YYY). Exige 7 dígitos — não preenche CP4 com zeros."""
+    digitos = "".join(c for c in str(codpost or "") if c.isdigit())
+    if len(digitos) < 7:
         return None
-    s = str(cp7).zfill(7)
+    s = digitos[:7]
     return f"{s[:4]}-{s[4:7]}"
 
 
@@ -99,6 +114,90 @@ def _gps_iguais(lat1, lng1, lat2, lng2):
 
 def _http_get(url):
     return requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=15)
+
+
+def _abrir_dataset_cp7(path):
+    path = Path(path)
+    suffixes = "".join(path.suffixes).lower()
+    if suffixes.endswith(".gz"):
+        return gzip.open(path, "rt", encoding="utf-8", newline="")
+    return path.open("rt", encoding="utf-8", newline="")
+
+
+def _aplicar_overrides_cp7(indice):
+    path = CP7_OVERRIDES_PATH
+    if not path.is_file():
+        return
+    try:
+        with path.open("rt", encoding="utf-8", newline="") as fh:
+            reader = csv.DictReader(fh)
+            for row in reader:
+                cp = (row.get("cp7") or "").strip()
+                if not cp:
+                    continue
+                try:
+                    lat = float(row["lat"])
+                    lng = float(row["lng"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                indice[cp] = (lat, lng)
+    except OSError as exc:
+        logger.error(exc, exc_info=True)
+
+
+def carregar_indice_cp7(*, caminho=None, forcar=False):
+    """Carrega o mapa CP7 → (lat, lng). Vazio se o ficheiro falhar."""
+    global _indice_cp7
+    if _indice_cp7 is not None and not forcar:
+        return _indice_cp7
+
+    path = Path(caminho) if caminho else CP7_DATASET_PATH
+    indice = {}
+    try:
+        with _abrir_dataset_cp7(path) as fh:
+            reader = csv.DictReader(fh)
+            for row in reader:
+                cp = (row.get("cp7") or "").strip()
+                if not cp:
+                    continue
+                try:
+                    lat = float(row["lat"])
+                    lng = float(row["lng"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                indice[cp] = (lat, lng)
+    except OSError as exc:
+        logger.error(exc, exc_info=True)
+        return {}
+
+    if caminho is None:
+        _aplicar_overrides_cp7(indice)
+
+    _indice_cp7 = indice
+    if indice:
+        logger.info("Índice CP7 local carregado: %s códigos (%s)", len(indice), path)
+    else:
+        logger.warning("Índice CP7 local vazio ou indisponível: %s", path)
+    return _indice_cp7
+
+
+def consultar_cp7_local(codpost, *, indice=None):
+    """Lookup no índice local. Não acede à rede."""
+    cp_url = _cp_para_url(codpost)
+    if not cp_url:
+        return {"ok": False, "candidatos": [], "codigo_erro": "cp_invalido"}
+
+    mapa = indice if indice is not None else carregar_indice_cp7()
+    ponto = mapa.get(cp_url)
+    if not ponto:
+        return {"ok": False, "candidatos": [], "codigo_erro": "cp_nao_encontrado"}
+
+    lat, lng = ponto
+    return {
+        "ok": True,
+        "candidatos": [{"rua": "", "gps_lat": lat, "gps_lng": lng, "localidade": ""}],
+        "codigo_erro": None,
+    }
 
 
 def verificar_estrutura_codigo_postal_pt(*, forcar=False):
@@ -262,6 +361,58 @@ def _contar_restantes_filial(filial):
     ).exclude(codpost_dest__isnull=True).exclude(codpost_dest="").count()
 
 
+def listar_cps_pendentes_filial(filial):
+    """CP únicos (canónicos) de pedidos da filial ainda sem coordenadas."""
+    valores = (
+        Pedido.objects.filter(filial=filial)
+        .filter(Q(lat__isnull=True) | Q(lng__isnull=True))
+        .exclude(codpost_dest__isnull=True)
+        .exclude(codpost_dest="")
+        .values_list("codpost_dest", flat=True)
+    )
+    vistos = set()
+    cps = []
+    for bruto in valores:
+        chave = _cp_para_url(bruto) or (bruto or "").strip()
+        if not chave or chave in vistos:
+            continue
+        vistos.add(chave)
+        cps.append(chave)
+    cps.sort()
+    return cps
+
+
+def formatar_linha_cps_nao_geocodificados(cps):
+    if not cps:
+        return None
+    if len(cps) <= _MAX_CPS_MENSAGEM:
+        return f"CP não geocodificados: {', '.join(cps)}."
+    shown = cps[:_MAX_CPS_MENSAGEM]
+    resto = len(cps) - _MAX_CPS_MENSAGEM
+    return f"CP não geocodificados ({len(cps)}): {', '.join(shown)} e mais {resto}."
+
+
+def anexar_mensagem_cps_pendentes(mensagens, filial):
+    """Acrescenta a listagem de CP pendentes às mensagens SisVar da importação."""
+    mensagens = dict(mensagens or {})
+    linha = formatar_linha_cps_nao_geocodificados(listar_cps_pendentes_filial(filial))
+    if not linha:
+        return mensagens
+    if "aviso" in mensagens and mensagens["aviso"].get("conteudo"):
+        mensagens["aviso"] = {
+            **mensagens["aviso"],
+            "conteudo": list(mensagens["aviso"]["conteudo"]) + [linha],
+        }
+    elif "erro" in mensagens and mensagens["erro"].get("conteudo"):
+        mensagens["erro"] = {
+            **mensagens["erro"],
+            "conteudo": list(mensagens["erro"]["conteudo"]) + [linha],
+        }
+    else:
+        mensagens["aviso"] = {"conteudo": [linha], "ignorar": True}
+    return mensagens
+
+
 def _adquirir_lock(filial_id, origem):
     if origem == "comando":
         return cache.add("geocode_cp_pt:comando", "1", timeout=GEOCODE_TIMEOUT_DIARIO_SEG)
@@ -327,14 +478,6 @@ def atribuir_coordenadas_pedidos(
         lock_adquirido = True
 
     try:
-        check = verificar_estrutura_codigo_postal_pt()
-        if not check["ok"]:
-            stats["site_ok"] = False
-            stats["coords_falha_site"] = len(pedido_ids)
-            stats["avisos"].append(check["mensagem"])
-            stats["coords_restantes_filial"] = _contar_restantes_filial(filial)
-            return stats
-
         qs = (
             Pedido.objects.filter(filial=filial, id__in=pedido_ids)
             .only(
@@ -342,6 +485,7 @@ def atribuir_coordenadas_pedidos(
                 "endereco_dest", "cidade_dest",
                 "geocoding_display", "geocoding_precision",
             )
+            .order_by("id")
         )
         elegiveis = []
         for pedido in qs:
@@ -354,28 +498,52 @@ def atribuir_coordenadas_pedidos(
                 continue
             elegiveis.append(pedido)
 
-        if max_processar is not None and len(elegiveis) > max_processar:
-            stats["coords_enfileiradas"] = len(elegiveis) - max_processar
-            elegiveis = elegiveis[:max_processar]
-
         cache_cp = {}
         atualizar = []
         inicio = time.monotonic()
-        processados = 0
+        site_check = None
+        indice_local = carregar_indice_cp7()
+        acoes = 0
 
-        for pedido in elegiveis:
+        for idx, pedido in enumerate(elegiveis):
+            nao_vistos = len(elegiveis) - idx
             if origem != "comando" and (time.monotonic() - inicio) >= GEOCODE_TIMEOUT_SYNC_SEG:
-                stats["coords_enfileiradas"] += len(elegiveis) - processados
+                stats["coords_enfileiradas"] += nao_vistos
                 break
 
-            cp_url = _cp_para_url(pedido.codpost_dest)
-            ja_em_cache = cp_url in cache_cp if cp_url else False
-            consulta = consultar_codigo_postal_pt(
-                pedido.codpost_dest,
-                cache_cp=cache_cp,
-                aplicar_sleep=not ja_em_cache,
-            )
-            processados += 1
+            fonte = "local"
+            consulta = consultar_cp7_local(pedido.codpost_dest, indice=indice_local)
+            if consulta.get("codigo_erro") == "cp_invalido":
+                stats["coords_cp_nao_encontrado"] += 1
+                continue
+
+            if not consulta["ok"]:
+                if site_check is None:
+                    site_check = verificar_estrutura_codigo_postal_pt()
+                if not site_check["ok"]:
+                    stats["site_ok"] = False
+                    stats["coords_falha_site"] += 1
+                    continue
+
+                if max_processar is not None and acoes >= max_processar:
+                    stats["coords_enfileiradas"] += nao_vistos
+                    break
+
+                stats["usou_site"] = True
+                cp_url = _cp_para_url(pedido.codpost_dest)
+                ja_em_cache = bool(cp_url) and cp_url in cache_cp
+                consulta = consultar_codigo_postal_pt(
+                    pedido.codpost_dest,
+                    cache_cp=cache_cp,
+                    aplicar_sleep=not ja_em_cache,
+                )
+                fonte = "codigo-postal.pt"
+                acoes += 1
+            else:
+                if max_processar is not None and acoes >= max_processar:
+                    stats["coords_enfileiradas"] += nao_vistos
+                    break
+                acoes += 1
 
             if not consulta["ok"]:
                 cod = consulta.get("codigo_erro")
@@ -395,6 +563,12 @@ def atribuir_coordenadas_pedidos(
                 stats["coords_cp_nao_encontrado"] += 1
                 continue
 
+            if fonte == "local":
+                cp_fmt = _cp_para_url(pedido.codpost_dest) or (pedido.codpost_dest or "")
+                resolvido["precision"] = "cp7_local"
+                resolvido["display"] = f"cp7-local: {cp_fmt}"[:300]
+                resolvido["aviso"] = None
+
             pedido.lat = Decimal(str(resolvido["lat"])).quantize(Decimal("0.000001"))
             pedido.lng = Decimal(str(resolvido["lng"])).quantize(Decimal("0.000001"))
             pedido.geocoding_display = resolvido["display"]
@@ -402,7 +576,9 @@ def atribuir_coordenadas_pedidos(
             atualizar.append(pedido)
 
             prec = resolvido["precision"]
-            if prec == "cp_pt":
+            if prec == "cp7_local":
+                stats["coords_cp7_local"] += 1
+            elif prec == "cp_pt":
                 stats["coords_cp_pt"] += 1
             elif prec == "cp_pt_rua":
                 stats["coords_cp_pt_rua"] += 1
@@ -410,7 +586,8 @@ def atribuir_coordenadas_pedidos(
                 stats["coords_cp_pt_fallback"] += 1
                 if resolvido.get("aviso") and len(stats["avisos"]) < _MAX_AVISOS_RELATORIO:
                     stats["avisos"].append(
-                        f"  vonzu={pedido.id_vonzu} | {resolvido['aviso']}"
+                        f"vonzu={pedido.id_vonzu} | ref={pedido.id} | "
+                        f"{resolvido['aviso']}"
                     )
 
         if atualizar:
@@ -430,8 +607,9 @@ def stats_geocode_para_resposta(stats_geocode):
     """Formata stats do serviço codigo-postal.pt para JSON SisVar (botão manual)."""
     if not stats_geocode:
         return {}
-    return {
+    payload = {
         "coords_atribuidas": stats_geocode.get("coords_atribuidas", 0),
+        "coords_cp7_local": stats_geocode.get("coords_cp7_local", 0),
         "coords_cp_pt": stats_geocode.get("coords_cp_pt", 0),
         "coords_cp_pt_rua": stats_geocode.get("coords_cp_pt_rua", 0),
         "coords_cp_pt_fallback": stats_geocode.get("coords_cp_pt_fallback", 0),
@@ -441,6 +619,10 @@ def stats_geocode_para_resposta(stats_geocode):
         "geocode_modo": stats_geocode.get("modo", "sync"),
         "geocode_site_ok": stats_geocode.get("site_ok", True),
     }
+    cps = stats_geocode.get("cps_nao_geocodificados") or []
+    if cps:
+        payload["cps_nao_geocodificados"] = ", ".join(cps[:_MAX_CPS_MENSAGEM])
+    return payload
 
 
 def geocodificar_filial_manual(filial):
@@ -449,6 +631,7 @@ def geocodificar_filial_manual(filial):
     stats = _stats_vazias()
     if not ids:
         stats["coords_restantes_filial"] = 0
+        stats["cps_nao_geocodificados"] = []
         return stats
 
     stats = atribuir_coordenadas_pedidos(
@@ -464,6 +647,7 @@ def geocodificar_filial_manual(filial):
     else:
         stats["modo"] = "sync"
         stats["coords_enfileiradas"] = 0
+    stats["cps_nao_geocodificados"] = listar_cps_pendentes_filial(filial)
     return stats
 
 
@@ -502,6 +686,7 @@ def executar_geocodificacao_diaria(*, filial_id=None, dry_run=False):
                 break
 
             progresso = False
+            usou_site_ronda = False
             for fid in filial_ids:
                 from pages.filial.models import Filial
 
@@ -510,7 +695,7 @@ def executar_geocodificacao_diaria(*, filial_id=None, dry_run=False):
                 except Filial.DoesNotExist:
                     continue
 
-                ids = listar_ids_pedidos_sem_coord(filial, limite=GEOCODE_LOTE_PEDIDOS)
+                ids = listar_ids_pedidos_sem_coord(filial)
                 if not ids:
                     continue
 
@@ -524,16 +709,16 @@ def executar_geocodificacao_diaria(*, filial_id=None, dry_run=False):
                 resumo["lotes"] += 1
                 resumo["coords_atribuidas_total"] += stats["coords_atribuidas"]
                 progresso = progresso or stats["coords_atribuidas"] > 0
-
+                usou_site_ronda = usou_site_ronda or stats.get("usou_site")
                 if not stats["site_ok"]:
                     resumo["abortado_site"] = True
-                    return resumo
 
             if not progresso:
                 break
             if not existe_pendente_global():
                 break
-            time.sleep(GEOCODE_INTERVALO_LOTE_SEG)
+            if usou_site_ronda:
+                time.sleep(GEOCODE_INTERVALO_LOTE_SEG)
 
         if time.monotonic() - inicio >= GEOCODE_TIMEOUT_DIARIO_SEG and existe_pendente_global():
             resumo["timeout"] = True

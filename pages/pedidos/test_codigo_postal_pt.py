@@ -1,6 +1,8 @@
-"""Testes de geocodificação via codigo-postal.pt."""
+"""Testes de geocodificação via índice CP7 local e codigo-postal.pt."""
 
+import tempfile
 from decimal import Decimal
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from django.core.cache import cache
@@ -14,10 +16,15 @@ from pages.pedidos.services.codigo_postal_pt import (
     GEOCODE_LOTE_PEDIDOS,
     GEOCODE_SYNC_MAX_PEDIDOS,
     _parse_candidatos_html,
+    anexar_mensagem_cps_pendentes,
     atribuir_coordenadas_pedidos,
+    carregar_indice_cp7,
     consultar_codigo_postal_pt,
+    consultar_cp7_local,
     executar_geocodificacao_diaria,
+    formatar_linha_cps_nao_geocodificados,
     geocodificar_filial_manual,
+    listar_cps_pendentes_filial,
     resolver_coordenadas,
     verificar_estrutura_codigo_postal_pt,
 )
@@ -161,9 +168,10 @@ class GeocodificacaoLoteTests(TestCase):
     def tearDown(self):
         cache.clear()
 
+    @patch("pages.pedidos.services.codigo_postal_pt.carregar_indice_cp7", return_value={})
     @patch("pages.pedidos.services.codigo_postal_pt.consultar_codigo_postal_pt")
     @patch("pages.pedidos.services.codigo_postal_pt.verificar_estrutura_codigo_postal_pt")
-    def test_atribuir_coordenadas_bulk_update(self, mock_check, mock_consulta):
+    def test_atribuir_coordenadas_bulk_update(self, mock_check, mock_consulta, _mock_indice):
         mock_check.return_value = {"ok": True, "codigo": "ok", "mensagem": ""}
         mock_consulta.return_value = {
             "ok": True,
@@ -178,14 +186,16 @@ class GeocodificacaoLoteTests(TestCase):
         )
         self.assertEqual(stats["coords_atribuidas"], 1)
         self.assertEqual(stats["coords_cp_pt"], 1)
+        self.assertTrue(stats["usou_site"])
 
         self.pedido.refresh_from_db()
         self.assertIsNotNone(self.pedido.lat)
         self.assertIsNotNone(self.pedido.lng)
         self.assertEqual(self.pedido.geocoding_precision, "cp_pt")
 
+    @patch("pages.pedidos.services.codigo_postal_pt.carregar_indice_cp7", return_value={})
     @patch("pages.pedidos.services.codigo_postal_pt.verificar_estrutura_codigo_postal_pt")
-    def test_aborta_lote_site_alterado(self, mock_check):
+    def test_site_indisponivel_sem_local_nao_atribui(self, mock_check, _mock_indice):
         mock_check.return_value = {
             "ok": False,
             "codigo": "site_alterado",
@@ -200,6 +210,103 @@ class GeocodificacaoLoteTests(TestCase):
         self.assertFalse(stats["site_ok"])
         self.pedido.refresh_from_db()
         self.assertIsNone(self.pedido.lat)
+
+    @patch("pages.pedidos.services.codigo_postal_pt.verificar_estrutura_codigo_postal_pt")
+    @patch("pages.pedidos.services.codigo_postal_pt.consultar_codigo_postal_pt")
+    @patch(
+        "pages.pedidos.services.codigo_postal_pt.carregar_indice_cp7",
+        return_value={"7580-610": (38.42304, -8.572102)},
+    )
+    def test_indice_local_nao_consulta_site(self, _mock_indice, mock_consulta, mock_check):
+        stats = atribuir_coordenadas_pedidos(
+            self.filial,
+            [self.pedido.id],
+            origem="importacao",
+        )
+        mock_check.assert_not_called()
+        mock_consulta.assert_not_called()
+        self.assertEqual(stats["coords_atribuidas"], 1)
+        self.assertEqual(stats["coords_cp7_local"], 1)
+        self.assertFalse(stats["usou_site"])
+        self.pedido.refresh_from_db()
+        self.assertEqual(self.pedido.geocoding_precision, "cp7_local")
+        self.assertAlmostEqual(float(self.pedido.lat), 38.42304, places=5)
+        self.assertAlmostEqual(float(self.pedido.lng), -8.572102, places=5)
+
+    @patch("pages.pedidos.services.codigo_postal_pt.consultar_codigo_postal_pt")
+    @patch("pages.pedidos.services.codigo_postal_pt.verificar_estrutura_codigo_postal_pt")
+    @patch(
+        "pages.pedidos.services.codigo_postal_pt.carregar_indice_cp7",
+        return_value={"7580-610": (38.42304, -8.572102)},
+    )
+    def test_indice_local_funciona_com_site_indisponivel(
+        self, _mock_indice, mock_check, mock_consulta,
+    ):
+        mock_check.return_value = {
+            "ok": False,
+            "codigo": "site_indisponivel",
+            "mensagem": "timeout",
+        }
+        stats = atribuir_coordenadas_pedidos(
+            self.filial,
+            [self.pedido.id],
+            origem="importacao",
+        )
+        mock_consulta.assert_not_called()
+        self.assertTrue(stats["site_ok"])
+        self.assertEqual(stats["coords_cp7_local"], 1)
+
+    @patch("pages.pedidos.services.codigo_postal_pt.consultar_codigo_postal_pt")
+    @patch("pages.pedidos.services.codigo_postal_pt.verificar_estrutura_codigo_postal_pt")
+    @patch(
+        "pages.pedidos.services.codigo_postal_pt.carregar_indice_cp7",
+        return_value={"7580-610": (38.42304, -8.572102)},
+    )
+    def test_site_down_nao_bloqueia_cp_posterior_no_indice(
+        self, _mock_indice, mock_check, mock_consulta,
+    ):
+        mock_check.return_value = {
+            "ok": False,
+            "codigo": "site_indisponivel",
+            "mensagem": "timeout",
+        }
+        self.pedido.delete()
+        now = timezone.now()
+        pedido_fora = Pedido.objects.create(
+            filial=self.filial,
+            id_vonzu=9000,
+            tipo="ENTREGA",
+            criado=now,
+            atualizacao=now,
+            prev_entrega=now.date(),
+            endereco_dest="Rua X",
+            codpost_dest="9999-999",
+            cidade_dest="X",
+        )
+        pedido_ok = Pedido.objects.create(
+            filial=self.filial,
+            id_vonzu=9002,
+            tipo="ENTREGA",
+            criado=now,
+            atualizacao=now,
+            prev_entrega=now.date(),
+            endereco_dest="Estrada Nacional 253",
+            codpost_dest="7580-610",
+            cidade_dest="COMPORTA",
+        )
+        stats = atribuir_coordenadas_pedidos(
+            self.filial,
+            [pedido_fora.id, pedido_ok.id],
+            origem="importacao",
+            max_processar=1,
+        )
+        mock_consulta.assert_not_called()
+        self.assertEqual(stats["coords_cp7_local"], 1)
+        self.assertEqual(stats["coords_falha_site"], 1)
+        pedido_fora.refresh_from_db()
+        pedido_ok.refresh_from_db()
+        self.assertIsNone(pedido_fora.lat)
+        self.assertIsNotNone(pedido_ok.lat)
 
     def test_ignora_pedido_ja_com_coordenadas(self):
         self.pedido.lat = Decimal("38.0")
@@ -311,6 +418,8 @@ class ExecutarGeocodificacaoDiariaTests(TestCase):
             {
                 "coords_atribuidas": GEOCODE_LOTE_PEDIDOS,
                 "site_ok": True,
+                "usou_site": True,
+                "coords_cp7_local": 0,
                 "coords_cp_pt": GEOCODE_LOTE_PEDIDOS,
                 "coords_cp_pt_rua": 0,
                 "coords_cp_pt_fallback": 0,
@@ -326,6 +435,8 @@ class ExecutarGeocodificacaoDiariaTests(TestCase):
             {
                 "coords_atribuidas": 3,
                 "site_ok": True,
+                "usou_site": True,
+                "coords_cp7_local": 0,
                 "coords_cp_pt": 3,
                 "coords_cp_pt_rua": 0,
                 "coords_cp_pt_fallback": 0,
@@ -379,3 +490,93 @@ class ConsultarCodigoPostalPtTests(TestCase):
         resultado = consultar_codigo_postal_pt("7580-610", aplicar_sleep=False)
         self.assertTrue(resultado["ok"])
         self.assertEqual(len(resultado["candidatos"]), 1)
+
+
+class IndiceCp7LocalTests(TestCase):
+    def tearDown(self):
+        import pages.pedidos.services.codigo_postal_pt as mod
+
+        mod._indice_cp7 = None
+
+    def test_cp4_nao_consulta_indice_nem_inventa_chave(self):
+        resultado = consultar_cp7_local("7580", indice={"0007-580": (1.0, 2.0)})
+        self.assertFalse(resultado["ok"])
+        self.assertEqual(resultado["codigo_erro"], "cp_invalido")
+
+    def test_carregar_csv_e_consultar(self):
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".csv", delete=False, encoding="utf-8", newline="",
+        ) as fh:
+            fh.write("cp7,lat,lng\n7580-610,38.423040,-8.572102\n")
+            path = fh.name
+        try:
+            indice = carregar_indice_cp7(caminho=path, forcar=True)
+            self.assertIn("7580-610", indice)
+            resultado = consultar_cp7_local("7580-610", indice=indice)
+            self.assertTrue(resultado["ok"])
+            self.assertAlmostEqual(resultado["candidatos"][0]["gps_lat"], 38.423040)
+            self.assertEqual(
+                consultar_cp7_local("9999-999", indice=indice)["codigo_erro"],
+                "cp_nao_encontrado",
+            )
+        finally:
+            Path(path).unlink(missing_ok=True)
+
+    def test_dataset_empacotado_contem_cp_referencia(self):
+        indice = carregar_indice_cp7(forcar=True)
+        self.assertGreater(len(indice), 100000)
+        self.assertIn("7580-610", indice)
+        lat, lng = indice["7580-610"]
+        self.assertAlmostEqual(lat, 38.42304, places=4)
+        self.assertAlmostEqual(lng, -8.572102, places=4)
+        self.assertIn("7200-490", indice)
+        lat_r, lng_r = indice["7200-490"]
+        self.assertAlmostEqual(lat_r, 38.4167, places=4)
+        self.assertAlmostEqual(lng_r, -7.5333, places=4)
+
+    def test_formatar_linha_cps(self):
+        self.assertIsNone(formatar_linha_cps_nao_geocodificados([]))
+        linha = formatar_linha_cps_nao_geocodificados(["7200-490"])
+        self.assertIn("7200-490", linha)
+
+
+class CpsPendentesMensagemTests(TestCase):
+    def setUp(self):
+        self.pais = Pais.objects.create(nome="PT-CPS", sigla="PT", codigo_tel="+351")
+        self.filial = Filial.objects.create(
+            codigo="CPS1", nome="FIL CPS", pais_atuacao=self.pais, is_matriz=True
+        )
+        now = timezone.now()
+        Pedido.objects.create(
+            filial=self.filial,
+            id_vonzu=41001,
+            tipo="ENTREGA",
+            criado=now,
+            atualizacao=now,
+            prev_entrega=now.date(),
+            endereco_dest="Rua A",
+            codpost_dest="7200-490",
+            cidade_dest="Reguengos",
+        )
+        Pedido.objects.create(
+            filial=self.filial,
+            id_vonzu=41002,
+            tipo="ENTREGA",
+            criado=now,
+            atualizacao=now,
+            prev_entrega=now.date(),
+            endereco_dest="Rua B",
+            codpost_dest="7200-490",
+            cidade_dest="Reguengos",
+        )
+
+    def test_lista_cp_unico_pendente(self):
+        cps = listar_cps_pendentes_filial(self.filial)
+        self.assertEqual(cps, ["7200-490"])
+
+    def test_anexa_listagem_ao_sucesso_da_importacao(self):
+        mensagens = {"sucesso": {"conteudo": ["Importação concluída."], "ignorar": True}}
+        out = anexar_mensagem_cps_pendentes(mensagens, self.filial)
+        self.assertIn("sucesso", out)
+        self.assertIn("aviso", out)
+        self.assertTrue(any("7200-490" in m for m in out["aviso"]["conteudo"]))

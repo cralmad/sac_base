@@ -37,6 +37,7 @@ from .services.importador_csv import importar_csv
 from .services.importador_xlsx import importar_xlsx
 from .services.codigo_postal_pt import (
     _contar_restantes_filial,
+    anexar_mensagem_cps_pendentes,
     geocodificar_filial_manual,
     stats_geocode_para_resposta,
 )
@@ -923,13 +924,15 @@ def pedidos_importar_view(request):
     nome_base = nome_arquivo
     for ext in (".csv", ".xlsx", ".xlsm", ".CSV", ".XLSX", ".XLSM"):
         nome_base = nome_base.replace(ext, "")
+    mensagens = {"sucesso": {"conteudo": [resumo], "ignorar": True}}
+    mensagens = anexar_mensagem_cps_pendentes(mensagens, filial)
     return JsonResponse(
         {
             "success": True,
             "relatorio": resultado["relatorio"],
             "nome_relatorio": f"relatorio_{nome_base}.txt",
             "stats": stats,
-            "mensagens": {"sucesso": {"conteudo": [resumo], "ignorar": True}},
+            "mensagens": mensagens,
             "relatorio_volumes_url": relatorio_url,
         }
     )
@@ -958,29 +961,34 @@ def pedidos_geocodificar_sem_coord_view(request):
     avisos = stats_geocode.get("avisos") or []
 
     mensagens = {}
-    if not stats_geocode.get("site_ok", True):
-        mensagens["erro"] = {
-            "conteudo": [
-                "codigo-postal.pt indisponível ou com estrutura alterada. "
-                "Contacte o administrador.",
-            ],
-            "ignorar": False,
-        }
-    elif atribuidas > 0 and restantes > 0:
-        mensagens["aviso"] = {
-            "conteudo": [
-                f"{atribuidas} pedido(s) geocodificado(s). "
-                f"{restantes} restante(s) — clique novamente para continuar "
-                "ou aguarde o Scheduler noturno.",
-            ],
-            "ignorar": True,
-        }
+    site_ok = stats_geocode.get("site_ok", True)
+    if atribuidas > 0 and restantes > 0:
+        conteudo = [
+            f"{atribuidas} pedido(s) geocodificado(s). "
+            f"{restantes} restante(s) — clique novamente para continuar "
+            "ou aguarde o Scheduler noturno.",
+        ]
+        if not site_ok:
+            conteudo.append(
+                "codigo-postal.pt indisponível: códigos fora do índice local "
+                "ficaram pendentes."
+            )
+        mensagens["aviso"] = {"conteudo": conteudo, "ignorar": True}
     elif atribuidas > 0:
         mensagens["sucesso"] = {
             "conteudo": [
                 f"{atribuidas} pedido(s) geocodificado(s).",
             ],
             "ignorar": True,
+        }
+    elif not site_ok:
+        mensagens["erro"] = {
+            "conteudo": [
+                "codigo-postal.pt indisponível ou com estrutura alterada, "
+                "e o código postal não está no índice local. "
+                "Contacte o administrador.",
+            ],
+            "ignorar": False,
         }
     elif restantes > 0 and avisos:
         mensagens["aviso"] = {
@@ -1003,6 +1011,7 @@ def pedidos_geocodificar_sem_coord_view(request):
             "ignorar": True,
         }
 
+    mensagens = anexar_mensagem_cps_pendentes(mensagens, filial)
     return JsonResponse({"success": True, "stats": stats, "mensagens": mensagens})
 
 

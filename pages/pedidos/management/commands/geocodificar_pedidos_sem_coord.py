@@ -1,8 +1,9 @@
 """
 Management command: geocodificar_pedidos_sem_coord
 
-Geocodifica pedidos sem coordenadas via codigo-postal.pt, em lotes com pausas
-na mesma execução (várias rondas até esgotar pendentes ou timeout de 1 h).
+Geocodifica pedidos sem coordenadas pelo índice local de CP7 (com fallback
+a codigo-postal.pt), em lotes com pausas na mesma execução quando o site
+é usado (várias rondas até esgotar pendentes ou timeout de 1 h).
 
 Heroku Scheduler — recomendado: 1× ao dia (ex.: 03:00 Europe/Lisbon)
     python manage.py geocodificar_pedidos_sem_coord
@@ -18,7 +19,7 @@ from pages.pedidos.services.codigo_postal_pt import executar_geocodificacao_diar
 
 
 class Command(BaseCommand):
-    help = "Geocodifica pedidos sem coordenadas via codigo-postal.pt (lotes noturnos)."
+    help = "Geocodifica pedidos sem coordenadas (índice CP7 local + fallback codigo-postal.pt)."
 
     def add_arguments(self, parser):
         parser.add_argument("--filial-id", type=int, default=None)
@@ -44,6 +45,8 @@ class Command(BaseCommand):
             f"Restantes: {resumo.get('restantes_global', 0)}"
         )
         if resumo.get("abortado_site"):
-            self.stdout.write(self.style.ERROR("Abortado: estrutura codigo-postal.pt alterada."))
+            self.stdout.write(self.style.WARNING(
+                "codigo-postal.pt indisponível; CP fora do índice local não geocodificados."
+            ))
         if resumo.get("timeout"):
             self.stdout.write(self.style.WARNING("Timeout diário atingido; restantes amanhã."))

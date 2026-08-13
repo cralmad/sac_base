@@ -123,13 +123,14 @@ function _fmtPeso(valor) {
 function _precisaoCor(precision) {
   if (precision === 'muito_impreciso') return '#dc3545';
   if (precision === 'impreciso') return '#ffc107';
-  if (precision === 'cp_pt' || precision === 'cp_pt_rua' || precision === 'cp_pt_fallback') return '#ffc107';
+  if (precision === 'cp7_local' || precision === 'cp_pt' || precision === 'cp_pt_rua' || precision === 'cp_pt_fallback') return '#ffc107';
   return null;
 }
 
 function _precisaoTitulo(precision) {
   if (precision === 'muito_impreciso') return 'Localiza\u00e7\u00e3o muito imprecisa';
   if (precision === 'impreciso') return 'Localiza\u00e7\u00e3o imprecisa';
+  if (precision === 'cp7_local') return 'Coordenadas por c\u00f3digo postal (\u00edndice local)';
   if (precision === 'cp_pt') return 'Coordenadas por c\u00f3digo postal';
   if (precision === 'cp_pt_rua') return 'Coordenadas por c\u00f3digo postal e morada';
   if (precision === 'cp_pt_fallback') return 'Coordenadas por c\u00f3digo postal (1\u00aa op\u00e7\u00e3o \u2014 morada amb\u00edgua)';
