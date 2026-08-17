@@ -119,6 +119,24 @@ class SmsRelatorioQuerysetTests(TestCase):
     def test_manual_ids_vazio_retorna_none(self):
         self.assertFalse(queryset_tentativas_envio_manual_por_ids(self.filial, self.dt, []).exists())
 
+    def test_invalidar_sms_quando_data_tentativa_muda(self):
+        p = self._pedido(20004)
+        t = self._tentativa(p, data_tentativa=date(2026, 7, 24), sms_enviado=True, periodo="TARDE")
+        t.invalidar_sms_se_janela_mudou(date(2026, 8, 18), "TARDE")
+        self.assertFalse(t.sms_enviado)
+
+    def test_invalidar_sms_quando_periodo_muda(self):
+        p = self._pedido(20005)
+        t = self._tentativa(p, sms_enviado=True, periodo="MANHA")
+        t.invalidar_sms_se_janela_mudou(self.dt, "TARDE")
+        self.assertFalse(t.sms_enviado)
+
+    def test_manter_sms_quando_janela_nao_muda(self):
+        p = self._pedido(20006)
+        t = self._tentativa(p, sms_enviado=True, periodo="TARDE")
+        t.invalidar_sms_se_janela_mudou(self.dt, "TARDE")
+        self.assertTrue(t.sms_enviado)
+
 
 class SmsRelatorioHelpersTests(TestCase):
     def setUp(self):

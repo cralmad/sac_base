@@ -390,6 +390,7 @@ def pedido_mov_save_view(request):
     else:
         mov = TentativaEntrega(pedido=pedido)
 
+    mov.invalidar_sms_se_janela_mudou(dt_tentativa, periodo)
     mov.data_tentativa = dt_tentativa
     mov.estado = (data.get("estado") or "").strip() or None
     mov.carro = carro

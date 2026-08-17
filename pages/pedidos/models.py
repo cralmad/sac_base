@@ -302,6 +302,15 @@ class TentativaEntrega(models.Model):
             models.Index(fields=["data_tentativa", "faturado"]),
         ]
 
+    def invalidar_sms_se_janela_mudou(self, nova_data, novo_periodo=None):
+        """SMS vale só para a data/período em que foi enviado; não herdar a flag."""
+        if not self.pk:
+            return
+        periodo_atual = (self.periodo or None)
+        novo_periodo = (novo_periodo or None)
+        if self.data_tentativa != nova_data or periodo_atual != novo_periodo:
+            self.sms_enviado = False
+
     def __str__(self):
         return f"Tentativa {self.data_tentativa} — Pedido {self.pedido_id}"
 
