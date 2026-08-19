@@ -295,7 +295,7 @@ async function enviarSms() {
 }
 
 // ─── Prévia das mensagens ──────────────────────────────────────────────────────────────────────────
-function _buildPreviewBody(previews, dataFmt) {
+function _buildPreviewBody(previewsPorTipo, dataFmt, mensagensAusencia = []) {
   const wrap = document.createElement('div');
 
   const info = document.createElement('p');
@@ -303,20 +303,40 @@ function _buildPreviewBody(previews, dataFmt) {
   info.textContent = `Mensagens que serão enviadas na data ${dataFmt || '(nenhuma data selecionada)'}:`;
   wrap.appendChild(info);
 
-  const periodos = [['MANHA', 'MANhÃ', 'text-warning'], ['TARDE', 'TARDE', 'text-primary']];
-  periodos.forEach(([chave, rotulo, cor]) => {
-    const label = document.createElement('strong');
-    label.className = cor;
-    label.textContent = rotulo;
-    wrap.appendChild(label);
+  const tipos = ['ENTREGA', 'RECOLHA'];
+  const periodos = [['MANHA', 'MANHÃ', 'text-warning'], ['TARDE', 'TARDE', 'text-primary']];
+  tipos.forEach((tipo) => {
+    const bloco = previewsPorTipo?.[tipo];
+    if (!bloco) return;
 
-    const box = document.createElement('pre');
-    box.className = 'bg-light rounded p-2 mt-1 mb-3';
-    box.style.whiteSpace = 'pre-wrap';
-    box.style.wordBreak = 'break-word';
-    box.textContent = previews[chave] ?? '(sem mensagem)';
-    wrap.appendChild(box);
+    const tituloTipo = document.createElement('h6');
+    tituloTipo.className = 'mt-3 mb-1';
+    tituloTipo.textContent = `Exemplo ${tipo} — referência: ${bloco.referencia || '(sem referência)'}`;
+    wrap.appendChild(tituloTipo);
+
+    periodos.forEach(([chave, rotulo, cor]) => {
+      const label = document.createElement('strong');
+      label.className = cor;
+      label.textContent = rotulo;
+      wrap.appendChild(label);
+
+      const box = document.createElement('pre');
+      box.className = 'bg-light rounded p-2 mt-1 mb-3';
+      box.style.whiteSpace = 'pre-wrap';
+      box.style.wordBreak = 'break-word';
+      box.textContent = bloco.mensagens?.[chave] ?? '(sem mensagem)';
+      wrap.appendChild(box);
+    });
   });
+
+  if (Array.isArray(mensagensAusencia) && mensagensAusencia.length) {
+    mensagensAusencia.forEach((msg) => {
+      const aviso = document.createElement('p');
+      aviso.className = 'text-muted small mb-1';
+      aviso.textContent = msg;
+      wrap.appendChild(aviso);
+    });
+  }
 
   return wrap;
 }
@@ -356,7 +376,13 @@ async function abrirPreview() {
     // Formata data para exibição
     const [ano, mes, dia] = data.split('-');
     const dataFmt = `${dia}/${mes}/${ano}`;
-    modalPreviewBody.replaceChildren(_buildPreviewBody(json.previews, dataFmt));
+    modalPreviewBody.replaceChildren(
+      _buildPreviewBody(
+        json.previews_por_tipo || {},
+        dataFmt,
+        json.mensagens_ausencia || []
+      )
+    );
   } catch {
     modalPreviewBody.replaceChildren();
     const err = document.createElement('p');

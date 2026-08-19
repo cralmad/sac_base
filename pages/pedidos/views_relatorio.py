@@ -31,9 +31,8 @@ from pages.pedidos.services.sms_relatorio import (
     complemento_verificacao_solicitacao,
     estado_verificacao_sms_dia,
     executar_envio_sms_relatorio_manual,
-    ler_templates_sms_filial,
+    montar_preview_sms_por_tipo,
     queryset_tentativas_envio_manual_por_ids,
-    sigla_pais_operacao_filial,
 )
 from pages.pedidos.services.importador_csv import parse_csv_artigos_sem_persistir
 from pages.pedidos.services.importador_xlsx import parse_xlsx_artigos_sem_persistir
@@ -56,7 +55,6 @@ from pages.pedidos.services.relatorio_fechamento import (
     validar_periodo,
 )
 from sac_base.permissions_utils import build_action_permissions
-from sac_base.sms_service import montar_mensagem
 from sac_base.smart_filter import apply_smart_number_filter, apply_smart_text_filter
 
 PERMISSOES_RELATORIO = {
@@ -520,24 +518,20 @@ def relatorio_sms_preview_view(request):
     if not filial:
         return JsonResponse({"success": False, "mensagem": "Nenhuma filial ativa na sessão."}, status=400)
 
-    template_manha, template_tarde = ler_templates_sms_filial(filial)
-    sigla_pais = sigla_pais_operacao_filial(filial)
+    resultado = montar_preview_sms_por_tipo(filial, dt)
+    if not resultado.get("ok"):
+        return JsonResponse(
+            {"success": False, "mensagem": resultado.get("mensagem", "Erro ao montar prévia.")},
+            status=400,
+        )
 
-    if not template_manha and not template_tarde:
-        return JsonResponse({"success": False, "mensagem": "Nenhum template SMS configurado (sms_padrao_1/2) para a filial ativa."}, status=400)
-
-    previews = {}
-    templates_por_periodo = {"MANHA": template_manha, "TARDE": template_tarde}
-    for periodo, template_msg in templates_por_periodo.items():
-        if not template_msg:
-            previews[periodo] = "[Template não configurado para este período.]"
-            continue
-        try:
-            previews[periodo] = montar_mensagem(template_msg, dt, periodo, sigla_pais)
-        except Exception as exc:
-            previews[periodo] = f"[Erro: {exc}]"
-
-    return JsonResponse({"success": True, "previews": previews})
+    return JsonResponse(
+        {
+            "success": True,
+            "previews_por_tipo": resultado.get("previews_por_tipo", {}),
+            "mensagens_ausencia": resultado.get("mensagens_ausencia", []),
+        }
+    )
 
 
 # ─── Relatório Gerencial de Pedidos ──────────────────────────────────────────

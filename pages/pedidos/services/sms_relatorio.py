@@ -67,6 +67,76 @@ def qs_tentativas_sms_pendentes_envio(filial, dt) -> QuerySet[TentativaEntrega]:
     return qs_tentativas_sms_regra_base(filial, dt).filter(sms_enviado=False)
 
 
+def montar_preview_sms_por_tipo(filial, dt: date) -> dict:
+    """
+    Gera prévia com base em exemplos reais da lista do relatório SMS do dia.
+
+    Seleciona o primeiro pedido do tipo ENTREGA e o primeiro do tipo RECOLHA,
+    na mesma ordenação da lista (codpost_dest, pedido), e retorna mensagens
+    MANHÃ/TARDE com referência usada em cada exemplo.
+    """
+    template_manha, template_tarde = ler_templates_sms_filial(filial)
+    if not template_manha and not template_tarde:
+        return {
+            "ok": False,
+            "mensagem": "Nenhum template SMS configurado (sms_padrao_1/2) para a filial ativa.",
+        }
+
+    sigla_pais = sigla_pais_operacao_filial(filial)
+    qs = (
+        TentativaEntrega.objects.select_related("pedido")
+        .filter(data_tentativa=dt, pedido__filial=filial)
+        .order_by("pedido__codpost_dest", "pedido__pedido")
+    )
+
+    exemplos: dict[str, dict] = {}
+    for mov in qs.iterator():
+        pedido = mov.pedido
+        tipo = (pedido.tipo or "").strip().upper()
+        if tipo not in {"ENTREGA", "RECOLHA"}:
+            continue
+        if tipo in exemplos:
+            continue
+        exemplos[tipo] = {
+            "referencia": pedido.pedido or str(pedido.id_vonzu),
+            "mensagens": {},
+        }
+        if len(exemplos) == 2:
+            break
+
+    mensagens_ausencia: list[str] = []
+    previews: dict[str, dict] = {}
+    templates_por_periodo = {"MANHA": template_manha, "TARDE": template_tarde}
+    for tipo in ("ENTREGA", "RECOLHA"):
+        exemplo = exemplos.get(tipo)
+        if not exemplo:
+            mensagens_ausencia.append(f"Não há exemplo de {tipo} na lista para esta data.")
+            continue
+
+        mensagens_tipo: dict[str, str] = {}
+        for periodo, template_msg in templates_por_periodo.items():
+            if not template_msg:
+                mensagens_tipo[periodo] = "[Template não configurado para este período.]"
+                continue
+            mensagens_tipo[periodo] = montar_mensagem(
+                template_msg,
+                dt,
+                periodo,
+                sigla_pais,
+                tipo,
+            )
+        previews[tipo] = {
+            "referencia": exemplo["referencia"],
+            "mensagens": mensagens_tipo,
+        }
+
+    return {
+        "ok": True,
+        "previews_por_tipo": previews,
+        "mensagens_ausencia": mensagens_ausencia,
+    }
+
+
 def estado_verificacao_sms_dia(filial, dt) -> dict:
     """
     Estado agregado do dia para SMS: quantos ainda faltam (com telefone),
@@ -189,7 +259,13 @@ def executar_envio_sms_relatorio_manual(
             continue
 
         try:
-            mensagem = montar_mensagem(template_msg, dt, mov.periodo, sigla_pais)
+            mensagem = montar_mensagem(
+                template_msg,
+                dt,
+                mov.periodo,
+                sigla_pais,
+                getattr(pedido, "tipo", None),
+            )
         except Exception as exc:
             erros += 1
             erros_detalhe.append(f"{referencia}: erro na montagem da mensagem — {exc}")

@@ -179,7 +179,13 @@ class Command(BaseCommand):
                     continue
 
                 try:
-                    mensagem = montar_mensagem(template_msg, today, mov.periodo, sigla_pais)
+                    mensagem = montar_mensagem(
+                        template_msg,
+                        today,
+                        mov.periodo,
+                        sigla_pais,
+                        getattr(pedido, "tipo", None),
+                    )
                 except Exception as exc:
                     self.stderr.write(f"    [{referencia}] Erro ao montar mensagem: {exc}")
                     erros += 1
@@ -232,7 +238,13 @@ class Command(BaseCommand):
                         continue
 
                     try:
-                        mensagem = montar_mensagem(template_msg, today, mov.periodo, sigla_pais)
+                        mensagem = montar_mensagem(
+                            template_msg,
+                            today,
+                            mov.periodo,
+                            sigla_pais,
+                            getattr(pedido, "tipo", None),
+                        )
                     except Exception as exc:
                         self.stderr.write(f"    [{referencia}] Erro ao montar mensagem: {exc}")
                         erros += 1

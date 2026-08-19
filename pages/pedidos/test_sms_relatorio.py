@@ -9,9 +9,11 @@ from pages.core.models import Pais
 from pages.filial.models import Filial, FilialConfig
 from pages.pedidos.models import Pedido, TentativaEntrega
 from pages.pedidos.services import sms_envio_automatico
+from sac_base.sms_service import montar_mensagem
 from pages.pedidos.services.sms_relatorio import (
     ddi_padrao_operacao_filial,
     ler_templates_sms_filial,
+    montar_preview_sms_por_tipo,
     qs_tentativas_sms_pendentes_envio,
     queryset_tentativas_envio_manual_por_ids,
     sigla_pais_operacao_filial,
@@ -166,6 +168,84 @@ class SmsRelatorioHelpersTests(TestCase):
     def test_sigla_e_ddi_operacao_filial(self):
         self.assertEqual(sigla_pais_operacao_filial(self.filial), "ES")
         self.assertEqual(ddi_padrao_operacao_filial(self.filial), "34")
+
+    def test_montagem_placeholder_entrega_por_tipo(self):
+        dt = date(2026, 5, 1)
+        template = "A sua #entrega# será em #dd/mm/aaaa# (#periodo#)."
+        msg_entrega = montar_mensagem(template, dt, "MANHA", "PT", "ENTREGA")
+        msg_recolha = montar_mensagem(template, dt, "MANHA", "PT", "RECOLHA")
+        self.assertIn("A sua entrega", msg_entrega)
+        self.assertIn("A sua recolha", msg_recolha)
+
+    def test_preview_sms_por_tipo_traz_exemplos_reais(self):
+        now = timezone.now()
+        p_ent = Pedido.objects.create(
+            filial=self.filial,
+            id_vonzu=41001,
+            tipo="ENTREGA",
+            criado=now,
+            atualizacao=now,
+            prev_entrega=date(2026, 5, 1),
+            pedido="REF-ENT-01",
+        )
+        p_rec = Pedido.objects.create(
+            filial=self.filial,
+            id_vonzu=41002,
+            tipo="RECOLHA",
+            criado=now,
+            atualizacao=now,
+            prev_entrega=date(2026, 5, 1),
+            pedido="REF-REC-01",
+        )
+        TentativaEntrega.objects.create(
+            pedido=p_ent,
+            data_tentativa=date(2026, 5, 1),
+            estado="created",
+            periodo="MANHA",
+        )
+        TentativaEntrega.objects.create(
+            pedido=p_rec,
+            data_tentativa=date(2026, 5, 1),
+            estado="created",
+            periodo="TARDE",
+        )
+
+        self.filial.config.sms_padrao_1 = "A sua #entrega# MANHA #periodo#"
+        self.filial.config.sms_padrao_2 = "A sua #entrega# TARDE #periodo#"
+        self.filial.config.save()
+
+        resultado = montar_preview_sms_por_tipo(self.filial, date(2026, 5, 1))
+        self.assertTrue(resultado["ok"])
+        prev = resultado["previews_por_tipo"]
+        self.assertEqual(prev["ENTREGA"]["referencia"], "REF-ENT-01")
+        self.assertEqual(prev["RECOLHA"]["referencia"], "REF-REC-01")
+        self.assertIn("entrega", prev["ENTREGA"]["mensagens"]["MANHA"])
+        self.assertIn("recolha", prev["RECOLHA"]["mensagens"]["MANHA"])
+
+    def test_preview_sms_por_tipo_informa_ausencia(self):
+        now = timezone.now()
+        p_ent = Pedido.objects.create(
+            filial=self.filial,
+            id_vonzu=41003,
+            tipo="ENTREGA",
+            criado=now,
+            atualizacao=now,
+            prev_entrega=date(2026, 5, 1),
+            pedido="REF-ENT-ONLY",
+        )
+        TentativaEntrega.objects.create(
+            pedido=p_ent,
+            data_tentativa=date(2026, 5, 1),
+            estado="created",
+            periodo="MANHA",
+        )
+        resultado = montar_preview_sms_por_tipo(self.filial, date(2026, 5, 1))
+        self.assertTrue(resultado["ok"])
+        self.assertIn("ENTREGA", resultado["previews_por_tipo"])
+        self.assertNotIn("RECOLHA", resultado["previews_por_tipo"])
+        self.assertTrue(
+            any("RECOLHA" in m for m in resultado["mensagens_ausencia"])
+        )
 
 
 class SmsEnvioAutomaticoListaTests(TestCase):

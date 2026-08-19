@@ -141,21 +141,37 @@ def dia_semana_para_pais(dt: date, sigla_pais: str) -> str:
     return dias[dt.weekday()]
 
 
-def montar_mensagem(template: str, dt: date, periodo: str, sigla_pais: str) -> str:
+def texto_tipo_operacao(tipo_pedido: str | None) -> str:
+    tipo = (tipo_pedido or "").strip().upper()
+    if tipo == "RECOLHA":
+        return "recolha"
+    return "entrega"
+
+
+def montar_mensagem(
+    template: str,
+    dt: date,
+    periodo: str,
+    sigla_pais: str,
+    tipo_pedido: str | None = "ENTREGA",
+) -> str:
     """
-    Substitui os 3 placeholders no template FilialConfig.sms_padrao_1:
+    Substitui placeholders no template FilialConfig.sms_padrao_1/2:
       #dia_da_semana# → nome do dia da semana (idioma do país de atuação)
       #dd/mm/aaaa#    → data no formato dd/mm/aaaa  (ex.: 25/04/2026)
       #periodo#       → horário do período ("09:00 as 14:00" ou "14:00 as 20:00")
+      #entrega#       → "entrega" ou "recolha" conforme tipo do pedido
     """
     dia = dia_semana_para_pais(dt, sigla_pais)
     data_fmt = dt.strftime("%d/%m/%Y")
     horario = HORARIO_PERIODO.get(periodo, "")
+    entrega = texto_tipo_operacao(tipo_pedido)
 
     resultado = template
     resultado = resultado.replace("#dia_da_semana#", dia)
     resultado = resultado.replace("#dd/mm/aaaa#", data_fmt)
     resultado = resultado.replace("#periodo#", horario)
+    resultado = resultado.replace("#entrega#", entrega)
     return resultado
 
 
