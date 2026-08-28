@@ -63,8 +63,8 @@ let avisoOrdemPendente = false;
 function inicializarMapa() {
   if (mapaLeaflet) return;
   mapaLeaflet = L.map('mapa-leaflet').setView([39.5, -8.0], 7);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     maxZoom: 19,
   }).addTo(mapaLeaflet);
   rotasLayer = L.layerGroup().addTo(mapaLeaflet);

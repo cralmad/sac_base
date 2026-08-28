@@ -15,8 +15,8 @@ _CSP = (
     "script-src 'self' cdn.jsdelivr.net unpkg.com 'unsafe-inline'; "
     # Estilos: próprio servidor + Bootstrap + Leaflet + fontes inline do Leaflet
     "style-src 'self' cdn.jsdelivr.net unpkg.com 'unsafe-inline'; "
-    # Imagens: próprio servidor, data URIs, tiles do mapa (CARTO), fotos do ImgBB, ícones Leaflet
-    "img-src 'self' data: blob: *.cartocdn.com unpkg.com *.ibb.co i.ibb.co; "
+    # Imagens: próprio servidor, data URIs, tiles OSM, fotos do ImgBB, ícones Leaflet
+    "img-src 'self' data: blob: tile.openstreetmap.org *.tile.openstreetmap.org unpkg.com *.ibb.co i.ibb.co; "
     # Fontes: Bootstrap Icons via CDN
     "font-src 'self' cdn.jsdelivr.net unpkg.com; "
     # Conexões AJAX/fetch/WebSocket
