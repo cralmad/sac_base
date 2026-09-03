@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Rotas por Zona{% endblock %}
+
+{% block estilo %}
+<style>
+.rrz-filtros      { background: #f8f9fa; border-radius: .5rem; padding: 1rem; }
+.rrz-grupo        { margin-bottom: 1.5rem; }
+.rrz-grupo-header {
+  background: #1a3a5c;
+  color: #fff;
+  padding: .35rem .75rem;
+  border-radius: .375rem .375rem 0 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .5rem 1rem;
+  font-weight: 600;
+  font-size: .95rem;
+}
+.rrz-grupo-header .rrz-badge {
+  background: rgba(255,255,255,.2);
+  border-radius: .25rem;
+  padding: .1rem .45rem;
+  font-size: .8rem;
+}
+.rrz-tabela-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.rrz-tabela  { width: 100%; border-collapse: collapse; font-size: 9pt; min-width: 860px; }
+table.rrz-tabela th {
+  background: #e9f0f7;
+  color: #1a3a5c;
+  border: 1px solid #c8d8e8;
+  padding: .3rem .5rem;
+  white-space: nowrap;
+}
+table.rrz-tabela td {
+  border: 1px solid #dee2e6;
+  padding: .28rem .5rem;
+  vertical-align: top;
+}
+.rrz-tipo-e { color: #0a6640; font-weight: 700; }
+.rrz-tipo-r { color: #7c2020; font-weight: 700; }
+.rrz-obs    { color: #555; font-size: .78rem; font-style: italic; }
+.rrz-periodo-MANHA { color: #b55a00; font-weight: 600; }
+.rrz-periodo-TARDE { color: #0055a5; font-weight: 600; }
+.rrz-dev-ref { color: #842029; font-weight: 700; }
+.rrz-peso-alerta { color: #e6a800; margin-left: .25rem; vertical-align: middle; }
+.rrz-rodape-totais {
+  margin-top: 1rem;
+  padding: .75rem 1rem;
+  border-top: 2px solid #1a3a5c;
+  font-size: .95rem;
+  font-weight: 600;
+  color: #1a3a5c;
+}
+table.rrz-tabela tr.rrz-nao-segue td { background: #e0e0e0 !important; }
+.rrz-subgrupo-data td {
+  background: #eef3f8;
+  color: #1a3a5c;
+  font-weight: 700;
+}
+.rrz-ref-wrap { display: inline-flex; align-items: center; gap: .35rem; }
+.rrz-ref-dev { background: #fff3cd; padding: 0 .25rem; border-radius: .2rem; }
+#rrz-zonas {
+  min-height: 6rem;
+  font-size: .875rem;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+.rrz-select-actions { display: flex; gap: .25rem; margin-top: .25rem; }
+.rrz-select-actions button { font-size: .75rem; padding: .1rem .4rem; }
+@media print {
+  @page { size: A4 landscape; margin: 6mm 8mm; }
+  body, .container-xl, .container-fluid { padding: 0 !important; margin: 0 !important; }
+  .rrz-filtros, #rrz-toolbar, .navbar, .sidebar, footer,
+  [data-bs-toggle], .btn, #container-mensagens { display: none !important; }
+  .rrz-grupo {
+    margin-bottom: .25rem;
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+  .rrz-grupo-header {
+    background: #1a3a5c !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color: #fff !important;
+    padding: .1rem .4rem;
+    font-size: 8pt;
+  }
+  .rrz-tabela-scroll { overflow: visible; }
+  table.rrz-tabela  { font-size: 8pt; min-width: 0; }
+  table.rrz-tabela th { background: #dce6f1 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: .1rem .25rem; }
+  table.rrz-tabela td { padding: .08rem .25rem; vertical-align: middle; }
+  table.rrz-tabela tr.rrz-nao-segue td { background: #d6d6d6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  table.rrz-tabela tr.rrz-subgrupo-data td {
+    background: #eef3f8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  h1 { font-size: .85rem !important; margin-bottom: .15rem !important; }
+  #rrz-titulo-periodo { font-size: 7.5pt; }
+  .rrz-grupo-header .rrz-badge-totais { display: none !important; }
+  .rrz-rodape-totais {
+    margin-top: .5rem;
+    padding: .35rem .4rem;
+    font-size: 8.5pt;
+    border-top-width: 1.5pt;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-xl my-3" id="rrz-root"
+     data-url-buscar="{% url 'relatorio_rotas_zona' %}"
+     data-url-exportar-xlsx="{% url 'relatorio_rotas_zona_exportar_xlsx' %}">
+
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="h4 mb-0"><i class="bi bi-geo-alt me-2"></i>Rotas por Zona</h1>
+    <span id="rrz-titulo-periodo" class="text-muted small"></span>
+  </div>
+
+  <div class="rrz-filtros mb-3" id="rrz-toolbar">
+    <form id="rrz-form" class="row g-2 align-items-end">
+      <div class="col-6 col-md-3">
+        <label class="form-label mb-0 d-flex align-items-center gap-1" for="rrz-data-ini">
+          <span>Data inicial *</span>
+          <span class="text-primary" role="button" tabindex="0"
+            data-bs-toggle="tooltip" data-bs-placement="top"
+            data-bs-title="Início do período da tentativa de entrega (máximo 365 dias).">
+            <i class="bi bi-question-circle"></i>
+          </span>
+        </label>
+        <input type="date" id="rrz-data-ini" class="form-control" required>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label mb-0 d-flex align-items-center gap-1" for="rrz-data-fim">
+          <span>Data final *</span>
+          <span class="text-primary" role="button" tabindex="0"
+            data-bs-toggle="tooltip" data-bs-placement="top"
+            data-bs-title="Fim do período da tentativa de entrega (máximo 365 dias).">
+            <i class="bi bi-question-circle"></i>
+          </span>
+        </label>
+        <input type="date" id="rrz-data-fim" class="form-control" required>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label mb-0 d-flex align-items-center gap-1" for="rrz-zonas">
+          <span>Zonas de entrega</span>
+          <span class="text-primary" role="button" tabindex="0"
+            data-bs-toggle="tooltip" data-bs-placement="top"
+            data-bs-title="Selecione uma ou mais zonas. Use Ctrl (ou Cmd) para múltiplos. Nenhum selecionado = todas. Inclua Sem zona para linhas sem correspondência de código postal. Todos inclui Sem zona.">
+            <i class="bi bi-question-circle"></i>
+          </span>
+        </label>
+        <select id="rrz-zonas" class="form-select" multiple></select>
+        <div class="rrz-select-actions">
+          <button type="button" class="btn btn-outline-secondary" id="rrz-btn-sel-todos">Todos</button>
+          <button type="button" class="btn btn-outline-secondary" id="rrz-btn-des-todos">Limpar</button>
+        </div>
+      </div>
+      <div class="col-12 col-md-2 d-flex gap-2">
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-search"></i> Buscar
+        </button>
+        <button type="button" id="rrz-btn-imprimir" class="btn btn-outline-secondary w-100" disabled title="Imprimir">
+          <i class="bi bi-printer"></i>
+        </button>
+      </div>
+      <div class="col-12 col-md-3 d-flex gap-2">
+        <button type="button" id="rrz-btn-exportar-xlsx" class="btn btn-outline-success w-100" disabled title="Exportar para Excel">
+          <i class="bi bi-file-earmark-excel"></i> Excel
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div id="rrz-resultado"></div>
+
+  <div id="rrz-loader" class="text-center my-4 d-none">
+    <div class="spinner-border" role="status">
+      <span class="visually-hidden">Carregando…</span>
+    </div>
+  </div>
+
+  <div id="rrz-vazio" class="text-center text-muted d-none">Nenhum registro encontrado.</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'pedidos/js/relatorio_rotas_zona.js' %}"></script>
+{% endblock %}

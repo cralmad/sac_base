@@ -95,11 +95,12 @@ def _item_expresso_linha_payload(item: dict) -> dict:
     }
 
 
-def validar_periodo(data_ini: date, data_fim: date) -> str | None:
+def validar_periodo(data_ini: date, data_fim: date, max_dias: int | None = None) -> str | None:
+    limite = PERIODO_MAXIMO_DIAS if max_dias is None else max_dias
     if data_ini > data_fim:
         return "A data inicial não pode ser maior que a data final."
-    if (data_fim - data_ini).days > PERIODO_MAXIMO_DIAS:
-        return f"O período máximo é de {PERIODO_MAXIMO_DIAS} dias."
+    if (data_fim - data_ini).days > limite:
+        return f"O período máximo é de {limite} dias."
     return None
 
 

@@ -27,6 +27,11 @@ from pages.pedidos.services.relatorio_rotas import (
     gerar_xlsx_relatorio_rotas,
     montar_relatorio_rotas,
 )
+from pages.pedidos.services.relatorio_rotas_zona import (
+    gerar_xlsx_relatorio_rotas_zona,
+    listar_zonas_choices_filial,
+    montar_relatorio_rotas_zona,
+)
 from pages.pedidos.services.sms_relatorio import (
     complemento_verificacao_solicitacao,
     estado_verificacao_sms_dia,
@@ -368,6 +373,73 @@ def relatorio_rotas_cadastrar_produto_critico_view(request):
         f"Produto {obj.codigo} cadastrado como crítico.",
         extra_payload={"produto_critico_id": obj.id, "produto_critico_codigo": obj.codigo},
     ))
+
+
+# ─── Relatório de Rotas por Zona ─────────────────────────────────────────────
+
+PERMISSOES_ROTAS_ZONA = {
+    "acessar": "pedidos.view_tentativaentrega",
+}
+
+
+@login_required
+@permission_required(PERMISSOES_ROTAS_ZONA["acessar"], raise_exception=True)
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def relatorio_rotas_zona_view(request):
+    if request.method == "GET":
+        filial_ativa = getattr(request, "filial_ativa", None)
+        request.sisvar_extra = build_sisvar_payload(
+            permissions={"rotas_zona": build_action_permissions(request.user, PERMISSOES_ROTAS_ZONA)},
+            options={"zonas": listar_zonas_choices_filial(filial_ativa)},
+        )
+        return render(request, "relatorio_rotas_zona.html")
+
+    filtros = (request.sisvar_front or {}).get("filtros") or {}
+    payload, err = montar_relatorio_rotas_zona(getattr(request, "filial_ativa", None), filtros)
+    if err:
+        status = 403 if "Filial ativa" in err else 400
+        return JsonResponse({"success": False, "mensagem": err}, status=status)
+    return JsonResponse({
+        "success": True,
+        "grupos": payload["grupos"],
+        "periodo_texto": payload["periodo_texto"],
+    })
+
+
+@login_required
+@permission_required(PERMISSOES_ROTAS_ZONA["acessar"], raise_exception=True)
+@csrf_protect
+@require_POST
+def relatorio_rotas_zona_exportar_xlsx_view(request):
+    filtros = (request.sisvar_front or {}).get("filtros") or {}
+    payload, err = montar_relatorio_rotas_zona(getattr(request, "filial_ativa", None), filtros)
+    if err:
+        status = 403 if "Filial ativa" in err else 400
+        return JsonResponse({"success": False, "mensagem": err}, status=status)
+
+    try:
+        conteudo = gerar_xlsx_relatorio_rotas_zona(payload)
+    except ImportError:
+        return JsonResponse(
+            {"success": False, "mensagem": "Biblioteca Excel (openpyxl) não disponível no servidor."},
+            status=500,
+        )
+    except (OSError, ValueError, TypeError):
+        return JsonResponse(
+            {"success": False, "mensagem": "Não foi possível gerar o arquivo Excel."},
+            status=500,
+        )
+
+    ini = payload.get("data_ini_iso") or "ini"
+    fim = payload.get("data_fim_iso") or "fim"
+    nome = f"rotas_por_zona_{ini}_{fim}.xlsx"
+    response = HttpResponse(
+        conteudo,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{nome}"'
+    return response
 
 
 # ─── Relatório de Envio de SMS ────────────────────────────────────────────────

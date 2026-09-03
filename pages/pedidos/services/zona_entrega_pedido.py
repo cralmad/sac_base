@@ -32,12 +32,14 @@ def carregar_regras_zona_por_filial(filial):
     return regras
 
 
-def resolver_zona_e_faixa_entrega(codigo_postal, regras_zona):
+def resolver_zona_entrega(codigo_postal, regras_zona):
+    """Devolve (zona_id, descricao, faixa_desc). Sem match: (None, "", "")."""
     cp4, cp7 = normalizar_cp7_num(codigo_postal)
     if cp4 is None or cp7 is None:
-        return "", ""
+        return None, "", ""
 
     for regra in regras_zona:
+        zona = regra["zona"]
         inclui_excecao = False
         exclui_excecao = False
         codigo_excecao_incluir = ""
@@ -50,7 +52,7 @@ def resolver_zona_e_faixa_entrega(codigo_postal, regras_zona):
                     exclui_excecao = True
         if inclui_excecao:
             faixa_exc = f"EXC {codigo_excecao_incluir}"
-            return regra["zona"].descricao, faixa_exc
+            return zona.id, zona.descricao, faixa_exc
         if exclui_excecao:
             continue
 
@@ -58,9 +60,14 @@ def resolver_zona_e_faixa_entrega(codigo_postal, regras_zona):
             if faixa.tipo_intervalo == "CP4":
                 if faixa.cp4_inicial and faixa.cp4_final and int(faixa.cp4_inicial) <= cp4 <= int(faixa.cp4_final):
                     faixa_desc = f"CP4 {faixa.codigo_postal_inicial}-{faixa.codigo_postal_final}"
-                    return regra["zona"].descricao, faixa_desc
+                    return zona.id, zona.descricao, faixa_desc
             else:
                 if faixa.cp7_inicial_num <= cp7 <= faixa.cp7_final_num:
                     faixa_desc = f"CP7 {faixa.codigo_postal_inicial}-{faixa.codigo_postal_final}"
-                    return regra["zona"].descricao, faixa_desc
-    return "", ""
+                    return zona.id, zona.descricao, faixa_desc
+    return None, "", ""
+
+
+def resolver_zona_e_faixa_entrega(codigo_postal, regras_zona):
+    _zona_id, descricao, faixa = resolver_zona_entrega(codigo_postal, regras_zona)
+    return descricao, faixa
