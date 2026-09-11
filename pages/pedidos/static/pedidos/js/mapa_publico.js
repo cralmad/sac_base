@@ -2,6 +2,7 @@
 // Rota e distância são temporárias (exibição), com reordenação manual na lista.
 
 import {
+    adicionarCamadaTilesOsm,
     chamarRota,
     desenharPolyline,
     initReordenacaoLista,
@@ -72,10 +73,7 @@ function setListaStatus(texto, tipo = 'muted') {
 function inicializarMapa() {
     if (mapaLeaflet) return;
     mapaLeaflet = L.map('mapa-leaflet').setView([39.5, -8.0], 7);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
-    }).addTo(mapaLeaflet);
+    adicionarCamadaTilesOsm(mapaLeaflet);
     rotasLayer = L.layerGroup().addTo(mapaLeaflet);
 }
 

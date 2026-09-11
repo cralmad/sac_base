@@ -1,6 +1,7 @@
 import { getCsrfToken, hasScreenPermission, confirmar } from '/static/js/sisVar.js';
 import { AppLoader } from '/static/js/loader.js';
 import {
+  adicionarCamadaTilesOsm,
   chamarRota,
   desenharPolyline,
   initReordenacaoLista,
@@ -63,10 +64,7 @@ let avisoOrdemPendente = false;
 function inicializarMapa() {
   if (mapaLeaflet) return;
   mapaLeaflet = L.map('mapa-leaflet').setView([39.5, -8.0], 7);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    maxZoom: 19,
-  }).addTo(mapaLeaflet);
+  adicionarCamadaTilesOsm(mapaLeaflet);
   rotasLayer = L.layerGroup().addTo(mapaLeaflet);
 }
 

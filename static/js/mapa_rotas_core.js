@@ -1,6 +1,15 @@
 // mapa_rotas_core.js — utilitários compartilhados de rotas (Leaflet + OSRM)
 // Estado (rota/ordem) fica no chamador; este módulo é stateless.
 
+/** OSM exige Referer nas tiles; Django usa Referrer-Policy same-origin no documento. */
+export function adicionarCamadaTilesOsm(mapa) {
+  return L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+    referrerPolicy: 'strict-origin-when-cross-origin',
+  }).addTo(mapa);
+}
+
 export function formatarDistanciaKm(metros) {
   const m = typeof metros === 'number' ? metros : parseFloat(String(metros));
   if (!Number.isFinite(m)) return '—';

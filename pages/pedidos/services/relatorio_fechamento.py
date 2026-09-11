@@ -16,7 +16,7 @@ from pages.logistica_config.services.excecoes_resolucao import (
 )
 from pages.pedidos.models import TentativaEntrega
 
-PERIODO_MAXIMO_DIAS = 90
+PERIODO_MAXIMO_DIAS = 365
 
 _DIAS_SEMANA_PT = (
     "segunda-feira",

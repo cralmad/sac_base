@@ -94,9 +94,9 @@ class RelatorioFechamentoServiceTests(TestCase):
 
     def test_validar_periodo_maximo(self):
         self.assertIsNotNone(validar_periodo(self.d1, self.d0))
-        long_ini = date(2026, 1, 1)
-        long_fim = date(2026, 5, 1)
-        self.assertIsNotNone(validar_periodo(long_ini, long_fim))
+        self.assertIsNone(validar_periodo(date(2026, 1, 1), date(2026, 12, 31)))
+        self.assertIsNone(validar_periodo(date(2026, 1, 1), date(2027, 1, 1)))
+        self.assertIsNotNone(validar_periodo(date(2026, 1, 1), date(2027, 1, 2)))
 
     def test_formatar_decimal_milhares(self):
         self.assertEqual(formatar_decimal_pt_br(Decimal("11111.11")), "11.111,11")

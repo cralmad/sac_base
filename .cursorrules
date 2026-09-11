@@ -160,7 +160,7 @@ Uma **única execução** do comando: várias **rondas** releem pendentes com te
 | Serviço | `pages/pedidos/services/relatorio_avaliacao_respostas.py` — `montar_relatorio_avaliacao_respostas`, `validar_e_montar_relatorio_avaliacao_respostas`, `montar_sisvar_relatorio_avaliacao_respostas_get` |
 | Front | `pages/pedidos/templates/relatorio_avaliacao_respostas.html`, `pages/pedidos/static/pedidos/js/relatorio_avaliacao_respostas.js` |
 
-**Regras (relatório tabular):** apenas `AvaliacaoPedido` com `respondido_em` preenchido; filtro de **período** em `Pedido.prev_entrega`; motorista da `TentativaEntrega` com `data_tentativa = pedido.prev_entrega` (primeira tentativa por `id` se houver várias). **Tenant:** `pedido__filial = filial_ativa`. **Permissão:** `pedidos.view_relatorio_avaliacao`. Validação de intervalo: `validar_periodo` (máx. 90 dias) como no fechamento.
+**Regras (relatório tabular):** apenas `AvaliacaoPedido` com `respondido_em` preenchido; filtro de **período** em `Pedido.prev_entrega`; motorista da `TentativaEntrega` com `data_tentativa = pedido.prev_entrega` (primeira tentativa por `id` se houver várias). **Tenant:** `pedido__filial = filial_ativa`. **Permissão:** `pedidos.view_relatorio_avaliacao`. Validação de intervalo: `validar_periodo` (máx. 365 dias, o mesmo default do fechamento).
 
 ### Dashboard de avaliações (logística)
 
