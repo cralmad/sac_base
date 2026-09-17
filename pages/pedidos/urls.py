@@ -1,6 +1,11 @@
 
 from django.urls import path, include
 
+from .views_conferencia_enovo import (
+    conferencia_enovo_preview_view,
+    conferencia_enovo_salvar_view,
+    conferencia_enovo_view,
+)
 from .views import (
     pedido_dev_del_view,
     pedido_dev_foto_add_view,
@@ -57,6 +62,10 @@ urlpatterns = [
         name="pedidos_geocodificar_status",
     ),
     path("logistica/pedidos/relatorio-volumes/", pedidos_relatorio_volumes_view, name="pedidos_relatorio_volumes"),
+
+    path("logistica/conferencia-enovo/", conferencia_enovo_view, name="conferencia_enovo"),
+    path("logistica/conferencia-enovo/preview", conferencia_enovo_preview_view, name="conferencia_enovo_preview"),
+    path("logistica/conferencia-enovo/salvar", conferencia_enovo_salvar_view, name="conferencia_enovo_salvar"),
 
     # Relatório de conferência de volumes
     path("logistica/", include("pages.pedidos.urls_relatorio")),

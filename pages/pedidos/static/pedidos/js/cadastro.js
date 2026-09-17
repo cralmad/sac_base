@@ -42,6 +42,40 @@ const CAMPOS_SOMENTE_LEITURA = ['lat', 'lng'];
 
 const VONZU_EXPEDITIONS_URL = 'https://app.vonzu.es/user/expeditions';
 
+function hidratarCadastroPedido() {
+  hidratarFormulario(nomeForm);
+  renderConferenciaVolumes();
+}
+
+function linhasConferidoQr(conferido) {
+  if (!conferido || typeof conferido !== 'object') return [];
+  const chaves = Object.keys(conferido).sort((a, b) => {
+    const na = Number.parseInt(String(a).replace(/\D/g, ''), 10);
+    const nb = Number.parseInt(String(b).replace(/\D/g, ''), 10);
+    if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb;
+    return String(a).localeCompare(String(b));
+  });
+  const linhas = [];
+  chaves.forEach((chave) => {
+    const item = conferido[chave];
+    if (!Array.isArray(item) || item.length < 2) return;
+    const data = String(item[0] ?? '').trim();
+    const volume = item[1];
+    if (!data && (volume == null || volume === '')) return;
+    linhas.push(`${data} · vol. ${volume}`);
+  });
+  return linhas;
+}
+
+function renderConferenciaVolumes() {
+  const el = document.getElementById('conferencia-volumes-resumo');
+  if (!el) return;
+  const conferido = getForm(nomeForm)?.campos?.conferencia_volumes?.conferido;
+  const texto = linhasConferidoQr(conferido).join('; ');
+  el.value = texto;
+  el.title = texto;
+}
+
 function criarLinkVonzu(idVonzu) {
   const id = Number.parseInt(idVonzu, 10);
   if (!Number.isInteger(id) || id <= 0) return null;
@@ -1009,7 +1043,7 @@ async function excluirMovimentacao(id) {
 
 async function resetarFormularioAposCancelamento() {
   setFormState(nomeForm, pode('incluir') ? 'novo' : 'visualizar');
-  hidratarFormulario(nomeForm);
+  hidratarCadastroPedido();
   preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
   await carregarMovimentacoes();
   await carregarDevolucoes();
@@ -1176,7 +1210,7 @@ document.addEventListener('DOMContentLoaded', () => {
   preencherOrigens();
   preencherMotivosDev();
 
-  hidratarFormulario(nomeForm);
+  hidratarCadastroPedido();
   aplicarPermissoesNaInterface();
   preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
 
@@ -1213,7 +1247,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setFormState(nomeForm, 'novo');
     form.reset();
     updateState({ form: { [nomeForm]: { estado: 'novo', campos: { ...getForm(nomeForm).campos, id: null, origem: 'MANUAL' } } } });
-    hidratarFormulario(nomeForm);
+    hidratarCadastroPedido();
     carregarMovimentacoes();
     carregarDevolucoes();
     carregarIncidencias();
@@ -1244,7 +1278,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     updateState(resultado.data);
-    hidratarFormulario(nomeForm);
+    hidratarCadastroPedido();
     await aplicarListasPedidoDoPayload(resultado.data);
     aplicarPermissoesNaInterface();
   });
@@ -1290,7 +1324,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       updateState(resultado.data);
-      hidratarFormulario(nomeForm);
+      hidratarCadastroPedido();
       preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
       await aplicarListasPedidoDoPayload(resultado.data);
       alternar();
@@ -1319,7 +1353,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       updateState(resultado.data);
-      hidratarFormulario(nomeForm);
+      hidratarCadastroPedido();
       preencherMotoristasFilial(getForm(nomeForm)?.campos?.filial_id || '');
       await aplicarListasPedidoDoPayload(resultado.data);
       updateFormField(nomeCons, 'id_selecionado', null);

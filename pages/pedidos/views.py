@@ -25,7 +25,7 @@ from sac_base.sisvar_builders import (
     build_success_payload,
 )
 
-from .models import ESTADO_CHOICES, INCIDENCIA_CHOICE, INCIDENCIA_ORIG_CHOICE, INCIDENCIA_TIPO_CHOICES, MOTIVO_CHOICES, ORIGEM_CHOICES, PERIODO_CHOICES, TIPO_CHOICES, Devolucao, Incidencia, Pedido, TentativaEntrega, estado_label
+from .models import ESTADO_CHOICES, INCIDENCIA_CHOICE, INCIDENCIA_ORIG_CHOICE, INCIDENCIA_TIPO_CHOICES, MOTIVO_CHOICES, ORIGEM_CHOICES, PERIODO_CHOICES, TIPO_CHOICES, Devolucao, Incidencia, Pedido, TentativaEntrega, conferencia_volumes_padrao, estado_label
 from .serializers import (
     build_pedido_extra_payload,
     serialize_devolucao,
@@ -69,6 +69,7 @@ def _build_campos_pedido_iniciais():
         "estado": "",
         "volume": "",
         "volume_conf": 0,
+        "conferencia_volumes": conferencia_volumes_padrao(),
         "nome_dest": "",
         "email_dest": "",
         "fone_dest": "",

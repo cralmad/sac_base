@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 from django.db import models
 from django.db.models import Exists, OuterRef
 
@@ -123,6 +125,68 @@ ESTADOS_SEGUE_PARA_ENTREGA = {
 }
 
 
+# Conferência de volumes por QR de etiqueta ENOVO (cadastro / futura leitura).
+# QR 18 dígitos: TRK(12) + total_volume(3) + volume(3), ex. 008007108629003001
+# → TRK 8007108629 (id_vonzu, sem zeros à esquerda), total 3, volume 1.
+# conferido: {"conf_1": ["DD/MM/AAAA", n_volume], ...}
+QR_ETIQUETA_ENOVO_LEN = 18
+QR_ETIQUETA_ENOVO_TRK_LEN = 12
+QR_ETIQUETA_ENOVO_BLOCO_LEN = 3
+
+
+def conferencia_volumes_padrao():
+    return {
+        "TRK": None,
+        "total_volume": 0,
+        "total_vol_conferido": 0,
+        "conferido": {},
+    }
+
+
+def montar_conferencia_volumes_inicial(id_vonzu, volume=None):
+    dados = conferencia_volumes_padrao()
+    if id_vonzu is not None:
+        dados["TRK"] = int(id_vonzu)
+    if volume is not None:
+        dados["total_volume"] = int(volume)
+    return dados
+
+
+def conferencia_volumes_para_exibicao(pedido):
+    """Cópia segura do JSON para o cadastro; preenche TRK/total a partir do pedido se vazios."""
+    dados = pedido.conferencia_volumes
+    if not isinstance(dados, dict):
+        dados = conferencia_volumes_padrao()
+    else:
+        dados = deepcopy(dados)
+        for chave, valor in conferencia_volumes_padrao().items():
+            dados.setdefault(chave, valor)
+    if dados.get("TRK") is None and pedido.id_vonzu is not None:
+        dados["TRK"] = int(pedido.id_vonzu)
+    if not dados.get("total_volume") and pedido.volume is not None:
+        dados["total_volume"] = int(pedido.volume)
+    return dados
+
+
+def parse_qr_etiqueta_enovo(codigo):
+    """Parseia o QR da etiqueta ENOVO. Retorna dict ou None se inválido."""
+    raw = "".join(str(codigo or "").split())
+    if not raw.isdigit() or len(raw) != QR_ETIQUETA_ENOVO_LEN:
+        return None
+    trk_len = QR_ETIQUETA_ENOVO_TRK_LEN
+    bloco = QR_ETIQUETA_ENOVO_BLOCO_LEN
+    trk = int(raw[:trk_len])
+    total_volume = int(raw[trk_len : trk_len + bloco])
+    volume = int(raw[trk_len + bloco :])
+    if trk <= 0 or total_volume <= 0 or volume <= 0 or volume > total_volume:
+        return None
+    return {
+        "TRK": trk,
+        "total_volume": total_volume,
+        "volume": volume,
+    }
+
+
 def estado_segue_para_entrega(estado: str | None) -> bool:
     """True se o estado da tentativa (TentativaEntrega.estado) indica que segue para entrega."""
     return (estado or "") in ESTADOS_SEGUE_PARA_ENTREGA
@@ -172,6 +236,15 @@ class Pedido(AuditFieldsMixin, models.Model):
     obs = models.TextField(null=True, blank=True)
     obs_rota = models.TextField(null=True, blank=True)
     volume_conf = models.SmallIntegerField(default=0)
+    conferencia_volumes = models.JSONField(
+        default=conferencia_volumes_padrao,
+        blank=True,
+        help_text=(
+            "Conferência por QR ENOVO: "
+            '{"TRK": int, "total_volume": int, "total_vol_conferido": int, '
+            '"conferido": {"conf_n": ["DD/MM/AAAA", n_volume]}}'
+        ),
+    )
     cliente = models.ForeignKey(
         Cliente,
         on_delete=models.SET_NULL,
@@ -207,6 +280,9 @@ class Pedido(AuditFieldsMixin, models.Model):
             models.Index(fields=["filial", "id_vonzu"]),
             models.Index(fields=["prev_entrega"]),
             models.Index(fields=["estado"]),
+        ]
+        permissions = [
+            ("conferir_etiqueta_enovo", "Pode conferir etiquetas ENOVO"),
         ]
 
     def __str__(self):

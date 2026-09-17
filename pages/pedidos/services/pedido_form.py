@@ -7,7 +7,7 @@ from django.db import DatabaseError, IntegrityError, transaction
 from django.utils import timezone
 
 from pages.filial.services import get_filiais_escrita_queryset
-from pages.pedidos.models import Pedido
+from pages.pedidos.models import Pedido, montar_conferencia_volumes_inicial
 from sac_base.coercion import parse_date, parse_datetime, parse_decimal, parse_int
 from sac_base.sisvar_builders import build_error_payload
 
@@ -84,6 +84,12 @@ def persistir_pedido_cadastro(usuario, estado_form, campos, filial):
 
             if parsed["id_vonzu"] is None:
                 return fail("ID Vonzu é obrigatório e numérico.", 400)
+
+            if estado_form == "novo":
+                parsed["conferencia_volumes"] = montar_conferencia_volumes_inicial(
+                    parsed["id_vonzu"],
+                    parsed["volume"],
+                )
 
             existe_duplicado = Pedido.objects.filter(
                 filial_id=filial.id,

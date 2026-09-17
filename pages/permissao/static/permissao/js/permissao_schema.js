@@ -39,6 +39,7 @@ export const PERMISSOES_SCHEMA = {
     { codename: "pedidos.add_pedido",  label: "Importar Pedidos (CSV)" },
     { codename: "pedidos.change_pedido", label: "Editar Pedido" },
     { codename: "pedidos.delete_pedido", label: "Excluir Pedido" },
+    { codename: "pedidos.conferir_etiqueta_enovo", label: "Conferir etiquetas ENOVO" },
     // --- Conferência de Volumes ---
     { codename: "pedidos.view_tentativaentrega",          label: "Acessar Mapa / Conferência de Volumes" },
     { codename: "pedidos.change_tentativaentrega",        label: "Editar Conferência de Volumes" },
@@ -116,6 +117,7 @@ export const PERMISSOES_SCHEMA = {
     { codename: "pedidos.add_pedido",  label: "Importar Pedidos (CSV)" },
     { codename: "pedidos.change_pedido", label: "Editar Pedido" },
     { codename: "pedidos.delete_pedido", label: "Excluir Pedido" },
+    { codename: "pedidos.conferir_etiqueta_enovo", label: "Conferir etiquetas ENOVO" },
     // --- Conferência de Volumes ---
     { codename: "pedidos.view_tentativaentrega",          label: "Acessar Mapa / Conferência de Volumes" },
     { codename: "pedidos.change_tentativaentrega",        label: "Editar Conferência de Volumes" },

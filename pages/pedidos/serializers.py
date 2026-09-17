@@ -2,7 +2,7 @@
 
 from django.utils import timezone
 
-from .models import estado_label
+from .models import conferencia_volumes_para_exibicao, estado_label
 
 
 def _dt_to_local_input(dt):
@@ -28,6 +28,7 @@ def serialize_pedido_form(pedido):
         "estado_label": estado_label(pedido.estado),
         "volume": pedido.volume,
         "volume_conf": pedido.volume_conf,
+        "conferencia_volumes": conferencia_volumes_para_exibicao(pedido),
         "nome_dest": pedido.nome_dest or "",
         "email_dest": pedido.email_dest or "",
         "fone_dest": pedido.fone_dest or "",

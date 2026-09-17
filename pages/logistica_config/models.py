@@ -82,7 +82,10 @@ class PeriodoExcecaoConfigLogistica(models.Model):
         verbose_name = "Período de exceção (logística)"
         verbose_name_plural = "Períodos de exceção (logística)"
         indexes = [
-            models.Index(fields=["configuracao", "data_inicio", "data_fim"]),
+            models.Index(
+                fields=["configuracao", "data_inicio", "data_fim"],
+                name="periodo_exc_cfg_ini_fim_idx",
+            ),
         ]
 
     def __str__(self):
