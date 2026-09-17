@@ -14,21 +14,27 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     padding: 1rem;
+    overflow-y: auto;
   }
   #ce-overlay.d-none { display: none !important; }
   #ce-video {
     width: min(100%, 420px);
-    max-height: 55vh;
+    max-height: 40vh;
     background: #111;
     border-radius: .5rem;
     object-fit: cover;
   }
-  #ce-flash-carro {
+  #ce-flash-carro,
+  .ce-flash-carro {
     font-size: clamp(2.5rem, 12vw, 4.5rem);
     font-weight: 700;
     line-height: 1.1;
+  }
+  #ce-overlay-flash {
+    width: min(100%, 420px);
+    text-align: center;
   }
 </style>
 {% endblock %}
@@ -79,6 +85,7 @@
 </div>
 
 <div id="ce-overlay" class="d-none" hidden>
+  <div id="ce-overlay-flash" class="alert d-none mb-3" role="status"></div>
   <video id="ce-video" playsinline muted autoplay></video>
   <p class="text-white small mt-2 mb-3" id="ce-scan-hint">Aponte a câmara para o QR da etiqueta.</p>
   <div class="d-flex flex-wrap gap-2 justify-content-center">

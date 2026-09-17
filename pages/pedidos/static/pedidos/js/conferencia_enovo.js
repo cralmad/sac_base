@@ -17,6 +17,7 @@ if (!root) {
   const overlay = document.getElementById("ce-overlay");
   const video = document.getElementById("ce-video");
   const flash = document.getElementById("ce-flash");
+  const overlayFlash = document.getElementById("ce-overlay-flash");
   const loteBanner = document.getElementById("ce-lote-banner");
   const tbody = document.getElementById("ce-tbody");
   const scanHint = document.getElementById("ce-scan-hint");
@@ -86,20 +87,21 @@ if (!root) {
     atualizarBotaoGravar();
   }
 
-  function mostrarFlash(ok, leitura, mensagemErro) {
-    flash.classList.remove("d-none", "alert-success", "alert-danger");
-    flash.replaceChildren();
+  function preencherAlertaFlash(el, ok, leitura, mensagemErro) {
+    if (!el) return;
+    el.classList.remove("d-none", "alert-success", "alert-danger");
+    el.replaceChildren();
     if (!ok) {
-      flash.classList.add("alert-danger");
+      el.classList.add("alert-danger");
       const p = document.createElement("p");
       p.className = "mb-0 fw-semibold";
       p.textContent = mensagemErro || "Leitura recusada.";
-      flash.appendChild(p);
+      el.appendChild(p);
       return;
     }
-    flash.classList.add("alert-success");
+    el.classList.add("alert-success");
     const carro = document.createElement("div");
-    carro.id = "ce-flash-carro";
+    carro.className = "ce-flash-carro";
     carro.textContent = leitura.sem_carro ? "SEM CARRO" : `CARRO ${leitura.carro}`;
     const det = document.createElement("div");
     det.className = "mt-2";
@@ -107,8 +109,19 @@ if (!root) {
     if (leitura.referencia) {
       det.textContent += `  ·  ${leitura.referencia}`;
     }
-    flash.appendChild(carro);
-    flash.appendChild(det);
+    el.appendChild(carro);
+    el.appendChild(det);
+  }
+
+  function mostrarFlash(ok, leitura, mensagemErro) {
+    preencherAlertaFlash(flash, ok, leitura, mensagemErro);
+    preencherAlertaFlash(overlayFlash, ok, leitura, mensagemErro);
+  }
+
+  function limparOverlayFlash() {
+    if (!overlayFlash) return;
+    overlayFlash.classList.add("d-none");
+    overlayFlash.replaceChildren();
   }
 
   function mostrarBannerLote(ok, texto, erros) {
@@ -253,6 +266,7 @@ if (!root) {
     overlay.hidden = false;
     overlay.classList.remove("d-none");
     btnSeguinte.disabled = true;
+    limparOverlayFlash();
     if (scanHint) scanHint.textContent = "Aponte a câmara para o QR da etiqueta.";
     try {
       if (window.BarcodeDetector) {
@@ -286,6 +300,7 @@ if (!root) {
     scanPausado = false;
     processandoCodigo = false;
     btnSeguinte.disabled = true;
+    limparOverlayFlash();
     if (scanHint) scanHint.textContent = "Aponte a câmara para o QR da etiqueta.";
   });
 
