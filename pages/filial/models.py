@@ -121,6 +121,12 @@ class FilialConfig(models.Model):
     gsheets_sheet_name = models.CharField(max_length=100, null=True, blank=True)
     gsheets_spreadsheet_id_2 = models.CharField(max_length=200, null=True, blank=True)
     gsheets_sheet_name_2 = models.CharField(max_length=100, null=True, blank=True)
+    gmail_usuario = models.EmailField(
+        max_length=254,
+        null=True,
+        blank=True,
+        help_text="Conta Google Workspace cuja inbox é pesquisada (domain-wide delegation).",
+    )
 
     class Meta:
         db_table = "filial_config"

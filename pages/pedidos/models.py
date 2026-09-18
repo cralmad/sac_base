@@ -372,6 +372,7 @@ class TentativaEntrega(models.Model):
             ("view_relatorio_avaliacao", "Pode acessar o Relatório de Avaliações"),
             ("send_email_avaliacao", "Pode enviar e-mails de avaliação"),
             ("generate_email_queue_avaliacao", "Pode gerar fila de e-mails de avaliação"),
+            ("download_anexo_gmail_gerencial", "Pode descarregar anexos Gmail no Relatório Gerencial"),
         ]
         indexes = [
             models.Index(fields=["pedido", "data_tentativa"]),

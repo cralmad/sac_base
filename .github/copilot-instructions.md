@@ -177,7 +177,7 @@ page_size = max(1, min(int(data.get("page_size", 30)), 200))
 ### Integracoes externas
 - `BULKGATE_APP_ID` e `BULKGATE_APP_TOKEN` para SMS.
 - `IMGBB_API_KEY` para upload de fotos em devolucoes.
-- `EMAIL_HOST_USER` e `EMAIL_HOST_PASSWORD` para autenticacao SMTP (Gmail).
+- `EMAIL_HOST_USER` e `EMAIL_HOST_PASSWORD` para autenticacao SMTP (Gmail). A mesma conta (app password) serve a pesquisa IMAP de anexos no Relatório Gerencial; opcionalmente `GMAIL_IMAP_USER` / `GMAIL_IMAP_PASSWORD` se a inbox for outra.
 
 ### Avaliacoes e e-mails automaticos
 Fluxo funcional da pesquisa de satisfacao:

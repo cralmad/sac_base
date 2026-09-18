@@ -1,13 +1,14 @@
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.paginator import Paginator
 from django.db.models import Count, F
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, FileResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods, require_POST
 from datetime import datetime
 from itertools import groupby
 from decimal import Decimal
+from io import BytesIO
 
 from sac_base.sisvar_builders import build_error_payload, build_success_payload, build_sisvar_payload
 
@@ -59,6 +60,7 @@ from pages.pedidos.services.relatorio_fechamento import (
     montar_relatorio_fechamento,
     validar_periodo,
 )
+from pages.pedidos.services.gmail_anexo_gerencial import obter_anexo_gmail_gerencial
 from sac_base.permissions_utils import build_action_permissions
 from sac_base.smart_filter import apply_smart_number_filter, apply_smart_text_filter
 
@@ -611,6 +613,7 @@ def relatorio_sms_preview_view(request):
 PERMISSOES_GERENCIAL = {
     "acessar": "pedidos.view_relatorio_gerencial",
     "editar": "pedidos.change_pedido",  # registrar devoluções (mesmo critério de pedido_dev_save_view)
+    "download_gmail": "pedidos.download_anexo_gmail_gerencial",
 }
 
 
@@ -772,6 +775,32 @@ def relatorio_gerencial_view(request):
         "total_pedidos": len(linhas),
         "total_peso": format(total_peso, "f").rstrip("0").rstrip(".") or "0",
     })
+
+
+@login_required
+@permission_required(PERMISSOES_GERENCIAL["download_gmail"], raise_exception=True)
+@csrf_protect
+@require_POST
+def relatorio_gerencial_anexo_gmail_view(request):
+    filial_ativa = getattr(request, "filial_ativa", None)
+    if not filial_ativa:
+        return JsonResponse(
+            {"success": False, "codigo": "sem_filial", "mensagem": "Filial ativa não encontrada na sessão."},
+            status=403,
+        )
+    referencia = str((request.sisvar_front or {}).get("referencia") or "").strip()
+    resultado = obter_anexo_gmail_gerencial(filial_ativa, referencia)
+    if not resultado.ok:
+        return JsonResponse(
+            {"success": False, "codigo": resultado.codigo, "mensagem": resultado.mensagem},
+            status=resultado.http_status,
+        )
+    return FileResponse(
+        BytesIO(resultado.conteudo or b""),
+        as_attachment=True,
+        filename=resultado.filename,
+        content_type=resultado.content_type or "application/octet-stream",
+    )
 
 
 # ─── Relatório de Devoluções ──────────────────────────────────────────────────

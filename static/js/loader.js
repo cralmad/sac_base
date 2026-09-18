@@ -22,20 +22,21 @@ export const AppLoader = {
         this.attachListeners();
     },
 
-    show() {
+    show(timeoutMs = 15000) {
         if (!this.isInitialized) this.init();
         if (!this.element) return;
-        if (this.isVisible) return;
 
         this.isVisible = true;
         this.element.classList.remove('d-none');
 
         if (this.hideTimeout) clearTimeout(this.hideTimeout);
 
-        this.hideTimeout = setTimeout(() => {
-            console.warn('⚠️ Loader auto-hidden após 15s');
-            this.hide();
-        }, 15000);
+        if (timeoutMs > 0) {
+            this.hideTimeout = setTimeout(() => {
+                console.warn('⚠️ Loader auto-hidden após timeout');
+                this.hide();
+            }, timeoutMs);
+        }
     },
 
     hide() {

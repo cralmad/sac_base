@@ -32,6 +32,7 @@ function criarLinkVonzu(idVonzu, textoExibicao) {
 
 const root       = document.getElementById('rg-root');
 const URL_BUSCAR = root?.dataset?.urlBuscar ?? '';
+const URL_ANEXO_GMAIL = root?.dataset?.urlAnexoGmail ?? '';
 
 const form        = document.getElementById('rg-form');
 const inpDataIni  = document.getElementById('rg-data-ini');
@@ -52,6 +53,8 @@ const selArmazem       = document.getElementById('rg-armazem');
 const selConferencia   = document.getElementById('rg-conferencia');
 const colBtnDev        = document.getElementById('rg-col-btn-dev');
 const btnRegistrarDev  = document.getElementById('rg-btn-registrar-dev');
+const colBtnGmail      = document.getElementById('rg-col-btn-gmail');
+const btnGmail         = document.getElementById('rg-btn-gmail');
 const erroVonzu        = document.getElementById('rg-id-vonzu-erro');
 const erroRef          = document.getElementById('rg-referencia-erro');
 
@@ -134,9 +137,14 @@ let _devQueue      = [];   // [{pedido_id, pedido, tipo, volumes}, ...]
 let _devIndex      = 0;
 let _bsModal       = null;
 let _ultimasLinhas = [];   // último resultado da busca (lista plana)
+let _ultimoDataFmt = '';
 
 function _podeRegistrarDevolucoes() {
   return hasScreenPermission('gerencial', 'editar');
+}
+
+function _podeDescarregarGmail() {
+  return hasScreenPermission('gerencial', 'download_gmail');
 }
 
 function _coletarFilaDev(linhas) {
@@ -268,10 +276,12 @@ function renderizarRelatorio(linhas, dataFmt, totalPedidos, totalPeso) {
   totalBar.classList.add('d-none');
   _devQueue = [];
   _ultimasLinhas = linhas;
+  _ultimoDataFmt = dataFmt || '';
 
   if (!linhas.length) {
     vazio.classList.remove('d-none');
     btnImprimir.disabled = true;
+    if (btnGmail) btnGmail.disabled = true;
     return;
   }
 
@@ -346,6 +356,7 @@ function renderizarRelatorio(linhas, dataFmt, totalPedidos, totalPeso) {
   resultado.appendChild(wrapper);
 
   btnImprimir.disabled = false;
+  if (btnGmail) btnGmail.disabled = false;
 }
 
 // ─── Buscar ───────────────────────────────────────────────────────────────────
@@ -367,6 +378,7 @@ async function buscar() {
   vazio.classList.add('d-none');
   totalBar.classList.add('d-none');
   btnImprimir.disabled = true;
+  if (btnGmail) btnGmail.disabled = true;
   _ultimasLinhas = [];
   AppLoader.show();
 
@@ -410,6 +422,155 @@ async function buscar() {
   }
 }
 
+function referenciasUnicasDoRelatorio(linhas) {
+  const vistas = new Set();
+  const refs = [];
+  (linhas || []).forEach(l => {
+    const ref = String(l?.pedido ?? '').trim();
+    if (!ref || vistas.has(ref)) return;
+    vistas.add(ref);
+    refs.push(ref);
+  });
+  return refs;
+}
+
+function filenameDeContentDisposition(header, fallback) {
+  if (!header) return fallback;
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].trim());
+    } catch {
+      return fallback;
+    }
+  }
+  const quoted = /filename="([^"]+)"/i.exec(header);
+  if (quoted) return quoted[1];
+  const plain = /filename=([^;]+)/i.exec(header);
+  if (plain) return plain[1].trim();
+  return fallback;
+}
+
+function dispararDownloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function descarregarAnexosGmail() {
+  clearMessages();
+  if (!_podeDescarregarGmail()) {
+    definirMensagem('erro', 'Sem permissão para descarregar anexos Gmail.', false);
+    return;
+  }
+  const refs = referenciasUnicasDoRelatorio(_ultimasLinhas);
+  if (!refs.length) {
+    definirMensagem('aviso', 'Não há registros no relatório. Execute uma busca com resultados.', false);
+    return;
+  }
+  if (!URL_ANEXO_GMAIL) {
+    definirMensagem('erro', 'URL de anexos Gmail não configurada.', false);
+    return;
+  }
+
+  btnGmail.disabled = true;
+  AppLoader.show(0);
+
+  let descarregados = 0;
+  const refsSemEmail = [];
+  const refsSemAnexo = [];
+  const refsErro = [];
+  const abortarCodigos = new Set([
+    'gmail_nao_configurado',
+    'sem_filial',
+    'erro_api',
+    'erro_credenciais',
+  ]);
+  let abortou = false;
+  let mensagemAbort = '';
+
+  try {
+    for (let i = 0; i < refs.length; i += 1) {
+      const referencia = refs[i];
+      tituloData.textContent = `Anexos Gmail: ${i + 1}/${refs.length}`;
+      try {
+        const resp = await fetch(URL_ANEXO_GMAIL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+          body: JSON.stringify({ referencia }),
+        });
+        if (resp.status === 401 || resp.status === 403) {
+          abortou = true;
+          mensagemAbort = 'Sem permissão ou sessão expirada para descarregar anexos Gmail.';
+          break;
+        }
+        const ctype = (resp.headers.get('Content-Type') || '').toLowerCase();
+        if (resp.ok && !ctype.includes('application/json')) {
+          const blob = await resp.blob();
+          if (!blob.size) {
+            refsErro.push(referencia);
+            continue;
+          }
+          const nome = filenameDeContentDisposition(
+            resp.headers.get('Content-Disposition'),
+            `${referencia}.bin`,
+          );
+          dispararDownloadBlob(blob, nome);
+          descarregados += 1;
+        } else {
+          let json = {};
+          try {
+            json = await resp.json();
+          } catch {
+            json = {};
+          }
+          const codigo = json.codigo || '';
+          if (abortarCodigos.has(codigo)) {
+            abortou = true;
+            mensagemAbort = json.mensagem || 'Não foi possível consultar o Gmail.';
+            break;
+          }
+          if (codigo === 'sem_email') refsSemEmail.push(referencia);
+          else if (codigo === 'sem_anexo_permitido') refsSemAnexo.push(referencia);
+          else refsErro.push(referencia);
+        }
+      } catch {
+        refsErro.push(referencia);
+      }
+    }
+  } finally {
+    AppLoader.hide();
+    btnGmail.disabled = false;
+    if (_ultimoDataFmt) tituloData.textContent = `Período: ${_ultimoDataFmt}`;
+  }
+
+  if (abortou) {
+    definirMensagem('erro', mensagemAbort, false);
+    return;
+  }
+
+  function trechoComRefs(rotulo, lista) {
+    if (!lista.length) return '';
+    return `${lista.length} ${rotulo} (${lista.join(', ')})`;
+  }
+
+  const partes = [`${descarregados} descarregado(s)`];
+  const semEmail = trechoComRefs('sem e-mail', refsSemEmail);
+  const semAnexo = trechoComRefs('sem PDF/imagem', refsSemAnexo);
+  const comErro = trechoComRefs('com erro', refsErro);
+  if (semEmail) partes.push(semEmail);
+  if (semAnexo) partes.push(semAnexo);
+  if (comErro) partes.push(comErro);
+  const tipo = descarregados > 0 && refsErro.length === 0 ? 'sucesso' : (descarregados > 0 ? 'aviso' : 'erro');
+  definirMensagem(tipo, `Anexos Gmail: ${partes.join(', ')}.`, false);
+}
+
 // ─── Feedback em tempo real nos campos smart_filter ───────────────────────────
 inpIdVonzu.addEventListener('input', () => {
   if (validateSmartNumber(inpIdVonzu.value)) {
@@ -433,6 +594,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (_podeRegistrarDevolucoes()) {
     colBtnDev.classList.remove('d-none');
   }
+  if (_podeDescarregarGmail() && colBtnGmail) {
+    colBtnGmail.classList.remove('d-none');
+  }
 
   // Inicializar tooltips Bootstrap
   document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
@@ -443,6 +607,9 @@ document.addEventListener('DOMContentLoaded', () => {
 // ─── Eventos ─────────────────────────────────────────────────────────────────
 form.addEventListener('submit', e => { e.preventDefault(); buscar(); });
 btnImprimir.addEventListener('click', () => window.print());
+if (btnGmail) {
+  btnGmail.addEventListener('click', () => { descarregarAnexosGmail(); });
+}
 btnRegistrarDev.addEventListener('click', () => {
   _coletarFilaDev(_ultimasLinhas);
   if (!_devQueue.length) {

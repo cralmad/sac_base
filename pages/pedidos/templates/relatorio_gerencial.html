@@ -118,7 +118,7 @@ table.rg-tabela tr.rg-nao-segue td { background: #e0e0e0 !important; }
   .rg-total-bar { border: none; background: none !important; padding: 0; font-size: 7.5pt; }
   h1 { font-size: .85rem !important; margin-bottom: .15rem !important; }
   #rg-titulo-data { font-size: 7.5pt; }
-  #rg-col-btn-dev, #rg-modal-dev { display: none !important; }
+  #rg-col-btn-dev, #rg-modal-dev, #rg-col-btn-gmail { display: none !important; }
   .rg-cod-link { color: inherit !important; text-decoration: none !important; }
 }
 </style>
@@ -126,7 +126,8 @@ table.rg-tabela tr.rg-nao-segue td { background: #e0e0e0 !important; }
 
 {% block content %}
 <div class="container-xl my-3" id="rg-root"
-     data-url-buscar="{% url 'relatorio_gerencial' %}">
+     data-url-buscar="{% url 'relatorio_gerencial' %}"
+     data-url-anexo-gmail="{% url 'relatorio_gerencial_anexo_gmail' %}">
 
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
     <h1 class="h4 mb-0 me-2"><i class="bi bi-bar-chart-line me-2"></i>Relatório Gerencial de Pedidos</h1>
@@ -289,6 +290,18 @@ table.rg-tabela tr.rg-nao-segue td { background: #e0e0e0 !important; }
         <button type="button" id="rg-btn-registrar-dev" class="btn btn-warning">
           <i class="bi bi-box-arrow-in-left me-1"></i>Registrar Devoluções
         </button>
+      </div>
+
+      <div class="col-12 d-none" id="rg-col-btn-gmail">
+        <button type="button" id="rg-btn-gmail" class="btn btn-outline-primary" disabled
+          title="O Chrome pode pedir permissão para vários descarregamentos. Pesquisa o assunto do e-mail pela Referência.">
+          <i class="bi bi-envelope-paper me-1"></i>Descarregar anexos Gmail
+        </button>
+        <span class="text-primary ms-1" role="button" tabindex="0"
+          data-bs-toggle="tooltip" data-bs-placement="top"
+          data-bs-title="Percorre as referências do resultado, pesquisa na inbox Gmail da filial (assunto) e descarrega o primeiro anexo PDF ou imagem. O navegador pode bloquear vários descarregamentos até permitir.">
+          <i class="bi bi-question-circle"></i>
+        </span>
       </div>
 
     </form>
