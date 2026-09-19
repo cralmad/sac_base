@@ -357,6 +357,7 @@ def _normalizar_linha_bruta(num_linha: int, row: dict):
             _get_col(row, "Observações Carga"),
             _get_col(row, "Observações Descarga"),
             _get_col(row, "Obs. Internas"),
+            _get_col(row, "Motivo Incidência"),
         ),
         "expresso": False,
         "cliente_pk": cliente_pk,

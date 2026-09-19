@@ -529,6 +529,7 @@ def _make_xlsx_enovo(rows_dicts):
         "Observações Carga",
         "Observações Descarga",
         "Obs. Internas",
+        "Motivo Incidência",
     ]
     wb = Workbook()
     ws = wb.active
@@ -571,6 +572,7 @@ def _row_enovo(**kwargs):
         "Observações Carga": "",
         "Observações Descarga": "",
         "Obs. Internas": "",
+        "Motivo Incidência": "",
     }
     defaults.update(kwargs)
     return defaults
@@ -720,6 +722,7 @@ class ImportadorXlsxTests(TestCase):
                 "Observações Carga": "Carga frágil",
                 "Observações Descarga": "Portão lateral",
                 "Obs. Internas": "Prioridade loja",
+                "Motivo Incidência": "Cliente ausente",
             }),
         ])
         resultado = importar_xlsx(xlsx, self.filial, "obs.xlsx")
@@ -727,7 +730,7 @@ class ImportadorXlsxTests(TestCase):
         pedido = Pedido.objects.get(filial=self.filial, id_vonzu=1002240391)
         self.assertEqual(
             pedido.obs,
-            "Agendado para amanhã | Carga frágil | Portão lateral | Prioridade loja",
+            "Agendado para amanhã | Carga frágil | Portão lateral | Prioridade loja | Cliente ausente",
         )
 
     def test_mesma_atualizacao_sem_forcar_ignora(self):
