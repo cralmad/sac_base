@@ -108,6 +108,32 @@ class SmsRelatorioQuerysetTests(TestCase):
         ids = set(qs_tentativas_sms_pendentes_envio(self.filial, self.dt).values_list("id", flat=True))
         self.assertNotIn(t_old.id, ids)
 
+    def test_pendentes_exclui_incidencia_com_motivo_bloqueante(self):
+        p = self._pedido(10061)
+        t = self._tentativa(p, estado="Incidência", motivo_incidencia="Fora da zona")
+        ids = set(qs_tentativas_sms_pendentes_envio(self.filial, self.dt).values_list("id", flat=True))
+        self.assertNotIn(t.id, ids)
+
+    def test_pendentes_inclui_incidencia_com_motivo_nao_bloqueante(self):
+        p = self._pedido(10062)
+        t = self._tentativa(p, estado="Incidência", motivo_incidencia="Cliente ausente")
+        ids = set(qs_tentativas_sms_pendentes_envio(self.filial, self.dt).values_list("id", flat=True))
+        self.assertIn(t.id, ids)
+
+    def test_pendentes_exclui_motivo_no_pedido_quando_tentativa_vazia(self):
+        p = self._pedido(10063)
+        p.motivo_incidencia = "Entrega recusada"
+        p.save(update_fields=["motivo_incidencia"])
+        t = self._tentativa(p, estado="Incidência", motivo_incidencia="")
+        ids = set(qs_tentativas_sms_pendentes_envio(self.filial, self.dt).values_list("id", flat=True))
+        self.assertNotIn(t.id, ids)
+
+    def test_pendentes_exclui_estado_que_nao_segue_mesmo_sem_motivo(self):
+        p = self._pedido(10064)
+        t = self._tentativa(p, estado="cancelled", motivo_incidencia="")
+        ids = set(qs_tentativas_sms_pendentes_envio(self.filial, self.dt).values_list("id", flat=True))
+        self.assertNotIn(t.id, ids)
+
     def test_manual_por_ids_respeita_data_do_post(self):
         p1 = self._pedido(10007)
         p2 = self._pedido(10008)

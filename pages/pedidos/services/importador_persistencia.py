@@ -15,6 +15,7 @@ CAMPOS_ATUALIZAVEIS = [
     "prev_entrega",
     "dt_entrega",
     "estado",
+    "motivo_incidencia",
     "volume",
     "nome_dest",
     "email_dest",
@@ -373,6 +374,7 @@ def persistir_pedidos_importados(
                     prev_entrega=dados["prev_entrega"],
                     dt_entrega=dados["dt_entrega"],
                     estado=dados["estado"],
+                    motivo_incidencia=dados.get("motivo_incidencia"),
                     volume=dados["volume"],
                     nome_dest=dados["nome_dest"],
                     email_dest=dados["email_dest"],
@@ -421,6 +423,8 @@ def persistir_pedidos_importados(
                 existente.prev_entrega = nova_prev_entrega
                 existente.dt_entrega = dados["dt_entrega"]
                 existente.estado = dados["estado"]
+                if "motivo_incidencia" in dados:
+                    existente.motivo_incidencia = dados.get("motivo_incidencia")
                 existente.volume = dados["volume"]
                 existente.nome_dest = dados["nome_dest"]
                 existente.email_dest = dados["email_dest"]
@@ -443,6 +447,8 @@ def persistir_pedidos_importados(
 
                     if tentativa_existente:
                         tentativa_existente.estado = dados["estado"]
+                        if "motivo_incidencia" in dados:
+                            tentativa_existente.motivo_incidencia = dados.get("motivo_incidencia")
                         tentativa_existente.motorista_id = dados["motorista_id"]
                         tentativa_existente.dt_entrega = dados["dt_entrega"]
                         tentativas_para_atualizar.append(tentativa_existente)
@@ -452,6 +458,11 @@ def persistir_pedidos_importados(
                                 pedido=existente,
                                 data_tentativa=nova_prev_entrega,
                                 estado=dados["estado"],
+                                motivo_incidencia=(
+                                    dados["motivo_incidencia"]
+                                    if "motivo_incidencia" in dados
+                                    else existente.motivo_incidencia
+                                ),
                                 motorista_id=dados["motorista_id"],
                                 dt_entrega=dados["dt_entrega"],
                                 periodo="TARDE",
@@ -468,6 +479,7 @@ def persistir_pedidos_importados(
                             pedido=p,
                             data_tentativa=p.prev_entrega,
                             estado=p.estado,
+                            motivo_incidencia=p.motivo_incidencia,
                             motorista_id=p.motorista_id,
                             dt_entrega=p.dt_entrega,
                             periodo="TARDE",
@@ -481,7 +493,7 @@ def persistir_pedidos_importados(
         if tentativas_para_atualizar:
             TentativaEntrega.objects.bulk_update(
                 tentativas_para_atualizar,
-                ["estado", "motorista_id", "dt_entrega"],
+                ["estado", "motivo_incidencia", "motorista_id", "dt_entrega"],
             )
 
         if novas_tentativas:

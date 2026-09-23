@@ -6,7 +6,7 @@ import unicodedata
 import requests as http_requests
 from django.db import transaction
 
-from pages.pedidos.models import Devolucao, TentativaEntrega, estado_segue_para_entrega
+from pages.pedidos.models import Devolucao, TentativaEntrega, tentativa_segue_para_entrega
 
 logger = logging.getLogger(__name__)
 
@@ -540,7 +540,7 @@ def montar_payload_mapa(filial, data_tentativa):
                 "geocoding_display": pedido.geocoding_display or "",
                 "geocoding_precision": pedido.geocoding_precision or "",
                 "segue_para_entrega": (
-                    estado_segue_para_entrega(mov.estado)
+                    tentativa_segue_para_entrega(mov)
                     and (pedido.id not in pedidos_com_tentativa_posterior)
                 ),
                 "tem_devolucao": pedido.id in pedidos_com_devolucao,

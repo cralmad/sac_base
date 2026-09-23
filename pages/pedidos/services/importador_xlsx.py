@@ -359,6 +359,7 @@ def _normalizar_linha_bruta(num_linha: int, row: dict):
             _get_col(row, "Obs. Internas"),
             _get_col(row, "Motivo Incidência"),
         ),
+        "motivo_incidencia": _as_text(_get_col(row, "Motivo Incidência")) or None,
         "expresso": False,
         "cliente_pk": cliente_pk,
         "id_enovo_motorista": _as_text(_get_col(row, "Cód. Motorista")) or None,
@@ -395,6 +396,10 @@ def _agregar_por_trk(linhas_norm: list[tuple[int, dict]]):
                     agg["description_raw"] = f"{agg['description_raw']}; {desc}"
                 else:
                     agg["description_raw"] = desc
+            if not agg.get("motivo_incidencia"):
+                mot = dados.get("motivo_incidencia")
+                if mot:
+                    agg["motivo_incidencia"] = mot
 
     agregadas = [por_trk[k] for k in ordem]
     return agregadas, linhas_extras

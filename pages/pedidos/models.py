@@ -1,7 +1,7 @@
 from copy import deepcopy
 
 from django.db import models
-from django.db.models import Exists, OuterRef
+from django.db.models import Exists, OuterRef, Q
 
 from pages.auditoria.models import AuditFieldsMixin
 from pages.cad_cliente.models import Cliente
@@ -124,6 +124,25 @@ ESTADOS_SEGUE_PARA_ENTREGA = {
     if bool(segue)
 }
 
+# Motivos ENOVO (coluna "Motivo Incidência") que impedem seguir para entrega,
+# mesmo se o estado (ex. Incidência) estiver em ESTADOS_SEGUE_PARA_ENTREGA.
+MOTIVO_INCIDENCIA_NAO_SEGUE_LABELS = (
+    "Anulado / Cancelado",
+    "Recolha com danos visíveis",
+    "Pedido Recusado Danificado",
+    "Recusa parcial (artigos danificados)",
+    "Não rececionado pela transportadora",
+    "Entrega com artigos em falta (infor pelo Cliente)",
+    "Extraviado no Operador",
+    "Entrega recusada",
+    "Fora da zona",
+    "Recusa Parcial",
+)
+
+_MOTIVOS_INCIDENCIA_NAO_SEGUE = frozenset(
+    lab.strip().casefold() for lab in MOTIVO_INCIDENCIA_NAO_SEGUE_LABELS
+)
+
 
 # Conferência de volumes por QR de etiqueta ENOVO (cadastro / futura leitura).
 # QR 18 dígitos: TRK(12) + total_volume(3) + volume(3), ex. 008007108629003001
@@ -187,9 +206,55 @@ def parse_qr_etiqueta_enovo(codigo):
     }
 
 
-def estado_segue_para_entrega(estado: str | None) -> bool:
-    """True se o estado da tentativa (TentativaEntrega.estado) indica que segue para entrega."""
-    return (estado or "") in ESTADOS_SEGUE_PARA_ENTREGA
+def motivo_incidencia_bloqueia_entrega(motivo: str | None) -> bool:
+    """True se o motivo de incidência (ENOVO) impede seguir para entrega."""
+    if not motivo:
+        return False
+    return str(motivo).strip().casefold() in _MOTIVOS_INCIDENCIA_NAO_SEGUE
+
+
+def estado_segue_para_entrega(estado: str | None, motivo_incidencia: str | None = None) -> bool:
+    """True se estado permite entrega e o motivo de incidência não bloqueia.
+
+    Se o estado não segue, o resultado é False mesmo com motivo vazio ou não bloqueante.
+    Se o motivo bloqueia, o resultado é False mesmo com estado em ESTADOS_SEGUE_PARA_ENTREGA.
+    """
+    if (estado or "") not in ESTADOS_SEGUE_PARA_ENTREGA:
+        return False
+    if motivo_incidencia_bloqueia_entrega(motivo_incidencia):
+        return False
+    return True
+
+
+def motivo_incidencia_de_tentativa(mov) -> str | None:
+    """Motivo na tentativa; se vazio, usa o do pedido."""
+    raw = getattr(mov, "motivo_incidencia", None)
+    if raw and str(raw).strip():
+        return str(raw).strip()
+    pedido = getattr(mov, "pedido", None)
+    if pedido is not None:
+        raw_p = getattr(pedido, "motivo_incidencia", None)
+        if raw_p and str(raw_p).strip():
+            return str(raw_p).strip()
+    return None
+
+
+def tentativa_segue_para_entrega(mov) -> bool:
+    return estado_segue_para_entrega(
+        getattr(mov, "estado", None),
+        motivo_incidencia_de_tentativa(mov),
+    )
+
+
+def q_motivo_incidencia_bloqueia_entrega() -> Q:
+    bloqueio = Q()
+    for lab in MOTIVO_INCIDENCIA_NAO_SEGUE_LABELS:
+        bloqueio |= Q(motivo_incidencia__iexact=lab)
+        bloqueio |= Q(
+            Q(motivo_incidencia__isnull=True) | Q(motivo_incidencia=""),
+            pedido__motivo_incidencia__iexact=lab,
+        )
+    return bloqueio
 
 
 def estado_label(estado: str | None) -> str:
@@ -225,6 +290,7 @@ class Pedido(AuditFieldsMixin, models.Model):
     prev_entrega = models.DateField(null=True, blank=True)
     dt_entrega = models.DateField(null=True, blank=True)
     estado = models.CharField(max_length=50, choices=ESTADO_CHOICES, null=True, blank=True)
+    motivo_incidencia = models.CharField(max_length=120, null=True, blank=True)
     volume = models.SmallIntegerField(null=True, blank=True)
     nome_dest = models.CharField(max_length=150, null=True, blank=True)
     email_dest = models.CharField(max_length=150, null=True, blank=True)
@@ -346,6 +412,7 @@ class TentativaEntrega(models.Model):
     )
     data_tentativa = models.DateField()
     estado = models.CharField(max_length=50, choices=ESTADO_CHOICES, null=True, blank=True)
+    motivo_incidencia = models.CharField(max_length=120, null=True, blank=True)
     carro = models.SmallIntegerField(null=True, blank=True)
     motorista = models.ForeignKey(
         Motorista,

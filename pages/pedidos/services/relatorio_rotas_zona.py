@@ -7,7 +7,7 @@ from io import BytesIO
 
 from django.db.models import Max
 
-from pages.pedidos.models import Devolucao, Incidencia, TentativaEntrega, estado_segue_para_entrega
+from pages.pedidos.models import Devolucao, Incidencia, TentativaEntrega, tentativa_segue_para_entrega
 from pages.pedidos.services.relatorio_fechamento import validar_periodo
 from pages.pedidos.services.zona_entrega_pedido import (
     carregar_regras_zona_por_filial,
@@ -26,6 +26,7 @@ _CAMPOS_TENTATIVA = (
     "carro",
     "periodo",
     "estado",
+    "motivo_incidencia",
     "pedido_id",
     "motorista_id",
     "pedido__id",
@@ -42,6 +43,7 @@ _CAMPOS_TENTATIVA = (
     "pedido__volume_conf",
     "pedido__peso",
     "pedido__obs_rota",
+    "pedido__motivo_incidencia",
     "motorista__id",
     "motorista__nome",
 )
@@ -277,7 +279,7 @@ def montar_relatorio_rotas_zona(filial_ativa, filtros: dict) -> tuple[dict | Non
             meta[zona_id] = (zona_desc or SEM_ZONA_LABEL, prioridade_por_zona.get(zona_id, 0))
         tipo_abrev = "R" if (p.tipo or "").upper() == "RECOLHA" else "E"
         fones = " / ".join(f for f in [p.fone_dest or "", p.fone_dest2 or ""] if f)
-        segue_para_entrega = estado_segue_para_entrega(mov.estado)
+        segue_para_entrega = tentativa_segue_para_entrega(mov)
         max_dt = max_dt_por_pedido.get(p.id)
         tem_tentativa_posterior = bool(max_dt and max_dt > mov.data_tentativa)
         buckets[zona_id].append({

@@ -112,7 +112,7 @@ Condições comuns a manual + verificação + automático:
 
 1. `data_tentativa` = data alvo (dia do relatório ou “hoje” em Lisboa no comando).
 2. `pedido__filial` = filial (ativa no HTTP; `FilialConfig`/`filial` no comando).
-3. `estado` ∈ `ESTADOS_SEGUE_PARA_ENTREGA` (campo **`TentativaEntrega.estado`**, alinhado a `estado_segue_para_entrega` no UI).
+3. `estado` ∈ `ESTADOS_SEGUE_PARA_ENTREGA` **e** o motivo de incidência não bloqueia (labels em `MOTIVO_INCIDENCIA_NAO_SEGUE_LABELS`; `estado_segue_para_entrega` / `tentativa_segue_para_entrega`). Se o estado ou o motivo impedir, não segue.
 4. `periodo` preenchido (MANHÃ/TARDE).
 5. **`exclude_tentativas_com_data_posterior`**: não enviar linha se existir outra tentativa do **mesmo pedido** com `data_tentativa` estritamente **posterior** (evita SMS obsoleto).
 

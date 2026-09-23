@@ -14,7 +14,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from datetime import datetime, time as dt_time
 
 from pages.filial.models import Filial
-from pages.pedidos.models import Pedido, TentativaEntrega, estado_segue_para_entrega
+from pages.pedidos.models import Pedido, TentativaEntrega, tentativa_segue_para_entrega
 from pages.pedidos.services.mapa_service import (
     buscar_local_para_pedido,
     calcular_rota_osrm,
@@ -366,7 +366,7 @@ def mapa_publico_pontos_view(request, token):
 
         fones = " / ".join(f for f in [pedido.fone_dest or "", pedido.fone_dest2 or ""] if f)
         segue_para_entrega = (
-            estado_segue_para_entrega(mov.estado)
+            tentativa_segue_para_entrega(mov)
             and (pedido.id not in pedidos_com_tentativa_posterior)
         )
         linhas.append({
@@ -407,7 +407,7 @@ def mapa_publico_pontos_view(request, token):
                 "periodo": mov.periodo or "",
                 "cor": cor,
                 "segue_para_entrega": (
-                    estado_segue_para_entrega(mov.estado)
+                    tentativa_segue_para_entrega(mov)
                     and (pedido.id not in pedidos_com_tentativa_posterior)
                 ),
             },

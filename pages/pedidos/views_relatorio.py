@@ -21,6 +21,7 @@ from pages.pedidos.models import (
     MOTIVO_CHOICES,
     estado_label,
     estado_segue_para_entrega,
+    tentativa_segue_para_entrega,
     exclude_tentativas_com_data_posterior,
 )
 from pages.motorista.models import Motorista
@@ -502,7 +503,7 @@ def relatorio_sms_view(request):
     for mov in movs:
         pedido = mov.pedido
         fones = [f for f in [pedido.fone_dest or "", pedido.fone_dest2 or ""] if f]
-        segue_tentativa = estado_segue_para_entrega(mov.estado)
+        segue_tentativa = tentativa_segue_para_entrega(mov)
         tem_posterior = pedido.id in pedidos_com_tentativa_posterior
         registros.append({
             "id": mov.id,
@@ -760,7 +761,7 @@ def relatorio_gerencial_view(request):
             "dev":            dev_count,
             "tem_devolucao":  dev_count > 0,
             "armazem":        armazem,
-            "segue_para_entrega": estado_segue_para_entrega(p.estado),
+            "segue_para_entrega": estado_segue_para_entrega(p.estado, p.motivo_incidencia),
         })
         total_peso += peso_valor
 

@@ -267,6 +267,22 @@ class RelatorioRotasZonaServiceTests(TestCase):
         self.assertIsNone(err)
         self.assertTrue(payload["grupos"][0]["linhas"][0]["tem_incidencia_peso_pendente"])
 
+    def test_incidencia_com_motivo_bloqueante_nao_segue(self):
+        p = self._pedido(92061, pedido_ref="REF-MOT", codpost="4100-100")
+        TentativaEntrega.objects.create(
+            pedido=p,
+            data_tentativa=self.d0,
+            carro=1,
+            periodo="MANHA",
+            estado="Incidência",
+            motivo_incidencia="Fora da zona",
+        )
+        payload, err = montar_relatorio_rotas_zona(self.filial, self._filtros())
+        self.assertIsNone(err)
+        linha = payload["grupos"][0]["linhas"][0]
+        self.assertFalse(linha["segue_para_entrega"])
+        self.assertTrue(linha["nao_segue_para_entrega"])
+
     def test_agrupa_por_data_e_conta_carros_distintos(self):
         p1 = self._pedido(92071, pedido_ref="REF-C1", codpost="4100-100", peso=10)
         p2 = self._pedido(92072, pedido_ref="REF-C3", codpost="4100-100", peso=5)

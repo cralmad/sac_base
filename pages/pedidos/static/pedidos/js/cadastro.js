@@ -38,7 +38,7 @@ const modalFotosEl = document.getElementById('modalFotos');
 const modalFotos = new bootstrap.Modal(modalFotosEl);
 
 const CAMPOS_TRAVADOS_IMPORTADO = ['filial_id', 'origem', 'id_vonzu', 'pedido', 'tipo', 'criado', 'cliente_id'];
-const CAMPOS_SOMENTE_LEITURA = ['lat', 'lng'];
+const CAMPOS_SOMENTE_LEITURA = ['lat', 'lng', 'motivo_incidencia'];
 
 const VONZU_EXPEDITIONS_URL = 'https://app.vonzu.es/user/expeditions';
 

@@ -125,6 +125,29 @@ class NormalizacaoEstadoEnovoTests(TestCase):
         )
 
 
+class EstadoSegueMotivoIncidenciaTests(TestCase):
+    def test_incidencia_sem_motivo_segue(self):
+        from pages.pedidos.models import estado_segue_para_entrega
+
+        self.assertTrue(estado_segue_para_entrega("Incidência"))
+        self.assertTrue(estado_segue_para_entrega("Incidência", None))
+        self.assertTrue(estado_segue_para_entrega("Incidência", "Cliente ausente"))
+
+    def test_incidencia_com_motivo_bloqueante_nao_segue(self):
+        from pages.pedidos.models import estado_segue_para_entrega
+
+        self.assertFalse(estado_segue_para_entrega("Incidência", "Fora da zona"))
+        self.assertFalse(estado_segue_para_entrega("Incidência", "anulado / cancelado"))
+        self.assertFalse(estado_segue_para_entrega("Incidência", "Recusa Parcial"))
+
+    def test_estado_que_nao_segue_nao_e_salvo_por_motivo(self):
+        from pages.pedidos.models import estado_segue_para_entrega
+
+        self.assertFalse(estado_segue_para_entrega("completed"))
+        self.assertFalse(estado_segue_para_entrega("completed", "Cliente ausente"))
+        self.assertFalse(estado_segue_para_entrega("cancelled", None))
+
+
 class ImportadorCSVTests(TestCase):
     def setUp(self):
         self.pais = Pais.objects.create(nome="PORTUGAL", sigla="PRT", codigo_tel="+351")
@@ -436,6 +459,10 @@ class PedidosViewTests(TestCase):
         req = self._get()
         response = pedidos_view(req)
         self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn('name="motivo_incidencia"', html)
+        self.assertIn("Motivo Incidência", html)
+        self.assertIn("readonly", html)
 
     def test_importar_sem_permissao_levanta_permission_denied(self):
         self.usuario.user_permissions.add(self.perm_view)
@@ -732,6 +759,35 @@ class ImportadorXlsxTests(TestCase):
             pedido.obs,
             "Agendado para amanhã | Carga frágil | Portão lateral | Prioridade loja | Cliente ausente",
         )
+        self.assertEqual(pedido.motivo_incidencia, "Cliente ausente")
+        tentativa = TentativaEntrega.objects.get(pedido=pedido)
+        self.assertEqual(tentativa.motivo_incidencia, "Cliente ausente")
+
+    def test_motivo_incidencia_agrega_da_linha_posterior_do_trk(self):
+        xlsx = _make_xlsx_enovo([
+            _row_enovo(**{
+                "Cod. Cliente": self.cliente.pk,
+                "Volumes": 1,
+                "Último Estado": "Incidência",
+                "Motivo Incidência": "",
+            }),
+            _row_enovo(**{
+                "Cod. Cliente": self.cliente.pk,
+                "Volumes": 1,
+                "Último Estado": "Incidência",
+                "Motivo Incidência": "Fora da zona",
+            }),
+        ])
+        resultado = importar_xlsx(xlsx, self.filial, "mot.xlsx")
+        self.assertTrue(resultado["sucesso"], resultado["erros"])
+        pedido = Pedido.objects.get(filial=self.filial, id_vonzu=1002240391)
+        self.assertEqual(pedido.motivo_incidencia, "Fora da zona")
+        self.assertEqual(pedido.estado, "Incidência")
+        tentativa = TentativaEntrega.objects.get(pedido=pedido)
+        self.assertEqual(tentativa.motivo_incidencia, "Fora da zona")
+        from pages.pedidos.models import tentativa_segue_para_entrega
+
+        self.assertFalse(tentativa_segue_para_entrega(tentativa))
 
     def test_mesma_atualizacao_sem_forcar_ignora(self):
         xlsx = _make_xlsx_enovo([

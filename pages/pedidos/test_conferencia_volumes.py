@@ -108,6 +108,34 @@ class ConferenciaVolumesCadastroTests(TestCase):
             ["25/08/2026", 3],
         )
 
+    def test_editar_preserva_motivo_incidencia_mesmo_com_payload(self):
+        agora = timezone.now()
+        pedido = Pedido.objects.create(
+            filial=self.filial,
+            origem="IMPORTADO",
+            id_vonzu=8007108630,
+            tipo="ENTREGA",
+            criado=agora,
+            atualizacao=agora,
+            estado="Incidência",
+            motivo_incidencia="Fora da zona",
+        )
+        pedido_salvo, err = persistir_pedido_cadastro(
+            self.usuario,
+            "editar",
+            {
+                "id": pedido.id,
+                "id_vonzu": "8007108630",
+                "tipo": "ENTREGA",
+                "estado": "Incidência",
+                "motivo_incidencia": "tentativa de alteração",
+            },
+            self.filial,
+        )
+        self.assertIsNone(err)
+        pedido_salvo.refresh_from_db()
+        self.assertEqual(pedido_salvo.motivo_incidencia, "Fora da zona")
+
     def test_serialize_inclui_json(self):
         agora = timezone.now()
         pedido = Pedido.objects.create(
@@ -121,3 +149,4 @@ class ConferenciaVolumesCadastroTests(TestCase):
         dados = serialize_pedido_form(pedido)
         self.assertIn("conferencia_volumes", dados)
         self.assertEqual(dados["conferencia_volumes"]["TRK"], 8007108629)
+        self.assertEqual(dados["motivo_incidencia"], "")

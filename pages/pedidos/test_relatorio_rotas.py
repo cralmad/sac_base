@@ -136,3 +136,22 @@ class RelatorioRotasServiceTests(TestCase):
         self.assertTrue(por_ref["REF-PESO"]["tem_incidencia_peso_pendente"])
         self.assertFalse(por_ref["REF-OK"]["tem_incidencia_peso_pendente"])
         self.assertFalse(por_ref["REF-OUTRO"]["tem_incidencia_peso_pendente"])
+
+    def test_incidencia_com_motivo_bloqueante_nao_segue(self):
+        p = self._pedido(91020, "REF-MOT")
+        TentativaEntrega.objects.create(
+            pedido=p,
+            data_tentativa=self.d0,
+            carro=1,
+            periodo="MANHA",
+            estado="Incidência",
+            motivo_incidencia="Fora da zona",
+        )
+        payload, err = montar_relatorio_rotas(
+            self.filial,
+            {"data_tentativa": self.d0.isoformat(), "agrupamento": "carro"},
+        )
+        self.assertIsNone(err)
+        linha = payload["grupos"][0]["linhas"][0]
+        self.assertFalse(linha["segue_para_entrega"])
+        self.assertTrue(linha["nao_segue_para_entrega"])

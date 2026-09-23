@@ -6,7 +6,7 @@ from datetime import date, datetime
 from io import BytesIO
 from itertools import groupby
 
-from pages.pedidos.models import Devolucao, Incidencia, TentativaEntrega, estado_segue_para_entrega
+from pages.pedidos.models import Devolucao, Incidencia, TentativaEntrega, tentativa_segue_para_entrega
 from pages.pedidos.services.zona_entrega_pedido import (
     carregar_regras_zona_por_filial,
     resolver_zona_e_faixa_entrega,
@@ -127,7 +127,7 @@ def montar_relatorio_rotas(filial_ativa, filtros: dict) -> tuple[dict | None, st
                     peso_str = str(int(p.peso))
                 except (TypeError, ValueError):
                     peso_str = str(p.peso)
-            segue_para_entrega = estado_segue_para_entrega(mov.estado)
+            segue_para_entrega = tentativa_segue_para_entrega(mov)
             tem_tentativa_posterior = p.id in pedidos_com_tentativa_posterior
             zona_entrega, faixa_entrega = resolver_zona_e_faixa_entrega(p.codpost_dest, regras_zona)
             linhas.append({

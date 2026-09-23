@@ -2,8 +2,9 @@
 Regras de elegibilidade, verificação e execução do envio SMS do relatório (filial + data).
 
 Critério de elegibilidade (alinhado com o automático): `TentativaEntrega` na data,
-`pedido__filial`, `estado` em `ESTADOS_SEGUE_PARA_ENTREGA`, período preenchido,
-`exclude_tentativas_com_data_posterior`, e `sms_enviado=False` no envio.
+`pedido__filial`, `estado` em `ESTADOS_SEGUE_PARA_ENTREGA`, motivo de incidência
+não bloqueante, período preenchido, `exclude_tentativas_com_data_posterior`,
+e `sms_enviado=False` no envio.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from pages.pedidos.models import (
     ESTADOS_SEGUE_PARA_ENTREGA,
     TentativaEntrega,
     exclude_tentativas_com_data_posterior,
+    q_motivo_incidencia_bloqueia_entrega,
 )
 from sac_base.sms_service import HORARIO_PERIODO, montar_mensagem, enviar_sms_bulkgate_resiliente
 
@@ -49,13 +51,14 @@ def ddi_padrao_operacao_filial(filial) -> str:
 
 
 def qs_tentativas_sms_regra_base(filial, dt) -> QuerySet[TentativaEntrega]:
-    """Tentativas na data com período e estado elegíveis (sem filtrar sms_enviado)."""
+    """Tentativas na data com período e estado/motivo elegíveis (sem filtrar sms_enviado)."""
     return exclude_tentativas_com_data_posterior(
         TentativaEntrega.objects.filter(
             data_tentativa=dt,
             pedido__filial=filial,
             estado__in=ESTADOS_SEGUE_PARA_ENTREGA,
         )
+        .exclude(q_motivo_incidencia_bloqueia_entrega())
         .exclude(periodo__isnull=True)
         .exclude(periodo="")
         .select_related("pedido")
