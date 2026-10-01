@@ -134,6 +134,24 @@ class SmsRelatorioQuerysetTests(TestCase):
         ids = set(qs_tentativas_sms_pendentes_envio(self.filial, self.dt).values_list("id", flat=True))
         self.assertNotIn(t.id, ids)
 
+    def test_pendentes_inclui_nao_rececionado_com_volume_conf(self):
+        p = self._pedido(10065)
+        p.volume_conf = 1
+        p.save(update_fields=["volume_conf"])
+        t = self._tentativa(
+            p, estado="Incidência", motivo_incidencia="Não rececionado pela transportadora"
+        )
+        ids = set(qs_tentativas_sms_pendentes_envio(self.filial, self.dt).values_list("id", flat=True))
+        self.assertIn(t.id, ids)
+
+    def test_pendentes_exclui_nao_rececionado_sem_volume_conf(self):
+        p = self._pedido(10066)
+        t = self._tentativa(
+            p, estado="Incidência", motivo_incidencia="Não rececionado pela transportadora"
+        )
+        ids = set(qs_tentativas_sms_pendentes_envio(self.filial, self.dt).values_list("id", flat=True))
+        self.assertNotIn(t.id, ids)
+
     def test_manual_por_ids_respeita_data_do_post(self):
         p1 = self._pedido(10007)
         p2 = self._pedido(10008)

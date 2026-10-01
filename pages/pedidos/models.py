@@ -143,6 +143,10 @@ _MOTIVOS_INCIDENCIA_NAO_SEGUE = frozenset(
     lab.strip().casefold() for lab in MOTIVO_INCIDENCIA_NAO_SEGUE_LABELS
 )
 
+# Exceção: este motivo só bloqueia se Volume Conf. não for > 0.
+MOTIVO_INCIDENCIA_NAO_RECECIONADO = "Não rececionado pela transportadora"
+_MOTIVO_INCIDENCIA_NAO_RECECIONADO = MOTIVO_INCIDENCIA_NAO_RECECIONADO.strip().casefold()
+
 
 # Conferência de volumes por QR de etiqueta ENOVO (cadastro / futura leitura).
 # QR 18 dígitos: TRK(12) + total_volume(3) + volume(3), ex. 008007108629003001
@@ -206,14 +210,35 @@ def parse_qr_etiqueta_enovo(codigo):
     }
 
 
-def motivo_incidencia_bloqueia_entrega(motivo: str | None) -> bool:
-    """True se o motivo de incidência (ENOVO) impede seguir para entrega."""
+def _volume_conf_positivo(volume_conf) -> bool:
+    if volume_conf is None or volume_conf is False:
+        return False
+    try:
+        return int(volume_conf) > 0
+    except (TypeError, ValueError):
+        return False
+
+
+def motivo_incidencia_bloqueia_entrega(motivo: str | None, volume_conf=None) -> bool:
+    """True se o motivo de incidência (ENOVO) impede seguir para entrega.
+
+    Exceção: "Não rececionado pela transportadora" não bloqueia se volume_conf > 0.
+    """
     if not motivo:
         return False
-    return str(motivo).strip().casefold() in _MOTIVOS_INCIDENCIA_NAO_SEGUE
+    chave = str(motivo).strip().casefold()
+    if chave not in _MOTIVOS_INCIDENCIA_NAO_SEGUE:
+        return False
+    if chave == _MOTIVO_INCIDENCIA_NAO_RECECIONADO and _volume_conf_positivo(volume_conf):
+        return False
+    return True
 
 
-def estado_segue_para_entrega(estado: str | None, motivo_incidencia: str | None = None) -> bool:
+def estado_segue_para_entrega(
+    estado: str | None,
+    motivo_incidencia: str | None = None,
+    volume_conf=None,
+) -> bool:
     """True se estado permite entrega e o motivo de incidência não bloqueia.
 
     Se o estado não segue, o resultado é False mesmo com motivo vazio ou não bloqueante.
@@ -221,7 +246,7 @@ def estado_segue_para_entrega(estado: str | None, motivo_incidencia: str | None 
     """
     if (estado or "") not in ESTADOS_SEGUE_PARA_ENTREGA:
         return False
-    if motivo_incidencia_bloqueia_entrega(motivo_incidencia):
+    if motivo_incidencia_bloqueia_entrega(motivo_incidencia, volume_conf=volume_conf):
         return False
     return True
 
@@ -240,20 +265,29 @@ def motivo_incidencia_de_tentativa(mov) -> str | None:
 
 
 def tentativa_segue_para_entrega(mov) -> bool:
+    pedido = getattr(mov, "pedido", None)
+    volume_conf = getattr(pedido, "volume_conf", None) if pedido is not None else None
     return estado_segue_para_entrega(
         getattr(mov, "estado", None),
         motivo_incidencia_de_tentativa(mov),
+        volume_conf=volume_conf,
     )
 
 
 def q_motivo_incidencia_bloqueia_entrega() -> Q:
     bloqueio = Q()
+    volume_nao_positivo = Q(pedido__volume_conf__isnull=True) | Q(pedido__volume_conf__lte=0)
     for lab in MOTIVO_INCIDENCIA_NAO_SEGUE_LABELS:
-        bloqueio |= Q(motivo_incidencia__iexact=lab)
-        bloqueio |= Q(
+        q_tent = Q(motivo_incidencia__iexact=lab)
+        q_ped = Q(
             Q(motivo_incidencia__isnull=True) | Q(motivo_incidencia=""),
             pedido__motivo_incidencia__iexact=lab,
         )
+        if lab.strip().casefold() == _MOTIVO_INCIDENCIA_NAO_RECECIONADO:
+            q_tent &= volume_nao_positivo
+            q_ped &= volume_nao_positivo
+        bloqueio |= q_tent
+        bloqueio |= q_ped
     return bloqueio
 
 

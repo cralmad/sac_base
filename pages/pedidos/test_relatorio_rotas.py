@@ -155,3 +155,24 @@ class RelatorioRotasServiceTests(TestCase):
         linha = payload["grupos"][0]["linhas"][0]
         self.assertFalse(linha["segue_para_entrega"])
         self.assertTrue(linha["nao_segue_para_entrega"])
+
+    def test_nao_rececionado_com_volume_conf_segue(self):
+        p = self._pedido(91021, "REF-NR")
+        p.volume_conf = 2
+        p.save(update_fields=["volume_conf"])
+        TentativaEntrega.objects.create(
+            pedido=p,
+            data_tentativa=self.d0,
+            carro=1,
+            periodo="MANHA",
+            estado="Incidência",
+            motivo_incidencia="Não rececionado pela transportadora",
+        )
+        payload, err = montar_relatorio_rotas(
+            self.filial,
+            {"data_tentativa": self.d0.isoformat(), "agrupamento": "carro"},
+        )
+        self.assertIsNone(err)
+        linha = payload["grupos"][0]["linhas"][0]
+        self.assertTrue(linha["segue_para_entrega"])
+        self.assertFalse(linha["nao_segue_para_entrega"])

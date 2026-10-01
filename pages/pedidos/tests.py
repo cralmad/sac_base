@@ -147,6 +147,16 @@ class EstadoSegueMotivoIncidenciaTests(TestCase):
         self.assertFalse(estado_segue_para_entrega("completed", "Cliente ausente"))
         self.assertFalse(estado_segue_para_entrega("cancelled", None))
 
+    def test_nao_rececionado_com_volume_conf_segue(self):
+        from pages.pedidos.models import estado_segue_para_entrega
+
+        motivo = "Não rececionado pela transportadora"
+        self.assertFalse(estado_segue_para_entrega("Incidência", motivo))
+        self.assertFalse(estado_segue_para_entrega("Incidência", motivo, volume_conf=0))
+        self.assertTrue(estado_segue_para_entrega("Incidência", motivo, volume_conf=1))
+        self.assertFalse(estado_segue_para_entrega("completed", motivo, volume_conf=2))
+        self.assertFalse(estado_segue_para_entrega("Incidência", "Fora da zona", volume_conf=3))
+
 
 class ImportadorCSVTests(TestCase):
     def setUp(self):
