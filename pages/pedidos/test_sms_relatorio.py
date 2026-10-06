@@ -152,6 +152,14 @@ class SmsRelatorioQuerysetTests(TestCase):
         ids = set(qs_tentativas_sms_pendentes_envio(self.filial, self.dt).values_list("id", flat=True))
         self.assertNotIn(t.id, ids)
 
+    def test_pendentes_inclui_quando_incidencia_resolvida(self):
+        p = self._pedido(10067)
+        p.incidencia_resolvida = True
+        p.save(update_fields=["incidencia_resolvida"])
+        t = self._tentativa(p, estado="Aceite", motivo_incidencia="Entrega recusada")
+        ids = set(qs_tentativas_sms_pendentes_envio(self.filial, self.dt).values_list("id", flat=True))
+        self.assertIn(t.id, ids)
+
     def test_manual_por_ids_respeita_data_do_post(self):
         p1 = self._pedido(10007)
         p2 = self._pedido(10008)

@@ -41,6 +41,7 @@ _CAMPOS_TENTATIVA = (
     "pedido__codpost_dest",
     "pedido__volume",
     "pedido__volume_conf",
+    "pedido__incidencia_resolvida",
     "pedido__peso",
     "pedido__obs_rota",
     "pedido__motivo_incidencia",

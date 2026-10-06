@@ -219,11 +219,19 @@ def _volume_conf_positivo(volume_conf) -> bool:
         return False
 
 
-def motivo_incidencia_bloqueia_entrega(motivo: str | None, volume_conf=None) -> bool:
+def motivo_incidencia_bloqueia_entrega(
+    motivo: str | None,
+    volume_conf=None,
+    *,
+    incidencia_resolvida: bool = False,
+) -> bool:
     """True se o motivo de incidência (ENOVO) impede seguir para entrega.
 
+    Se a incidência estiver marcada como resolvida, o motivo é ignorado.
     Exceção: "Não rececionado pela transportadora" não bloqueia se volume_conf > 0.
     """
+    if incidencia_resolvida:
+        return False
     if not motivo:
         return False
     chave = str(motivo).strip().casefold()
@@ -238,15 +246,22 @@ def estado_segue_para_entrega(
     estado: str | None,
     motivo_incidencia: str | None = None,
     volume_conf=None,
+    *,
+    incidencia_resolvida: bool = False,
 ) -> bool:
     """True se estado permite entrega e o motivo de incidência não bloqueia.
 
     Se o estado não segue, o resultado é False mesmo com motivo vazio ou não bloqueante.
     Se o motivo bloqueia, o resultado é False mesmo com estado em ESTADOS_SEGUE_PARA_ENTREGA.
+    Com incidencia_resolvida=True, o Motivo Incidência é ignorado.
     """
     if (estado or "") not in ESTADOS_SEGUE_PARA_ENTREGA:
         return False
-    if motivo_incidencia_bloqueia_entrega(motivo_incidencia, volume_conf=volume_conf):
+    if motivo_incidencia_bloqueia_entrega(
+        motivo_incidencia,
+        volume_conf=volume_conf,
+        incidencia_resolvida=incidencia_resolvida,
+    ):
         return False
     return True
 
@@ -267,10 +282,14 @@ def motivo_incidencia_de_tentativa(mov) -> str | None:
 def tentativa_segue_para_entrega(mov) -> bool:
     pedido = getattr(mov, "pedido", None)
     volume_conf = getattr(pedido, "volume_conf", None) if pedido is not None else None
+    incidencia_resolvida = (
+        bool(getattr(pedido, "incidencia_resolvida", False)) if pedido is not None else False
+    )
     return estado_segue_para_entrega(
         getattr(mov, "estado", None),
         motivo_incidencia_de_tentativa(mov),
         volume_conf=volume_conf,
+        incidencia_resolvida=incidencia_resolvida,
     )
 
 
@@ -288,7 +307,7 @@ def q_motivo_incidencia_bloqueia_entrega() -> Q:
             q_ped &= volume_nao_positivo
         bloqueio |= q_tent
         bloqueio |= q_ped
-    return bloqueio
+    return bloqueio & Q(pedido__incidencia_resolvida=False)
 
 
 def estado_label(estado: str | None) -> str:
@@ -325,6 +344,10 @@ class Pedido(AuditFieldsMixin, models.Model):
     dt_entrega = models.DateField(null=True, blank=True)
     estado = models.CharField(max_length=50, choices=ESTADO_CHOICES, null=True, blank=True)
     motivo_incidencia = models.CharField(max_length=120, null=True, blank=True)
+    incidencia_resolvida = models.BooleanField(
+        default=False,
+        help_text="Se marcado, o Motivo Incidência é ignorado na regra de segue para entrega.",
+    )
     volume = models.SmallIntegerField(null=True, blank=True)
     nome_dest = models.CharField(max_length=150, null=True, blank=True)
     email_dest = models.CharField(max_length=150, null=True, blank=True)

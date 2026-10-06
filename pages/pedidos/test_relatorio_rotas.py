@@ -176,3 +176,24 @@ class RelatorioRotasServiceTests(TestCase):
         linha = payload["grupos"][0]["linhas"][0]
         self.assertTrue(linha["segue_para_entrega"])
         self.assertFalse(linha["nao_segue_para_entrega"])
+
+    def test_incidencia_resolvida_ignora_motivo_bloqueante(self):
+        p = self._pedido(91022, "REF-RES")
+        p.incidencia_resolvida = True
+        p.save(update_fields=["incidencia_resolvida"])
+        TentativaEntrega.objects.create(
+            pedido=p,
+            data_tentativa=self.d0,
+            carro=1,
+            periodo="MANHA",
+            estado="Aceite",
+            motivo_incidencia="Entrega recusada",
+        )
+        payload, err = montar_relatorio_rotas(
+            self.filial,
+            {"data_tentativa": self.d0.isoformat(), "agrupamento": "carro"},
+        )
+        self.assertIsNone(err)
+        linha = payload["grupos"][0]["linhas"][0]
+        self.assertTrue(linha["segue_para_entrega"])
+        self.assertFalse(linha["nao_segue_para_entrega"])

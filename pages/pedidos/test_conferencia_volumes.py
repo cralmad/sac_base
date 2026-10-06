@@ -136,6 +136,36 @@ class ConferenciaVolumesCadastroTests(TestCase):
         pedido_salvo.refresh_from_db()
         self.assertEqual(pedido_salvo.motivo_incidencia, "Fora da zona")
 
+    def test_editar_grava_incidencia_resolvida(self):
+        agora = timezone.now()
+        pedido = Pedido.objects.create(
+            filial=self.filial,
+            origem="IMPORTADO",
+            id_vonzu=8007108631,
+            tipo="ENTREGA",
+            criado=agora,
+            atualizacao=agora,
+            estado="Aceite",
+            motivo_incidencia="Entrega recusada",
+            incidencia_resolvida=False,
+        )
+        pedido_salvo, err = persistir_pedido_cadastro(
+            self.usuario,
+            "editar",
+            {
+                "id": pedido.id,
+                "id_vonzu": "8007108631",
+                "tipo": "ENTREGA",
+                "estado": "Aceite",
+                "incidencia_resolvida": True,
+            },
+            self.filial,
+        )
+        self.assertIsNone(err)
+        pedido_salvo.refresh_from_db()
+        self.assertTrue(pedido_salvo.incidencia_resolvida)
+        self.assertEqual(pedido_salvo.motivo_incidencia, "Entrega recusada")
+
     def test_serialize_inclui_json(self):
         agora = timezone.now()
         pedido = Pedido.objects.create(

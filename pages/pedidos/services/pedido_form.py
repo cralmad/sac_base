@@ -61,6 +61,7 @@ def persistir_pedido_cadastro(usuario, estado_form, campos, filial):
                 "prev_entrega": parse_date(campos.get("prev_entrega")),
                 "dt_entrega": parse_date(campos.get("dt_entrega")),
                 "estado": (campos.get("estado") or "").strip() or None,
+                "incidencia_resolvida": bool(campos.get("incidencia_resolvida", False)),
                 "volume": parse_int(campos.get("volume")),
                 "volume_conf": parse_int(campos.get("volume_conf")) or 0,
                 "nome_dest": (campos.get("nome_dest") or "").strip() or None,

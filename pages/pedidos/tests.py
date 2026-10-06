@@ -157,6 +157,22 @@ class EstadoSegueMotivoIncidenciaTests(TestCase):
         self.assertFalse(estado_segue_para_entrega("completed", motivo, volume_conf=2))
         self.assertFalse(estado_segue_para_entrega("Incidência", "Fora da zona", volume_conf=3))
 
+    def test_incidencia_resolvida_ignora_motivo_bloqueante(self):
+        from pages.pedidos.models import estado_segue_para_entrega
+
+        motivo = "Entrega recusada"
+        self.assertFalse(estado_segue_para_entrega("Aceite", motivo, volume_conf=1))
+        self.assertTrue(
+            estado_segue_para_entrega(
+                "Aceite", motivo, volume_conf=1, incidencia_resolvida=True
+            )
+        )
+        self.assertFalse(
+            estado_segue_para_entrega(
+                "completed", motivo, volume_conf=1, incidencia_resolvida=True
+            )
+        )
+
 
 class ImportadorCSVTests(TestCase):
     def setUp(self):

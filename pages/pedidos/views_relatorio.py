@@ -762,7 +762,10 @@ def relatorio_gerencial_view(request):
             "tem_devolucao":  dev_count > 0,
             "armazem":        armazem,
             "segue_para_entrega": estado_segue_para_entrega(
-                p.estado, p.motivo_incidencia, volume_conf=p.volume_conf
+                p.estado,
+                p.motivo_incidencia,
+                volume_conf=p.volume_conf,
+                incidencia_resolvida=bool(p.incidencia_resolvida),
             ),
         })
         total_peso += peso_valor

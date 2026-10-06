@@ -27,6 +27,7 @@ def serialize_pedido_form(pedido):
         "estado": pedido.estado or "",
         "estado_label": estado_label(pedido.estado),
         "motivo_incidencia": pedido.motivo_incidencia or "",
+        "incidencia_resolvida": bool(pedido.incidencia_resolvida),
         "volume": pedido.volume,
         "volume_conf": pedido.volume_conf,
         "conferencia_volumes": conferencia_volumes_para_exibicao(pedido),
