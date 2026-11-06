@@ -88,7 +88,7 @@ ESTADO_DEFINITIONS = [
     ("danos_visiveis_embalagem", "Receção Transportadora: danos visíveis (embalagem)", 0, 1),
     ("3799", "Reagendado Zona Sem entregas dia Planeado", 0, 0),
     ("recusa_parcial", "Recusa parcial (artigos danificados)", 0, 0),
-    ("conferencia_condicionada", "Conferência condicionada", 0, 1),
+    ("conferencia_condicionada", "Conferência condicionada", 0, 1, "Receção Condicionada"),
     ("reactivar", "Reactivar (Reagendamento responsabilidade Leroy Merlin)", 0, 1),
     ("Reagendamento_Leroy_Merlin", "Reagendamento responsabilidade Leroy Merlin", 0, 1),
     ("returned_to_sender", "Devolvido ao Cliente", 0, 0),

@@ -110,6 +110,12 @@ class NormalizacaoEstadoEnovoTests(TestCase):
     def test_entrada_armazem_mapeia_para_ea(self):
         self.assertEqual(normalizar_estado_enovo("Entrada Armazém"), "EA")
 
+    def test_rececao_condicionada_mapeia_para_conferencia_condicionada(self):
+        self.assertEqual(
+            normalizar_estado_enovo("Receção Condicionada"),
+            "conferencia_condicionada",
+        )
+
     def test_desconhecido_retorna_none(self):
         self.assertIsNone(normalizar_estado_enovo("Estado ainda nao mapeado"))
 
@@ -121,7 +127,20 @@ class NormalizacaoEstadoEnovoTests(TestCase):
     def test_mapa_so_contem_labels_explicitos(self):
         self.assertEqual(
             ESTADO_ENOVO_PARA_CANONICO,
-            {"Entrada Armazém": "EA", "Pendente": "orders_vonzu"},
+            {
+                "Atribuido Motorista": "assigned",
+                "Em distribuição": "pending",
+                "Entregue": "completed",
+                "Entrada Armazém": "EA",
+                "Anulado": "A",
+                "Entregue Parcial": "CI",
+                "Pendente": "orders_vonzu",
+                "Receção Condicionada": "conferencia_condicionada",
+                "Incidência": "Incidência",
+                "Agendado": "Agendado",
+                "Aceite": "Aceite",
+                "Recolhido": "Recolhido",
+            },
         )
 
 
