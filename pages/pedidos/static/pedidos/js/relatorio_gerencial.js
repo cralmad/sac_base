@@ -51,6 +51,8 @@ const btnDesTodos      = document.getElementById('rg-btn-des-todos');
 const selTipo          = document.getElementById('rg-tipo');
 const selArmazem       = document.getElementById('rg-armazem');
 const selConferencia   = document.getElementById('rg-conferencia');
+const selPesoOp        = document.getElementById('rg-peso-op');
+const inpPesoValor     = document.getElementById('rg-peso-valor');
 const colBtnDev        = document.getElementById('rg-col-btn-dev');
 const btnRegistrarDev  = document.getElementById('rg-btn-registrar-dev');
 const colBtnGmail      = document.getElementById('rg-col-btn-gmail');
@@ -94,6 +96,20 @@ btnDesTodos.addEventListener('click', () => {
 });
 
 // ─── Validação de smart filters ───────────────────────────────────────────────
+function pesoOpRequerValor(op) {
+  return op === 'gt' || op === 'lt' || op === 'eq';
+}
+
+function atualizarCampoPesoValor() {
+  const precisaValor = pesoOpRequerValor(selPesoOp?.value || '');
+  if (!inpPesoValor) return;
+  inpPesoValor.disabled = !precisaValor;
+  if (!precisaValor) {
+    inpPesoValor.value = '';
+    inpPesoValor.classList.remove('is-invalid');
+  }
+}
+
 function validarFiltros() {
   let valido = true;
 
@@ -113,6 +129,18 @@ function validarFiltros() {
   } else {
     erroRef.classList.add('d-none');
     inpRef.classList.remove('is-invalid');
+  }
+
+  if (pesoOpRequerValor(selPesoOp?.value || '')) {
+    const raw = (inpPesoValor?.value || '').trim();
+    const num = Number(raw.replace(',', '.'));
+    if (!raw || !Number.isFinite(num) || num < 0) {
+      inpPesoValor?.classList.add('is-invalid');
+      definirMensagem('erro', 'Informe um valor de peso válido para o filtro.', false);
+      valido = false;
+    } else {
+      inpPesoValor?.classList.remove('is-invalid');
+    }
   }
 
   return valido;
@@ -383,6 +411,7 @@ async function buscar() {
   AppLoader.show();
 
   try {
+    const pesoOp = selPesoOp?.value || '';
     const payload = {
       filtros: {
         data_inicial: dataIni,
@@ -393,6 +422,10 @@ async function buscar() {
         estados:      getMultiSelectValues(selEstados),
         armazem:      selArmazem.value,
         conferencia:  selConferencia.value,
+        peso_op:      pesoOp,
+        peso_valor:   pesoOpRequerValor(pesoOp)
+          ? (inpPesoValor?.value || '').trim().replace(',', '.')
+          : '',
       },
     };
 
@@ -586,10 +619,20 @@ inpRef.addEventListener('input', () => {
   }
 });
 
+if (selPesoOp) {
+  selPesoOp.addEventListener('change', atualizarCampoPesoValor);
+}
+if (inpPesoValor) {
+  inpPesoValor.addEventListener('input', () => {
+    inpPesoValor.classList.remove('is-invalid');
+  });
+}
+
 // ─── Inicialização ────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   preencherEstados();
   preencherMotivos();
+  atualizarCampoPesoValor();
 
   if (_podeRegistrarDevolucoes()) {
     colBtnDev.classList.remove('d-none');

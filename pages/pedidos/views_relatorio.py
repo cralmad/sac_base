@@ -62,6 +62,7 @@ from pages.pedidos.services.relatorio_fechamento import (
     validar_periodo,
 )
 from pages.pedidos.services.gmail_anexo_gerencial import obter_anexo_gmail_gerencial
+from pages.pedidos.services.relatorio_gerencial import aplicar_filtro_peso
 from sac_base.permissions_utils import build_action_permissions
 from sac_base.smart_filter import apply_smart_number_filter, apply_smart_text_filter
 
@@ -647,6 +648,8 @@ def relatorio_gerencial_view(request):
     tipo_filtro    = filtros.get("tipo", "").strip().upper()
     armazem_filtro = filtros.get("armazem", "").strip().lower()
     conferencia_filtro = filtros.get("conferencia", "").strip().lower()
+    peso_op = str(filtros.get("peso_op") or "").strip().lower()
+    peso_valor_raw = filtros.get("peso_valor", "")
     if not isinstance(estados_lista, list):
         estados_lista = []
 
@@ -692,6 +695,10 @@ def relatorio_gerencial_view(request):
         qs = qs.filter(volume_conf=F("volume"))
     elif conferencia_filtro == "divergente":
         qs = qs.exclude(volume_conf=F("volume"))
+
+    qs, erro_peso = aplicar_filtro_peso(qs, peso_op, peso_valor_raw)
+    if erro_peso:
+        return JsonResponse({"success": False, "mensagem": erro_peso}, status=400)
 
     qs = qs.order_by("prev_entrega", "codpost_dest", "pedido", "id")
 
