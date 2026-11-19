@@ -258,12 +258,23 @@ async function _excluirFoto(imgbbId) {
 function criarCabecalhoTabela(ocultarMotorista) {
   const thead = document.createElement('thead');
   const tr = document.createElement('tr');
-  const labels = ['Pedido', 'Data', 'Tipo', 'Artigo', 'Valor'];
-  if (!ocultarMotorista) labels.push('Motorista');
-  labels.push('Obs.', 'Registado em', 'Fotos');
-  labels.forEach(txt => {
+  const cols = [
+    { txt: 'Pedido', cls: 'ri-col-pedido' },
+    { txt: 'Data', cls: 'ri-col-data' },
+    { txt: 'Tipo', cls: 'ri-col-tipo' },
+    { txt: 'Artigo', cls: 'ri-col-artigo' },
+    { txt: 'Valor', cls: 'ri-col-valor' },
+  ];
+  if (!ocultarMotorista) cols.push({ txt: 'Motorista', cls: 'ri-col-motorista' });
+  cols.push(
+    { txt: 'Obs.', cls: 'ri-col-obs' },
+    { txt: 'Registado em', cls: 'ri-col-registado' },
+    { txt: 'Fotos', cls: 'ri-col-fotos' },
+  );
+  cols.forEach(({ txt, cls }) => {
     const th = document.createElement('th');
     th.textContent = txt;
+    th.className = cls;
     tr.appendChild(th);
   });
   thead.appendChild(tr);
@@ -273,14 +284,19 @@ function criarCabecalhoTabela(ocultarMotorista) {
 function anexarLinha(tbody, reg, ocultarMotorista) {
   const tr = document.createElement('tr');
   const campos = [
-    { val: reg.pedido },
-    { val: reg.data },
-    { val: reg.tipo },
-    { val: reg.artigo || '—' },
-    { val: reg.valor_fmt || reg.valor || '—' },
+    { val: reg.pedido, cls: 'ri-col-pedido' },
+    { val: reg.data, cls: 'ri-col-data' },
+    { val: reg.tipo, cls: 'ri-col-tipo' },
+    { val: reg.artigo || '—', cls: 'ri-col-artigo' },
+    { val: reg.valor_fmt || reg.valor || '—', cls: 'ri-col-valor' },
   ];
-  if (!ocultarMotorista) campos.push({ val: reg.motorista || '—' });
-  campos.push({ val: reg.obs || '', cls: 'ri-obs' }, { val: reg.created_at_fmt || '' });
+  if (!ocultarMotorista) {
+    campos.push({ val: reg.motorista || '—', cls: 'ri-col-motorista' });
+  }
+  campos.push(
+    { val: reg.obs || '', cls: 'ri-col-obs ri-obs' },
+    { val: reg.created_at_fmt || '', cls: 'ri-col-registado' },
+  );
 
   campos.forEach(({ val, cls }) => {
     const td = document.createElement('td');
@@ -290,6 +306,7 @@ function anexarLinha(tbody, reg, ocultarMotorista) {
   });
 
   const tdFotos = document.createElement('td');
+  tdFotos.className = 'ri-col-fotos';
   const btnFotos = document.createElement('button');
   btnFotos.type = 'button';
   btnFotos.className = 'btn btn-outline-secondary btn-sm btn-ri-fotos';

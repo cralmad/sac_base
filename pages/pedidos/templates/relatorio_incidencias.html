@@ -7,7 +7,13 @@
 <style>
 .ri-filtros { background: #f8f9fa; border-radius: .5rem; padding: 1rem; }
 .ri-tabela-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-table.ri-tabela { width: 100%; border-collapse: collapse; font-size: 9pt; min-width: 960px; }
+table.ri-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 9pt;
+  min-width: 960px;
+}
 table.ri-tabela th {
   background: #e9f0f7;
   color: #1a3a5c;
@@ -19,8 +25,24 @@ table.ri-tabela td {
   border: 1px solid #dee2e6;
   padding: .28rem .5rem;
   vertical-align: top;
+  word-break: break-word;
 }
-.ri-obs { color: #555; font-size: .78rem; font-style: italic; max-width: 220px; white-space: pre-wrap; word-break: break-word; }
+.ri-col-pedido { width: 8%; }
+.ri-col-data { width: 7%; }
+.ri-col-tipo { width: 11%; }
+.ri-col-artigo { width: 18%; }
+.ri-col-valor { width: 7%; white-space: nowrap; }
+.ri-col-motorista { width: 10%; }
+.ri-col-obs { width: 24%; }
+.ri-col-registado { width: 10%; }
+.ri-col-fotos { width: 5%; }
+.ri-obs {
+  color: #555;
+  font-size: .78rem;
+  font-style: italic;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 .ri-total-bar {
   background: #e9f0f7;
   border: 1px solid #c8d8e8;
@@ -73,7 +95,7 @@ table.ri-tabela td {
   .ri-filtros, #ri-toolbar, .navbar, .sidebar, footer,
   [data-bs-toggle], .btn, #container-mensagens { display: none !important; }
   .ri-tabela-scroll { overflow: visible; }
-  table.ri-tabela { font-size: 7.5pt; min-width: 0; }
+  table.ri-tabela { font-size: 7.5pt; min-width: 0; table-layout: fixed; width: 100%; }
   table.ri-tabela th { background: #dce6f1 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .ri-grupo { break-inside: avoid-page; page-break-inside: avoid; margin-bottom: .35rem; }
   .ri-grupo-header {
