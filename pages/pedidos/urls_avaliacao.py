@@ -10,8 +10,8 @@ from .views_avaliacao import (
 )
 
 urlpatterns = [
-    path("avaliacao/<str:token>/", avaliacao_publica_view, name="avaliacao_publica"),
-    path("avaliacao/<str:token>/enviar", avaliacao_publica_enviar_view, name="avaliacao_publica_enviar"),
+    path("avaliacao/<str:token>/", avaliacao_publica_view, name="avaliacao_publica_legado"),
+    path("avaliacao/<str:token>/enviar", avaliacao_publica_enviar_view, name="avaliacao_publica_enviar_legado"),
     path("relatorio_avaliacao/geracao", relatorio_avaliacao_geracao_view, name="relatorio_avaliacao_geracao"),
     path("relatorio_avaliacao/", relatorio_avaliacao_view, name="relatorio_avaliacao"),
     path("relatorio_avaliacao/<int:avaliacao_id>/enviar", relatorio_avaliacao_enviar_view, name="relatorio_avaliacao_enviar"),

@@ -431,6 +431,9 @@ class AvaliacaoPedido(models.Model):
     email_enviado = models.BooleanField(default=False)
     email_enviado_em = models.DateTimeField(null=True, blank=True)
     email_tentativas = models.PositiveSmallIntegerField(default=0)
+    sms_enviado = models.BooleanField(default=False)
+    sms_enviado_em = models.DateTimeField(null=True, blank=True)
+    sms_tentativas = models.PositiveSmallIntegerField(default=0)
     respondido_em = models.DateTimeField(null=True, blank=True)
     p1_entrega_no_prazo = models.CharField(max_length=3, null=True, blank=True)
     p2_aviso_antes_chegada = models.CharField(max_length=3, null=True, blank=True)
@@ -450,6 +453,7 @@ class AvaliacaoPedido(models.Model):
         db_table = "avaliacao_pedido"
         indexes = [
             models.Index(fields=["email_enviado"]),
+            models.Index(fields=["sms_enviado"]),
             models.Index(fields=["link_ativo"]),
             models.Index(fields=["respondido_em"]),
             models.Index(fields=["selecionado_para_envio"]),
@@ -495,6 +499,7 @@ class TentativaEntrega(models.Model):
             ("view_relatorio_fechamento", "Pode acessar o Relatório de Fechamento (logística)"),
             ("view_relatorio_avaliacao", "Pode acessar o Relatório de Avaliações"),
             ("send_email_avaliacao", "Pode enviar e-mails de avaliação"),
+            ("send_sms_avaliacao", "Pode enviar SMS de avaliação"),
             ("generate_email_queue_avaliacao", "Pode gerar fila de e-mails de avaliação"),
             ("download_anexo_gmail_gerencial", "Pode descarregar anexos Gmail no Relatório Gerencial"),
         ]

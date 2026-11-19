@@ -179,12 +179,14 @@ page_size = max(1, min(int(data.get("page_size", 30)), 200))
 - `IMGBB_API_KEY` para upload de fotos em devolucoes.
 - `EMAIL_HOST_USER` e `EMAIL_HOST_PASSWORD` para autenticacao SMTP (Gmail). A mesma conta (app password) serve a pesquisa IMAP de anexos no Relatório Gerencial; opcionalmente `GMAIL_IMAP_USER` / `GMAIL_IMAP_PASSWORD` se a inbox for outra.
 
-### Avaliacoes e e-mails automaticos
-Fluxo funcional da pesquisa de satisfacao:
+### Avaliacoes (e-mail e/ou SMS) e e-mails automaticos
+Fluxo funcional da pesquisa de satisfacao (detalhe de dominio em `.cursorrules` — Avaliacao multi-canal):
 - a fila deve ser gerada manualmente no relatorio por data (`prev_entrega`);
+- elegiveis: pedidos concluidos com e-mail **ou** telefone (`fone_dest` / `fone_dest2`);
 - apenas pedidos selecionados entram em `AvaliacaoPedido` (1 por pedido);
-- o envio do e-mail usa apenas registros pre-gerados na fila;
-- o cliente responde via link publico (`/app/logistica/avaliacao/<token>/`);
+- envio manual por canal (e-mail e/ou SMS) no relatorio; template SMS em `FilialConfig.sms_padrao_avaliacao` (exige `{link_avaliacao}`);
+- o cliente responde via link publico curto (`/a/<token>/`); a rota legada `/app/logistica/avaliacao/<token>/` continua a funcionar;
+- o token e opaco curto (`secrets.token_urlsafe`); JWT legado e substituido no proximo `garantir_token_para_envio`;
 - apos resposta, o link e inativado (`link_ativo=False`) e nao permite novo envio.
 
 Comando automatico:

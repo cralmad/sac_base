@@ -29,6 +29,8 @@
           <th>Pedido</th>
           <th>Destinatário</th>
           <th>E-mail</th>
+          <th>Telefone</th>
+          <th>Canais</th>
           <th>Estado</th>
           <th>Na fila?</th>
         </tr>
@@ -42,6 +44,8 @@
           <td>{{ p.referencia }}</td>
           <td>{{ p.nome_dest }}</td>
           <td>{{ p.email_dest }}</td>
+          <td>{{ p.telefone }}</td>
+          <td>{{ p.canais }}</td>
           <td>{{ p.estado }}</td>
           <td>
             {% if p.ja_na_fila %}
@@ -52,7 +56,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="6" class="text-center text-muted">Nenhum pedido elegível para a data informada.</td></tr>
+        <tr><td colspan="8" class="text-center text-muted">Nenhum pedido elegível para a data informada.</td></tr>
         {% endfor %}
       </tbody>
     </table>

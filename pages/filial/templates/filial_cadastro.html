@@ -220,6 +220,21 @@
               </label>
               <textarea id="email_template_corpo" name="email_template_corpo" class="form-control" rows="4"></textarea>
             </div>
+            <div class="col-12">
+              <label class="form-label mb-0 d-flex align-items-center gap-1" for="sms_padrao_avaliacao">
+                <span>SMS Avaliação</span>
+                <span
+                  class="text-primary"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-title="Texto do SMS da pesquisa. Use {nome}, {pedido}, {filial} e obrigatoriamente {link_avaliacao}. Mantenha curto: o link conta caracteres/segmentos.">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <textarea id="sms_padrao_avaliacao" name="sms_padrao_avaliacao" class="form-control" rows="3"></textarea>
+            </div>
             <div class="col-12 col-md-4">
               <label class="form-label mb-0 d-flex align-items-center gap-1" for="email_auto">
                 <span>Horário E-mail Automático</span>

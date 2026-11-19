@@ -52,6 +52,7 @@ def build_filial_campos_iniciais():
         "sms_auto": "",
         "email_template_assunto": "",
         "email_template_corpo": "",
+        "sms_padrao_avaliacao": "",
         "email_auto": "",
         "email_nome_remetente": "",
         "gsheets_spreadsheet_id": "",
@@ -80,6 +81,7 @@ def serializar_form_filial(filial):
         sms_auto = config.sms_auto.strftime("%H:%M") if config.sms_auto else ""
         email_template_assunto = config.email_template_assunto or ""
         email_template_corpo = config.email_template_corpo or ""
+        sms_padrao_avaliacao = config.sms_padrao_avaliacao or ""
         email_auto = config.email_auto.strftime("%H:%M") if config.email_auto else ""
         email_nome_remetente = config.email_nome_remetente or ""
         gsheets_spreadsheet_id = config.gsheets_spreadsheet_id or ""
@@ -92,6 +94,7 @@ def serializar_form_filial(filial):
         sms_auto = ""
         email_template_assunto = ""
         email_template_corpo = ""
+        sms_padrao_avaliacao = ""
         email_auto = ""
         email_nome_remetente = ""
         gsheets_spreadsheet_id = ""
@@ -115,6 +118,7 @@ def serializar_form_filial(filial):
         "sms_auto": sms_auto,
         "email_template_assunto": email_template_assunto,
         "email_template_corpo": email_template_corpo,
+        "sms_padrao_avaliacao": sms_padrao_avaliacao,
         "email_auto": email_auto,
         "email_nome_remetente": email_nome_remetente,
         "gsheets_spreadsheet_id": gsheets_spreadsheet_id,
@@ -149,6 +153,7 @@ def cadastro_filial_view(request):
             "sms_auto": {"type": "string", "required": False, "value": ""},
             "email_template_assunto": {"type": "string", "maxlength": 200, "required": False, "value": ""},
             "email_template_corpo": {"type": "string", "required": False, "value": ""},
+            "sms_padrao_avaliacao": {"type": "string", "required": False, "value": ""},
             "email_auto": {"type": "string", "required": False, "value": ""},
             "email_nome_remetente": {"type": "string", "maxlength": 120, "required": False, "value": ""},
             "gsheets_spreadsheet_id": {"type": "string", "maxlength": 200, "required": False, "value": ""},
@@ -326,6 +331,7 @@ def cadastro_filial_view(request):
         sms_auto = None
     email_template_assunto = (campos.get("email_template_assunto") or "").strip() or None
     email_template_corpo = (campos.get("email_template_corpo") or "").strip() or None
+    sms_padrao_avaliacao = (campos.get("sms_padrao_avaliacao") or "").strip() or None
     _email_auto_raw = (campos.get("email_auto") or "").strip()
     if _email_auto_raw:
         try:
@@ -349,6 +355,7 @@ def cadastro_filial_view(request):
             "sms_auto": sms_auto,
             "email_template_assunto": email_template_assunto,
             "email_template_corpo": email_template_corpo,
+            "sms_padrao_avaliacao": sms_padrao_avaliacao,
             "email_auto": email_auto,
             "email_nome_remetente": email_nome_remetente,
             "gsheets_spreadsheet_id": gsheets_spreadsheet_id,

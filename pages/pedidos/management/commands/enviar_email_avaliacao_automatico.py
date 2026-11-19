@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand
 
 from pages.filial.models import FilialConfig
 from pages.pedidos.models import AvaliacaoPedido, ESTADOS_ENTREGA_EFETIVAMENTE_CONCLUIDA
-from pages.pedidos.views_avaliacao import enviar_email_pedido_avaliacao
+from pages.pedidos.services.avaliacao_envio import enviar_email_pedido_avaliacao
 
 LISBON_TZ = ZoneInfo("Europe/Lisbon")
 

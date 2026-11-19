@@ -111,6 +111,11 @@ class FilialConfig(models.Model):
     )
     email_template_assunto = models.CharField(max_length=200, null=True, blank=True)
     email_template_corpo = models.TextField(null=True, blank=True)
+    sms_padrao_avaliacao = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Template SMS da pesquisa de satisfação. Use {nome}, {pedido}, {filial} e {link_avaliacao}.",
+    )
     email_auto = models.TimeField(
         null=True,
         blank=True,

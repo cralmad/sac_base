@@ -24,14 +24,32 @@
         <option value="" {% if not filtros.status %}selected{% endif %}>Todos</option>
         <option value="respondido" {% if filtros.status == "respondido" %}selected{% endif %}>Respondido</option>
         <option value="pendente" {% if filtros.status == "pendente" %}selected{% endif %}>Pendente resposta</option>
-        <option value="enviado" {% if filtros.status == "enviado" %}selected{% endif %}>E-mail enviado</option>
-        <option value="nao_enviado" {% if filtros.status == "nao_enviado" %}selected{% endif %}>E-mail não enviado</option>
+        <option value="email_enviado" {% if filtros.status == "email_enviado" or filtros.status == "enviado" %}selected{% endif %}>E-mail enviado</option>
+        <option value="email_nao_enviado" {% if filtros.status == "email_nao_enviado" or filtros.status == "nao_enviado" %}selected{% endif %}>E-mail não enviado</option>
+        <option value="sms_enviado" {% if filtros.status == "sms_enviado" %}selected{% endif %}>SMS enviado</option>
+        <option value="sms_nao_enviado" {% if filtros.status == "sms_nao_enviado" %}selected{% endif %}>SMS não enviado</option>
       </select>
     </div>
     <div class="col-12 col-md-2">
       <button type="submit" class="btn btn-primary w-100 show-loader">Filtrar</button>
     </div>
     {% if pode_enviar %}
+    <div class="col-12 col-md-4">
+      <div class="d-flex flex-wrap gap-3 align-items-center">
+        {% if pode_enviar_email %}
+        <div class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" id="chk-canal-email" checked>
+          <label class="form-check-label" for="chk-canal-email">E-mail</label>
+        </div>
+        {% endif %}
+        {% if pode_enviar_sms %}
+        <div class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" id="chk-canal-sms" checked>
+          <label class="form-check-label" for="chk-canal-sms">SMS</label>
+        </div>
+        {% endif %}
+      </div>
+    </div>
     <div class="col-12 col-md-3">
       <button type="button" id="btn-enviar-selecionados" class="btn btn-success w-100" disabled>
         Enviar selecionados
@@ -59,7 +77,9 @@
           <th>Pedido</th>
           <th>Cliente</th>
           <th>E-mail</th>
-          <th>Enviado em</th>
+          <th>Telefone</th>
+          <th>E-mail env.</th>
+          <th>SMS env.</th>
           <th>Respondido em</th>
           <th>Status Link</th>
           <th class="text-center">Ação</th>
@@ -68,7 +88,7 @@
       <tbody>
         {% if not periodo_informado %}
         <tr>
-          <td colspan="{% if pode_enviar %}8{% else %}7{% endif %}" class="text-center text-muted">
+          <td colspan="{% if pode_enviar %}10{% else %}9{% endif %}" class="text-center text-muted">
             Informe o período completo (data inicial e data final) para consultar.
           </td>
         </tr>
@@ -77,32 +97,64 @@
         <tr>
           {% if pode_enviar %}
           <td class="text-center">
-            {% if not item.respondido_em and item.pedido.email_dest %}
-            <input type="checkbox" class="form-check-input chk-avaliacao" value="{{ item.id }}">
+            {% if not item.respondido_em %}
+              {% if item.tem_email or item.tem_telefone %}
+              <input type="checkbox" class="form-check-input chk-avaliacao" value="{{ item.id }}">
+              {% endif %}
             {% endif %}
           </td>
           {% endif %}
           <td>{{ item.pedido.pedido|default:item.pedido.id_vonzu }}</td>
           <td>{{ item.pedido.nome_dest }}</td>
           <td>{{ item.pedido.email_dest }}</td>
-          <td>{% if item.email_enviado_em %}{{ item.email_enviado_em|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
+          <td>{{ item.telefone_display }}</td>
+          <td>
+            {% if item.email_enviado %}
+            <span class="badge bg-success">{% if item.email_enviado_em %}{{ item.email_enviado_em|date:"d/m/Y H:i" }}{% else %}Sim{% endif %}</span>
+            {% else %}
+            <span class="badge bg-secondary">Não</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if item.sms_enviado %}
+            <span class="badge bg-success">{% if item.sms_enviado_em %}{{ item.sms_enviado_em|date:"d/m/Y H:i" }}{% else %}Sim{% endif %}</span>
+            {% else %}
+            <span class="badge bg-secondary">Não</span>
+            {% endif %}
+          </td>
           <td>{% if item.respondido_em %}{{ item.respondido_em|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
           <td>{% if item.link_ativo %}<span class="badge bg-success">Ativo</span>{% else %}<span class="badge bg-secondary">Inativo</span>{% endif %}</td>
           <td class="text-center">
             {% if not item.respondido_em %}
-            <button
-              class="btn btn-sm btn-outline-primary btn-reenviar"
-              type="button"
-              data-url="/app/logistica/relatorio_avaliacao/{{ item.id }}/enviar"
-              data-referencia="{{ item.pedido.pedido|default:item.pedido.id_vonzu }}"
-            >
-              Reenviar
-            </button>
+            <div class="d-flex flex-wrap gap-1 justify-content-center">
+              {% if pode_enviar_email and item.tem_email %}
+              <button
+                class="btn btn-sm btn-outline-primary btn-enviar-canal"
+                type="button"
+                data-url="/app/logistica/relatorio_avaliacao/{{ item.id }}/enviar"
+                data-canal="email"
+                data-referencia="{{ item.pedido.pedido|default:item.pedido.id_vonzu }}"
+              >
+                E-mail
+              </button>
+              {% endif %}
+              {% if pode_enviar_sms and item.tem_telefone %}
+              <button
+                class="btn btn-sm btn-outline-success btn-enviar-canal"
+                type="button"
+                data-url="/app/logistica/relatorio_avaliacao/{{ item.id }}/enviar"
+                data-canal="sms"
+                data-referencia="{{ item.pedido.pedido|default:item.pedido.id_vonzu }}"
+              >
+                SMS
+              </button>
+              {% endif %}
+            </div>
             {% endif %}
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="{% if pode_enviar %}8{% else %}7{% endif %}" class="text-center text-muted">Nenhuma avaliação encontrada.</td></tr>
+        <tr><td colspan="{% if pode_enviar %}10{% else %}9{% endif %}" class="text-center text-muted">Nenhuma avaliação encontrada.</td></tr>
         {% endfor %}
         {% endif %}
       </tbody>

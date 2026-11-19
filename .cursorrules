@@ -151,6 +151,14 @@ Uma **única execução** do comando: várias **rondas** releem pendentes com te
 
 ---
 
+## Avaliação multi-canal (e-mail e/ou SMS)
+
+- Link público curto: `/a/<token>/` (`pages/pedidos/services/avaliacao_link.py`); legado `/app/logistica/avaliacao/<token>/`.
+- Template SMS: `FilialConfig.sms_padrao_avaliacao` com `{nome}`, `{pedido}`, `{filial}`, **obrigatório** `{link_avaliacao}` (não misturar com `sms_padrao_1/2` de entrega).
+- Fila: pedidos concluídos com `email_dest` **ou** `fone_dest`/`fone_dest2` (`qs_pedidos_elegiveis_fila` em `avaliacao_envio.py`).
+- Envio: `pages/pedidos/services/avaliacao_envio.py` — canais explícitos; flags `email_enviado*` e `sms_enviado*` em `AvaliacaoPedido`.
+- Permissões: `send_email_avaliacao` e `send_sms_avaliacao` (união nos endpoints de envio). BulkGate via `enviar_sms_bulkgate_resiliente`. SMS automático de avaliação **não** existe (só e-mail via `enviar_email_avaliacao_automatico`).
+
 ## Relatório de respostas à avaliação (logística)
 
 | Peça | Ficheiro |
