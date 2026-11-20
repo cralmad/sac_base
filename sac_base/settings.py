@@ -301,5 +301,5 @@ GMAIL_IMAP_PASSWORD = os.environ.get("GMAIL_IMAP_PASSWORD", "")
 APP_BASE_URL = _email_cfg("APP_BASE_URL", "http://127.0.0.1:8000")
 # Domínio próprio para links públicos (SMS/e-mail de avaliação). Evita URLs *.herokuapp.com
 # que as operadoras tendem a classificar como spam.
-PUBLIC_BASE_URL = (_email_cfg("PUBLIC_BASE_URL") or "https://3dboxportugal.pt").rstrip("/")
+PUBLIC_BASE_URL = (_email_cfg("PUBLIC_BASE_URL") or "https://www.3dboxportugal.pt").rstrip("/")
 AVALIACAO_TOKEN_SECRET = _email_cfg("AVALIACAO_TOKEN_SECRET", SECRET_KEY)

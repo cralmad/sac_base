@@ -199,7 +199,7 @@ Comando automatico:
 Usar um unico payload no padrao dicionario:
 
 ```bash
-EMAIL_AUTO='{"EMAIL_HOST":"smtp.gmail.com","EMAIL_PORT":"587","EMAIL_USE_TLS":"true","EMAIL_HOST_USER":"conta@gmail.com","EMAIL_HOST_PASSWORD":"app_password","DEFAULT_FROM_EMAIL":"conta@gmail.com","APP_BASE_URL":"https://3dboxportugal.pt","PUBLIC_BASE_URL":"https://3dboxportugal.pt"}'
+EMAIL_AUTO='{"EMAIL_HOST":"smtp.gmail.com","EMAIL_PORT":"587","EMAIL_USE_TLS":"true","EMAIL_HOST_USER":"conta@gmail.com","EMAIL_HOST_PASSWORD":"app_password","DEFAULT_FROM_EMAIL":"conta@gmail.com","APP_BASE_URL":"https://www.3dboxportugal.pt","PUBLIC_BASE_URL":"https://www.3dboxportugal.pt"}'
 ```
 
 ### Scheduler de SMS automatico
@@ -249,7 +249,7 @@ heroku config:set BANCO_DE_DADOS="postgres://..." \
   DJANGO_CSRF_TRUSTED_ORIGINS="https://meuapp.herokuapp.com" \
   DJANGO_USE_X_FORWARDED_PROTO=true \
   DJANGO_SECURE_SSL_REDIRECT=true \
-  EMAIL_AUTO='{"EMAIL_HOST":"smtp.gmail.com","EMAIL_PORT":"587","EMAIL_USE_TLS":"true","EMAIL_HOST_USER":"conta@gmail.com","EMAIL_HOST_PASSWORD":"app_password","DEFAULT_FROM_EMAIL":"conta@gmail.com","APP_BASE_URL":"https://3dboxportugal.pt","PUBLIC_BASE_URL":"https://3dboxportugal.pt"}' \
+  EMAIL_AUTO='{"EMAIL_HOST":"smtp.gmail.com","EMAIL_PORT":"587","EMAIL_USE_TLS":"true","EMAIL_HOST_USER":"conta@gmail.com","EMAIL_HOST_PASSWORD":"app_password","DEFAULT_FROM_EMAIL":"conta@gmail.com","APP_BASE_URL":"https://www.3dboxportugal.pt","PUBLIC_BASE_URL":"https://www.3dboxportugal.pt"}' \
   BULKGATE_APP_ID="12345" \
   BULKGATE_APP_TOKEN="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
   IMGBB_API_KEY="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
