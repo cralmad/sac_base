@@ -89,6 +89,65 @@ def erro_sms_transiente_para_retry(mensagem_erro: str) -> bool:
     return any(k in m for k in _TRANSIENT_ERR_MARKERS)
 
 
+# DDI internacionais conhecidos (mais longos primeiro) para não prefixar o DDI
+# da filial quando o número já vem com outro país (ex.: ES 34 num filial PT 351).
+_DDI_INTERNACIONAIS_CONHECIDOS = tuple(
+    sorted(
+        {
+            "351",
+            "350",
+            "352",
+            "353",
+            "354",
+            "355",
+            "356",
+            "357",
+            "358",
+            "359",
+            "420",
+            "421",
+            "55",
+            "34",
+            "33",
+            "39",
+            "49",
+            "44",
+            "31",
+            "32",
+            "41",
+            "43",
+            "48",
+            "45",
+            "46",
+            "47",
+            "36",
+            "30",
+            "40",
+            "212",
+            "213",
+            "216",
+            "218",
+            "244",
+            "258",
+            "351",
+        },
+        key=len,
+        reverse=True,
+    )
+)
+_MIN_DIGITOS_NACIONAIS_APOS_DDI = 8
+
+
+def _ja_tem_ddi_internacional(digitos: str) -> bool:
+    """True se ``digitos`` já começa com um DDI conhecido + número nacional plausível."""
+    if not digitos:
+        return False
+    for codigo in _DDI_INTERNACIONAIS_CONHECIDOS:
+        if digitos.startswith(codigo) and len(digitos) - len(codigo) >= _MIN_DIGITOS_NACIONAIS_APOS_DDI:
+            return True
+    return False
+
+
 def normalizar_numero(numero: str, ddi_padrao: str = _DDI_FALLBACK) -> str | None:
     """
     Normaliza um número de telefone para o formato internacional exigido pela
@@ -99,7 +158,8 @@ def normalizar_numero(numero: str, ddi_padrao: str = _DDI_FALLBACK) -> str | Non
       2. Se começa com '+' → remove o '+', mantém o restante (DDI já incluso).
       3. Se começa com '00' → remove o '00', mantém o restante (DDI já incluso).
       4. Se o número já começa com o DDI padrão (sem '+') → mantém como está.
-      5. Caso contrário → prefixa com o DDI padrão (número local sem DDI).
+      5. Se já começa com outro DDI internacional conhecido → mantém (não prefixa o da filial).
+      6. Caso contrário → prefixa com o DDI padrão (número local sem DDI).
 
     O ddi_padrao deve ser somente os dígitos do DDI, sem '+' (ex.: "351", "55").
 
@@ -123,6 +183,9 @@ def normalizar_numero(numero: str, ddi_padrao: str = _DDI_FALLBACK) -> str | Non
     elif ddi and limpo.startswith(ddi):
         # Ex.: 351912345678 (já tem DDI) → mantém
         normalizado = limpo
+    elif _ja_tem_ddi_internacional(re.sub(r"\D", "", limpo)):
+        # Ex.: 34687394537 (ES) com filial PT → mantém 34…, não vira 35134…
+        normalizado = re.sub(r"\D", "", limpo)
     else:
         # Ex.: 912345678 → 351912345678
         normalizado = ddi + limpo
@@ -175,12 +238,20 @@ def montar_mensagem(
     return resultado
 
 
+def mensagem_requer_unicode(mensagem: str) -> bool:
+    """True se o texto tiver caracteres fora do alfabeto GSM-7 básico (ex.: acentos PT)."""
+    if not mensagem:
+        return False
+    return any(ord(c) > 127 for c in mensagem)
+
+
 def enviar_sms_bulkgate(numero: str, mensagem: str, ddi_padrao: str = _DDI_FALLBACK) -> dict:
     """
     Envia um SMS via BulkGate Simple Transactional API.
 
     O número é normalizado automaticamente antes do envio (veja normalizar_numero).
     ddi_padrao deve ser os dígitos do DDI sem '+' (ex.: "351" para Portugal).
+    Se a mensagem tiver acentos/não-ASCII, envia ``unicode: true`` (exigência BulkGate).
 
     Retorna dict com:
       {"sucesso": True,  "sms_id": "..."}   — em caso de sucesso
@@ -206,6 +277,8 @@ def enviar_sms_bulkgate(numero: str, mensagem: str, ddi_padrao: str = _DDI_FALLB
         "number": numero_norm,
         "text": mensagem,
     }
+    if mensagem_requer_unicode(mensagem):
+        payload["unicode"] = True
     try:
         resp = requests.post(BULKGATE_URL, json=payload, timeout=15)
         try:
@@ -214,9 +287,14 @@ def enviar_sms_bulkgate(numero: str, mensagem: str, ddi_padrao: str = _DDI_FALLB
             # resp.json() pode lançar ValueError/JSONDecodeError (não é RequestException)
             logger.error("BulkGate: resposta não-JSON para %s (status %s)", numero_norm, resp.status_code)
             return {"sucesso": False, "erro": f"Resposta inválida da BulkGate (não-JSON): {json_exc}"}
-        if resp.status_code == 200 and "data" in data:
-            return {"sucesso": True, "sms_id": data["data"].get("sms_id")}
-        erro = data.get("error", "Erro desconhecido.")
+        data_body = data.get("data") if isinstance(data, dict) else None
+        if (
+            resp.status_code == 200
+            and isinstance(data_body, dict)
+            and data_body.get("status") == "accepted"
+        ):
+            return {"sucesso": True, "sms_id": data_body.get("sms_id")}
+        erro = data.get("error", "Erro desconhecido.") if isinstance(data, dict) else "Erro desconhecido."
         logger.error("BulkGate erro para %s: %s", numero_norm, data)
         return {"sucesso": False, "erro": erro}
     except requests.RequestException as exc:

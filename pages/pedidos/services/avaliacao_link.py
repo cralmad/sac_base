@@ -53,7 +53,12 @@ def resolver_avaliacao_por_token(token: str) -> AvaliacaoPedido:
 
 
 def montar_link_publico(request, token: str) -> str:
-    base = (settings.APP_BASE_URL or "").rstrip("/")
+    """Monta URL absoluta curta ``/a/<token>/`` no domínio público (não Heroku)."""
+    base = (
+        getattr(settings, "PUBLIC_BASE_URL", None)
+        or getattr(settings, "APP_BASE_URL", None)
+        or ""
+    ).rstrip("/")
     path = f"/a/{token}/"
     if base:
         return f"{base}{path}"

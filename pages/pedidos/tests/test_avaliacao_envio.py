@@ -101,7 +101,10 @@ class AvaliacaoEnvioTests(TestCase):
         self.assertIsNone(msg2)
         self.assertIn("não configurado", err2 or "")
 
-    @override_settings(APP_BASE_URL="https://app.exemplo.pt")
+    @override_settings(
+        PUBLIC_BASE_URL="https://app.exemplo.pt",
+        APP_BASE_URL="https://app.exemplo.pt",
+    )
     @patch("pages.pedidos.services.avaliacao_envio.enviar_sms_bulkgate_resiliente")
     def test_envio_sms_marca_flag_e_usa_link_curto(self, mock_sms):
         mock_sms.return_value = {"sucesso": True, "sms_id": "1"}
@@ -117,7 +120,10 @@ class AvaliacaoEnvioTests(TestCase):
         self.assertIn("/a/", mensagem)
         self.assertIn(av.token_publico, mensagem)
 
-    @override_settings(APP_BASE_URL="https://app.exemplo.pt")
+    @override_settings(
+        PUBLIC_BASE_URL="https://app.exemplo.pt",
+        APP_BASE_URL="https://app.exemplo.pt",
+    )
     @patch("pages.pedidos.services.avaliacao_envio.enviar_email_avaliacao")
     @patch("pages.pedidos.services.avaliacao_envio.enviar_sms_bulkgate_resiliente")
     def test_lote_ambos_sms_ignorado_sem_telefone(self, mock_sms, mock_email):
@@ -131,7 +137,10 @@ class AvaliacaoEnvioTests(TestCase):
         self.assertEqual(canais["sms"], "ignorado")
         mock_sms.assert_not_called()
 
-    @override_settings(APP_BASE_URL="https://app.exemplo.pt")
+    @override_settings(
+        PUBLIC_BASE_URL="https://app.exemplo.pt",
+        APP_BASE_URL="https://app.exemplo.pt",
+    )
     @patch("pages.pedidos.services.avaliacao_envio.enviar_email_avaliacao")
     def test_template_sms_vazio_falha_email_ok(self, mock_email):
         mock_email.return_value = {"sucesso": True}
@@ -217,7 +226,10 @@ class AvaliacaoEnvioTests(TestCase):
         resp_bad = relatorio_avaliacao_enviar_lote_view(req_lote_bad)
         self.assertEqual(resp_bad.status_code, 400)
 
-    @override_settings(APP_BASE_URL="https://app.exemplo.pt")
+    @override_settings(
+        PUBLIC_BASE_URL="https://app.exemplo.pt",
+        APP_BASE_URL="https://app.exemplo.pt",
+    )
     @patch("pages.pedidos.services.avaliacao_envio.enviar_sms_bulkgate_resiliente")
     def test_sem_contacto_sms_ignorado(self, mock_sms):
         pedido = self._pedido(760, email_dest="a@b.com", fone_dest="", fone_dest2="")

@@ -68,7 +68,10 @@ class AvaliacaoLinkServiceTests(TestCase):
         found = resolver_avaliacao_por_token("abcTOKEN12xy")
         self.assertEqual(found.id, av.id)
 
-    @override_settings(APP_BASE_URL="https://app.exemplo.pt")
+    @override_settings(
+        PUBLIC_BASE_URL="https://app.exemplo.pt",
+        APP_BASE_URL="https://app.exemplo.pt",
+    )
     def test_upgrade_jwt_e_montar_link_curto(self):
         pedido = self._pedido(502)
         av = AvaliacaoPedido.objects.create(pedido=pedido, token_publico=JWT_FAKE)
