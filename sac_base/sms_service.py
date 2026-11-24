@@ -238,20 +238,17 @@ def montar_mensagem(
     return resultado
 
 
-def mensagem_requer_unicode(mensagem: str) -> bool:
-    """True se o texto tiver caracteres fora do alfabeto GSM-7 básico (ex.: acentos PT)."""
-    if not mensagem:
-        return False
-    return any(ord(c) > 127 for c in mensagem)
-
-
 def enviar_sms_bulkgate(numero: str, mensagem: str, ddi_padrao: str = _DDI_FALLBACK) -> dict:
     """
     Envia um SMS via BulkGate Simple Transactional API.
 
     O número é normalizado automaticamente antes do envio (veja normalizar_numero).
     ddi_padrao deve ser os dígitos do DDI sem '+' (ex.: "351" para Portugal).
-    Se a mensagem tiver acentos/não-ASCII, envia ``unicode: true`` (exigência BulkGate).
+
+    Não envia ``unicode: true``: mantém encoding GSM-7 (até 160 chars/parte). Acentos
+    fora do GSM são substituídos pela BulkGate; links de avaliação
+    (``https://…/a/<token>/`` com ``token_urlsafe``) usam só ASCII/GSM e não
+    dependem de Unicode.
 
     Retorna dict com:
       {"sucesso": True,  "sms_id": "..."}   — em caso de sucesso
@@ -277,8 +274,6 @@ def enviar_sms_bulkgate(numero: str, mensagem: str, ddi_padrao: str = _DDI_FALLB
         "number": numero_norm,
         "text": mensagem,
     }
-    if mensagem_requer_unicode(mensagem):
-        payload["unicode"] = True
     try:
         resp = requests.post(BULKGATE_URL, json=payload, timeout=15)
         try:
